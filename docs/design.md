@@ -275,12 +275,14 @@ Where the planning happens.
   an ingredient or changing an amount shows at once how the meal moves the day. No per-meal
   target and no suggestions: I judge the meal's size myself.
 - **Built so:** vertical bars side by side, each in its nutrient's colour, labelled with its
-  numbers (`1200 + 690` over `/ 2000`). The bar's scale is the goal, or the total when it goes
-  over; the goal line then sits below the top, and the numbers turn red. A total with unknown
-  values shows `≥`. A nutrient **without a goal** has a bar too, with a dashed outline and no
-  goal line: it fills to the day's own total, so it shows only the amount (`46`, `g · no goal`)
-  and, in the composer, this meal's share of it. Under the bars, the macro split
-  (`P 30% · F 30% · C 40% of energy`, from 4/9/4 kcal per gram).
+  numbers (`1200 + 690` over `/ 2000`). A total with unknown values shows `≥`.
+- **Bars of the same unit share one scale** (agreed), so equal amounts are equally high: 10 g
+  of protein is as high as 10 g of fat. The full height of the gram bars is the largest goal
+  or total among protein, fat and carbs; kcal has its own scale, set apart by a thin divider.
+  Going over a goal: the bar passes its goal line, and the numbers turn red.
+- A nutrient **without a goal** has a bar too, with a dashed outline and no goal line
+  (`46`, `g · no goal`). Under the bars, the macro split (`P 30% · F 30% · C 40% of energy`,
+  from 4/9/4 kcal per gram).
 - The chart stays at the top of the composer while the ingredients scroll, with a line of
   the meal's own totals (`This meal: 690 kcal · 48 g protein · …`).
 - **Save** logs the meal. Cancel discards it.

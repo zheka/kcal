@@ -684,6 +684,12 @@ legend select.input {
   background: var(--fg);
 }
 
+.bar-column.new-scale {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
 .bar-column.no-goal .bar-track {
   background: none;
   outline: 1px dashed var(--line);

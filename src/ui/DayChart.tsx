@@ -22,18 +22,29 @@ const LABEL: Record<Nutrient, string> = {
 
 /**
  * The day, one bar per nutrient, filled from the bottom with what was taken (faded), then the
- * meal being composed (bright). With a goal, the rest up to the goal line is what remains.
- * Without a goal the bar is the day's own total: it shows only how the total splits between
- * taken and this meal. The macro split is listed below.
+ * meal being composed (bright); with a goal, the rest up to the goal line is what remains.
+ * Bars of the same unit share one scale, so equal amounts are equally high: 10 g of protein
+ * and 10 g of fat. The macro split is listed below.
  */
 export function DayChart({ goals, taken, meal }: Props) {
-  const split = macroSplit(meal ? addNutrition(taken, meal) : taken);
+  const total = meal ? addNutrition(taken, meal) : taken;
+  const split = macroSplit(total);
+  const scales = chartScales(goals, total);
 
   return (
     <section class="chart" aria-label="Day chart">
       <div class="bars">
-        {NUTRIENTS.map((n) => (
-          <Bar key={n} nutrient={n} goal={goals?.[n]} taken={taken[n]} meal={meal?.[n]} />
+        {NUTRIENTS.map((n, i) => (
+          <Bar
+            key={n}
+            nutrient={n}
+            goal={goals?.[n]}
+            taken={taken[n]}
+            meal={meal?.[n]}
+            scale={scales.get(NUTRIENT_UNIT[n]) ?? 0}
+            // A gap where the unit, and so the scale, changes.
+            newScale={i > 0 && NUTRIENT_UNIT[n] !== NUTRIENT_UNIT[NUTRIENTS[i - 1]!]}
+          />
         ))}
       </div>
       {split && (
@@ -46,21 +57,38 @@ export function DayChart({ goals, taken, meal }: Props) {
   );
 }
 
+/**
+ * The full height of the bars of each unit: the largest goal or total among the nutrients
+ * measured in it.
+ */
+export function chartScales(goals: NutrientValues | null, total: Nutrition): Map<string, number> {
+  const scales = new Map<string, number>();
+  for (const n of NUTRIENTS) {
+    const unit = NUTRIENT_UNIT[n];
+    const highest = Math.max(goals?.[n] ?? 0, total[n].value);
+    scales.set(unit, Math.max(scales.get(unit) ?? 0, highest));
+  }
+  return scales;
+}
+
 function Bar({
   nutrient,
   goal,
   taken,
   meal,
+  scale,
+  newScale,
 }: {
   nutrient: Nutrient;
   goal: number | undefined;
   taken: NutrientAmount;
   meal: NutrientAmount | undefined;
+  /** The amount at the full height of the bar. */
+  scale: number;
+  newScale: boolean;
 }) {
   const mealValue = meal?.value ?? 0;
   const sum = taken.value + mealValue;
-  // The bar's scale: the goal, or the total when it goes over; without a goal, the total.
-  const scale = Math.max(goal ?? 0, sum);
   const pct = (v: number) => (scale > 0 ? `${(100 * v) / scale}%` : '0%');
   const missing = taken.missing + (meal?.missing ?? 0);
   const unit = nutrient === 'kcal' ? '' : ` ${NUTRIENT_UNIT[nutrient]}`;
@@ -78,6 +106,7 @@ function Bar({
     'bar-column',
     `nutrient-${nutrient}`,
     goal === undefined ? 'no-goal' : '',
+    newScale ? 'new-scale' : '',
     goal !== undefined && sum > goal ? 'over' : '',
   ];
 
