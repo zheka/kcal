@@ -21,18 +21,18 @@ after the UX.
   grams, millilitres, pieces, cups, spoons, servings.
 - **Offline-first, serverless.** A PWA hosted as static files; all data on the device.
 - **Data stays easy to inspect, back up, and fix with scripts.** One versioned JSON document,
-  strict import, as in Clog.
-- **Same stack and conventions as Clog** (`../clog`).
+  strict import.
 
 ## Concepts
 
 | Concept      | Meaning                                                                             |
 | ------------ | ----------------------------------------------------------------------------------- |
-| **Nutrient** | a tracked quantity: `kcal`, `protein`, `fat`, `carbs`, `water`                      |
+| **Nutrient** | a quantity in food: `kcal`, `protein`, `fat`, `carbs`                               |
 | **Product**  | something with nutrients per 100 g, from its label                                  |
 | **Recipe**   | products (and recipes) with amounts; usable everywhere a product is                 |
 | **Unit**     | a way to measure a food, defined in grams: `piece`, `ml`, `cup`, `serving`…         |
-| **Meal**     | a logged entry: foods taken together, at a date and time; a drink entry is one too  |
+| **Meal**     | a logged entry: foods taken together, at a date and time                            |
+| **Water**    | plain water I drink, logged separately from meals, in ml                            |
 | **Goals**    | daily targets per nutrient                                                          |
 | **Weight**   | my body weight, at most one value per day                                           |
 
@@ -40,12 +40,10 @@ after the UX.
 
 ### Nutrients
 
-- `kcal`, `protein`, `fat`, `carbs` (g), `water` (shown in ml, 1 g = 1 ml). The list is **built into the code**
+- `kcal`, `protein`, `fat`, `carbs` (g). The list is **built into the code**
   (`src/config.ts`), so adding `fiber` or `sugar` later is a config change plus an optional
   field.
-- **Water** counts only the drinks I log, not the water in foods. A **drink** is a product
-  with a water value (water: 1 g per g; coffee with milk: some kcal, mostly water); a drink
-  with calories counts towards both. See Drinks.
+- Water is **not a nutrient**: it is tracked on its own (see Water).
 - `kcal` comes **from the label**, not from the macros (labels round and use other factors).
 
 ### Products
@@ -141,7 +139,7 @@ and time. It has no name; a standalone snack or a single product is a meal too.
 Agreed:
 
 - **One daily target per nutrient**, and only for the nutrients I care about (likely `kcal`,
-  `protein`, `water`). Nutrients without a goal are counted and shown, just not compared with
+  `protein`, and water). Nutrients without a goal are counted and shown, just not compared with
   anything.
 - **Goals change over time, simply by editing them** (agreed). There is one "my goals" form;
   saving it makes the new goals **effective from today** (the day of the edit), and the old
@@ -190,19 +188,18 @@ Agreed:
 "weights": [{ "date": "2026-11-17", "kg": 78.4 }]
 ```
 
-### Drinks
+### Water
 
 Agreed:
 
-- Water is counted **orthogonally** to the macros, so drinks are usually logged **on their
-  own**: the day screen has two buttons, **＋ Eat** and **＋ Drink**.
-- **＋ Drink** opens the composer for a drink entry _(proposal: the same composer, with drink
-  chips (products with a water value) first, so a glass of water is: ＋ Drink → `water` →
-  save; amount and unit prefilled from the last time)_.
-- A drink can also be added to a meal as an ingredient (coffee with breakfast).
-- **Drinks are in the day list**, as rows of their own, among the meals by time _(proposal:
-  marked with a drink icon, showing the amount, e.g. `15:10 · 💧 250 ml`)_.
-- Water is a bar in the day chart like the others; each nutrient's bar has its own colour.
+- **Drinks are products.** Coffee, tea, milk, juice are products like any other, logged in
+  meals, counting towards kcal and macros.
+- **Water is tracked separately**: plain water I drink, in ml, with its own daily goal and its
+  own bar in the day chart. It does not come from products: neither foods nor other drinks
+  add to it. _(Assumption to confirm: coffee and tea do not count as water.)_
+- Logged on its own, with a **＋ Water** button on the day screen, next to **＋ Eat**.
+- **Not in the first prototype.** Details (one-tap amounts such as a glass, how water entries
+  show in the day list) are decided when it is built.
 
 ### Editing foods: everything is live
 
@@ -231,7 +228,7 @@ Agreed:
 ### Day (the main screen)
 
 **The whole day fits on one phone screen** (agreed): the day chart plus 5–6 meals (snacks
-and drinks included), without scrolling.
+included) and water, without scrolling.
 
 - The **same chart as in the meal composer**, without a meal being edited: taken vs the
   daily goal for each nutrient that has one.
@@ -241,22 +238,22 @@ and drinks included), without scrolling.
 - A small **edit icon** on the right of a meal row opens it in the meal composer (edit mode),
   which also offers **Eat again** and **Delete** (two-tap). _(What tapping the row itself does,
   if anything, is open.)_
-- **＋ Eat** and **＋ Drink** buttons: open the composer for the day on screen (see the meal
-  time defaults and Drinks).
+- **＋ Eat** opens the composer for the day on screen (see the meal time defaults); **＋ Water**
+  logs water (see Water).
 - A small **weight button** near the date, showing the last weight; tapping it logs the
   day's weight (see Weight).
 - **Other days**: small ‹ › arrows next to the date. No swiping: going back is rare. A date
   picker may be added to the menu.
-- _(proposal)_ Library, goals and backup are reached from a menu, as in Clog.
+- _(proposal)_ Library, goals and backup are reached from a menu.
 
 ### Meal composer
 
 Where the planning happens.
 
 - A list of ingredients, each with an amount and a unit, and its nutrients.
-- **Finding a food** (agreed): a text field with a row of chips, as in Clog; typing filters
-  the chips. Products and recipes are in the same list. _(proposal: chips ordered by recency,
-  as in Clog.)_
+- **Finding a food** (agreed): a text field with a row of chips (one line, scrolling
+  sideways); typing filters the chips, ignoring case. Products and recipes are in the same
+  list. _(proposal: chips ordered by recency, most recently used first.)_
 - **Added inline** (agreed): tapping a food adds it to the ingredient list at once, with its
   last-used unit and amount prefilled. Amounts are adjusted right there in the list while the
   chart updates, so a whole meal can be added first and tuned after.
@@ -301,13 +298,13 @@ screen stays about today.)_
 ### Goals and menu
 
 - Goals: one form with a target per nutrient (empty = no goal); see Goals.
-- Menu: backup export/import, app version (as in Clog).
+- Menu: backup export/import, app version and update.
 
 ## Technical design
 
 ### Stack
 
-Clog's stack, plus **Preact** for the UI (see UI rendering):
+A static PWA with no server (see UI rendering for the choice of Preact):
 
 - **TypeScript + Vite**; one-way data flow (UI event → store action → new state → saved →
   views update).
@@ -326,7 +323,7 @@ Clog's stack, plus **Preact** for the UI (see UI rendering):
 The data holds **only what was entered**; every number shown is derived (see Derived data).
 
 - **Records refer to each other by id, never by name.** Names are for display, so renaming
-  never touches meals or recipes. Products, recipes and meals get random UUIDs, as in Clog.
+  never touches meals or recipes. Products, recipes and meals get random UUIDs.
 - **Units live inside their food**, with an id unique within that food. An ingredient refers
   to a unit through its food, or to a built-in unit (`g`, `kg`) by its code name.
 - **Nutrients are stored per 100 g** _(proposal)_: label-like and readable; values entered per
@@ -407,8 +404,7 @@ day     → nutrients         Σ meals of that date
 
 ### Integrity
 
-Checked on every load and import, as strictly as in Clog (the problem screen when saved data
-fails):
+Checked on every load and on every import:
 
 - every food reference resolves; every unit reference exists on its food (or is built in);
 - recipes have no cycles, and a positive total weight;
@@ -420,14 +416,22 @@ A food or unit that is used is never deleted, only archived.
 ### Storage
 
 - The whole state lives **in memory** as one object, and every change saves the whole
-  document, as in Clog.
+  document.
 - Size: meals hold only references and amounts, so the data grows by roughly 0.5–1 MB a year;
   serialising it takes a few milliseconds.
 - **IndexedDB** _(proposal)_: the document is stored as one value under one key. It avoids the
   ~5 MB `localStorage` cap (reached after ~5 years) at the cost of an async load at startup.
-- Versioning, strict import, problem screen and check on load follow Clog's design
-  (`kcal <semver>`, `0.x` minors may break, import replaces everything, all-or-nothing).
-- Persistent storage is requested, as in Clog.
+- **Versioning.** The document carries `"version": "kcal <semver>"`, which marks it as a Kcal
+  file and versions its schema (independent of app releases). While `0.x`, a minor bump may
+  break (needs a migration) and a patch only adds optional fields. The app accepts the same
+  `0.minor` with a patch up to its own; saved data of an older version is migrated silently on
+  load once migrations exist.
+- **Strict import.** Import replaces all data and is all-or-nothing: a file with any problem
+  (see Integrity) is refused with the list of problems; nothing is silently fixed.
+- **Check on load.** Saved data is checked like an import on every start. If it fails, the
+  app shows a **problem screen** with the problems and two actions: download the saved data
+  unchanged (to fix it at the desk), or start fresh (two-tap confirmation).
+- Persistent storage is requested, so the browser does not evict the data.
 - Later sync fits this model: records with ids, plus `updatedAt` and tombstones.
 
 ### Backup vs analysis export
@@ -444,7 +448,7 @@ Two different files for two different readers:
 
 Agreed: **Preact** from the start.
 
-- Kcal's UI is much more interactive than Clog's: the meal composer (an inline editable list
+- Kcal's UI is highly interactive: the meal composer (an inline editable list
   with a live chart), product and recipe forms with unit selectors, the goals form, stats.
   Writing each screen as a function of the data avoids hand-written DOM syncing, which is
   where bugs would come from, and typing in an amount never loses focus.
@@ -477,10 +481,9 @@ UX details still to decide:
    and totals show them. Agreed in principle (see Products).
 2. **New food replacing an old one**: when `milk` is copied as new and the old one archived,
    may the new one also be called `milk` (names repeating among archived foods)?
-3. **Drink entries**: does a drink entry differ from a meal in the data, or only by what it
-   contains? What makes a product a drink (having a water value)?
-4. **Meal rows** on the day screen: totals as numbers or as a small inline chart; what tapping
+3. **Meal rows** on the day screen: totals as numbers or as a small inline chart; what tapping
    the row itself does.
+4. **Water** details, when it is built (see Water).
 5. The _(proposal)_ items above, to confirm or change while building.
 
 Technical questions (see Technical design):
@@ -488,15 +491,36 @@ Technical questions (see Technical design):
 - Recipe cooked weight when ingredients change: ask to re-check it?
 - IndexedDB from the start (proposal) or `localStorage`.
 
+## First prototype
+
+Agreed scope: the smallest app I can use every day for eating against my goals.
+
+| In                                                                                    | Later                                                      |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Products with units, nutrients entered per any unit; created from library or composer | Water                                                      |
+| Recipes (composer + yield), recipes inside recipes                                    | Weight, Stats screen, analysis export                      |
+| Meal composer: chips, inline amounts, unit selector, date/time, the live chart        | Copy as new, archiving (editing with "used in N" warning) |
+| Day screen: chart, meal rows, ‹ › days, ＋ Eat, Eat again, delete                     | Markers for unknown values in the chart                    |
+| Goals form (effective from today, history kept)                                       |                                                            |
+| Backup export/import, installable PWA, deploy to GitHub Pages                         |                                                            |
+
+- **No existing data to import**: the library starts empty, so creating products quickly
+  (from the composer, label values copied as printed) matters most in the first days.
+- **Built directly, no mockup**: the feel of the composer and whether the day fits on one
+  screen are judged on the phone, then adjusted in rounds.
+- Prototype defaults for open questions: kcal required, other nutrients optional; meal rows
+  show time and `kcal · protein`; tapping a row opens it like the edit icon; storage in
+  IndexedDB.
+
 ## Implementation plan
 
-To be written once the open questions are settled. A likely order:
+A likely order:
 
-1. Scaffold from Clog's setup (Vite, TS, lint, tests, PWA, deploy), plus Preact and signals.
+1. Scaffold: Vite, TypeScript, Preact + signals, Vitest, ESLint + Prettier, PWA, deploy.
 2. Core: units, food table, nutrient maths with unknowns, recipes, integrity checks (pure
    logic + tests); backup format and strict import.
 3. Library: products and recipes.
 4. Meal composer and the day screen with the chart.
 5. Goals form and goal history.
-6. Drinks.
+6. Water.
 7. Weight logging; then the Stats screen (reports, weight charts) and the analysis export.
