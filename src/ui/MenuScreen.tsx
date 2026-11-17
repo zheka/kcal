@@ -34,6 +34,9 @@ export function MenuScreen({ store }: { store: Store }) {
       <button type="button" class="menu-item" onClick={() => navigate('/library')}>
         Library
       </button>
+      <button type="button" class="menu-item" onClick={() => navigate('/goals')}>
+        Goals
+      </button>
 
       <section class="section">
         <h2 class="label">Backup</h2>

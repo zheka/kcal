@@ -55,3 +55,27 @@ describe('store', () => {
     expect(store.foods.value).not.toBe(before);
   });
 });
+
+describe('meals and goals', () => {
+  it('adds, replaces and deletes meals', () => {
+    const { store } = setup(appData({ products: [egg] }));
+    const breakfast = meal('2026-11-17T08:00', [ing(egg, 2, 'u1')]);
+    store.saveMeal(breakfast);
+    store.saveMeal({ ...breakfast, eatenAt: '2026-11-17T08:30' });
+    expect(store.data.value.meals).toEqual([{ ...breakfast, eatenAt: '2026-11-17T08:30' }]);
+    store.deleteMeal(breakfast.id);
+    expect(store.data.value.meals).toEqual([]);
+  });
+
+  it('refuses a meal without ingredients', () => {
+    const { store } = setup();
+    expect(() => store.saveMeal(meal('2026-11-17T08:00', []))).toThrow(/non-empty list/);
+  });
+
+  it('saves goals effective from today', () => {
+    const { store } = setup();
+    store.saveGoals({ kcal: 2000, protein: 150 }, '2026-11-17');
+    store.saveGoals({ kcal: 2100, protein: 150 }, '2026-11-20');
+    expect(store.data.value.goals.map((g) => g.from)).toEqual(['2026-11-17', '2026-11-20']);
+  });
+});

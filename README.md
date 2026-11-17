@@ -33,6 +33,7 @@ src/
     nutrition.ts    the food table (everything derived live), meal and day totals
     units.ts        units of a food, grams conversion, label conversion
     goals.ts        goals valid on a date, saving goals
+    meals.ts        default meal time, macro split
     validate.ts     integrity checks for saved data and imports
     foods.ts        usages, ids
     text.ts         cleaning names

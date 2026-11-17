@@ -4,15 +4,54 @@ import { LibraryScreen } from './LibraryScreen';
 import { MenuScreen } from './MenuScreen';
 import { ProductForm } from './ProductForm';
 import { RecipeForm } from './RecipeForm';
-import { goBack, navigate, route } from './router';
+import { isValidDate } from '../core/time';
+import { DayNav, DayScreen } from './DayScreen';
+import { GoalsScreen } from './GoalsScreen';
+import { MealComposer } from './MealComposer';
+import { goBack, navigate, route, today } from './router';
 
 interface Screen {
   title: string;
   body: JSX.Element;
+  /** Replaces the back button and title (the day screens). */
+  header?: JSX.Element;
+}
+
+function dayScreen(store: Store, date: string): Screen {
+  return {
+    title: date,
+    header: <DayNav date={date} />,
+    body: <DayScreen store={store} date={date} />,
+  };
 }
 
 function screenFor(store: Store, path: string, params: URLSearchParams): Screen {
-  if (path === '/') return { title: 'Kcal', body: <Home /> };
+  if (path === '/') return dayScreen(store, today.value);
+  const day = /^\/day\/(.+)$/.exec(path);
+  if (day && isValidDate(day[1]!)) return dayScreen(store, day[1]!);
+  const draftKey = `${path}?${params.toString()}`;
+  if (path === '/meal/new') {
+    return {
+      title: params.has('from') ? 'Eat again' : 'New meal',
+      body: (
+        <MealComposer
+          store={store}
+          id={null}
+          draftKey={draftKey}
+          {...(params.get('date') ? { date: params.get('date')! } : {})}
+          {...(params.get('from') ? { copyOf: params.get('from')! } : {})}
+        />
+      ),
+    };
+  }
+  const meal = /^\/meal\/(.+)$/.exec(path);
+  if (meal) {
+    return {
+      title: 'Meal',
+      body: <MealComposer store={store} id={meal[1]!} draftKey={draftKey} />,
+    };
+  }
+  if (path === '/goals') return { title: 'Goals', body: <GoalsScreen store={store} /> };
   if (path === '/menu') return { title: 'Menu', body: <MenuScreen store={store} /> };
   if (path === '/library') return { title: 'Library', body: <LibraryScreen store={store} /> };
   if (path === '/product/new') {
@@ -44,16 +83,18 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
 
 export function App({ store }: { store: Store }) {
   const { path, params } = route.value;
-  const { title, body } = screenFor(store, path, params);
+  const { title, body, header } = screenFor(store, path, params);
   return (
     <div class="app">
       <header class="bar">
-        {path !== '/' && (
-          <button type="button" class="icon-button" aria-label="Back" onClick={() => goBack('/')}>
-            ‹
-          </button>
+        {header ?? (
+          <>
+            <button type="button" class="icon-button" aria-label="Back" onClick={() => goBack('/')}>
+              ‹
+            </button>
+            <h1>{title}</h1>
+          </>
         )}
-        <h1>{title}</h1>
         {path !== '/menu' && (
           <button
             type="button"
@@ -67,18 +108,6 @@ export function App({ store }: { store: Store }) {
       </header>
       {/* A new route is a new screen: forms start from their own state. */}
       <main key={path}>{body}</main>
-    </div>
-  );
-}
-
-/** Placeholder until the day screen (next step). */
-function Home() {
-  return (
-    <div class="home">
-      <p class="empty">The day screen and the meal composer come next.</p>
-      <button type="button" class="button primary" onClick={() => navigate('/library')}>
-        Library
-      </button>
     </div>
   );
 }

@@ -24,3 +24,9 @@ export function isValidDateTime(text: string): boolean {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/.exec(text);
   return !!m && isValidDate(m[1]!) && Number(m[2]) < 24 && Number(m[3]) < 60;
 }
+
+/** The date `days` after `date` (negative: before). */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return localDate(new Date(y, m - 1, d + days));
+}

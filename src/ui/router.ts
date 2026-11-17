@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import { localDate } from '../core/time';
 
 /**
  * Hash routes (`#/library`, `#/product/<id>`), so the phone's back button and reloads work
@@ -39,3 +40,20 @@ export function goBack(fallback = '/'): void {
     update();
   }
 }
+
+/** Shows another screen in place of this one: back skips it (moving between days). */
+export function replaceRoute(path: string): void {
+  history.replaceState(history.state, '', `#${path}`);
+  update();
+}
+
+/** Today's local date as a signal, refreshed when the app comes back to the foreground. */
+export const today = signal(localDateNow());
+
+function localDateNow(): string {
+  return localDate(new Date());
+}
+
+const refreshToday = () => (today.value = localDateNow());
+document.addEventListener('visibilitychange', refreshToday);
+window.addEventListener('focus', refreshToday);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidDate, isValidDateTime, localDate, localDateTime } from './time';
+import { addDays, isValidDate, isValidDateTime, localDate, localDateTime } from './time';
 
 describe('local dates', () => {
   it('formats local date and time', () => {
@@ -22,5 +22,15 @@ describe('local dates', () => {
     expect(isValidDateTime('2026-11-17T08:30:00')).toBe(false);
     expect(isValidDateTime('2026-11-17T08:30Z')).toBe(false);
     expect(isValidDateTime('2026-11-31T08:30')).toBe(false);
+  });
+});
+
+describe('addDays', () => {
+  it('moves across months, years and DST changes', () => {
+    expect(addDays('2026-11-17', 1)).toBe('2026-11-18');
+    expect(addDays('2026-11-30', 1)).toBe('2026-12-01');
+    expect(addDays('2027-01-01', -1)).toBe('2026-12-31');
+    expect(addDays('2026-03-29', 1)).toBe('2026-03-30');
+    expect(addDays('2026-10-25', -1)).toBe('2026-10-24');
   });
 });

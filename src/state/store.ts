@@ -1,7 +1,8 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
 import { buildFoodTable, type FoodTable } from '../core/nutrition';
 import { usages } from '../core/foods';
-import type { AppData, Product, Recipe } from '../core/types';
+import { saveGoals } from '../core/goals';
+import type { AppData, Meal, NutrientValues, Product, Recipe } from '../core/types';
 import { validateAppData } from '../core/validate';
 
 /**
@@ -18,6 +19,11 @@ export interface Store {
   saveRecipe(recipe: Recipe): void;
   /** Deletes a food that nothing uses. */
   deleteFood(id: string): void;
+  /** Adds a meal or replaces the one with its id. */
+  saveMeal(meal: Meal): void;
+  deleteMeal(id: string): void;
+  /** New daily targets, effective from `today`; the days before keep their goals. */
+  saveGoals(targets: NutrientValues, today: string): void;
   /** Replaces all data (import). */
   replaceAll(data: AppData): void;
 }
@@ -62,6 +68,15 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
         products: data.value.products.filter((p) => p.id !== id),
         recipes: data.value.recipes.filter((r) => r.id !== id),
       });
+    },
+    saveMeal(meal) {
+      commit({ ...data.value, meals: upsert(data.value.meals, meal) });
+    },
+    deleteMeal(id) {
+      commit({ ...data.value, meals: data.value.meals.filter((m) => m.id !== id) });
+    },
+    saveGoals(targets, today) {
+      commit({ ...data.value, goals: saveGoals(data.value.goals, targets, today) });
     },
     replaceAll(next) {
       commit(next);

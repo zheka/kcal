@@ -130,7 +130,7 @@ and time. It has no name; a standalone snack or a single product is a meal too.
   depends on it.
 - **Date and time** (agreed): set in the meal composer with a date-time control. It defaults
   to **now** when the composer is opened from today, and to a time on that day when opened
-  from a past day _(proposal: just after that day's last meal, or 12:00 if it has none)_. The
+  from another day: one minute after that day's last meal, or 12:00 if it has none. The
   date decides which day the meal counts towards; the time orders the meals within the day.
   It is the time the meal is (or will be) eaten, so it can be in the future.
 
@@ -242,7 +242,9 @@ included) and water, without scrolling.
   logs water (see Water).
 - A small **weight button** near the date, showing the last weight; tapping it logs the
   day's weight (see Weight).
-- **Other days**: small ‹ › arrows next to the date. No swiping: going back is rare. A date
+- **Other days**: small ‹ › arrows next to the date, in the header bar. No swiping: going
+  back is rare. Moving between days replaces the screen, so the back button leaves the day
+  rather than stepping through days. Today is `#/`, other days `#/day/YYYY-MM-DD`. A date
   picker may be added to the menu.
 - _(proposal)_ Library, goals and backup are reached from a menu.
 
@@ -265,9 +267,13 @@ Where the planning happens.
   = this meal, **empty** = what remains to reach the goal. Updated on every change, so adding
   an ingredient or changing an amount shows at once how the meal moves the day. No per-meal
   target and no suggestions: I judge the meal's size myself.
-- _(proposal)_ Each bar is labelled with its numbers: taken + this meal / goal, e.g.
-  `1200 + 690 / 2000 kcal`. Going over the goal: the bright part continues past a goal line,
-  so the overshoot is visible.
+- **Built so:** vertical bars side by side, each in its nutrient's colour, labelled with its
+  numbers (`1200 + 690` over `/ 2000`). The bar's scale is the goal, or the total when it goes
+  over; the goal line then sits below the top, and the numbers turn red. A total with unknown
+  values shows `≥`. Nutrients without a goal are a line of amounts under the bars, with the
+  macro split (`P 30% · F 30% · C 40%`, shares of the energy from 4/9/4 kcal per gram).
+- The chart stays at the top of the composer while the ingredients scroll, with a line of
+  the meal's own totals (`This meal: 690 kcal · 48 g protein · …`).
 - **Save** logs the meal. Cancel discards it.
 - **Eat again** (agreed): open any past meal and press **Eat again**; the composer opens with a
   copy of its ingredients and amounts as a new meal for **now**, to adjust and save. This is how
@@ -544,7 +550,9 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
    (`src/state/store.ts`), backup export/import in the menu; library: product form (values per
    any unit, units, typo hint), recipe form (ingredient editor with food chips, create product
    from the picker, new unit from a row, live totals, yield); delete unused foods.
-4. Meal composer and the day screen with the chart.
-5. Goals form and goal history.
+4. **Done:** day screen (chart, meal rows, ‹ › days, ＋ Eat), meal composer (ingredient editor,
+   date and time, live chart, Eat again, two-tap delete).
+5. **Done:** goals form in the menu (effective from today, history listed); past days show
+   their own goals and say so.
 6. Water.
 7. Weight logging; then the Stats screen (reports, weight charts) and the analysis export.
