@@ -64,7 +64,7 @@ export function GoalsScreen({ store }: { store: Store }) {
           </label>
         ))}
       </div>
-      <div class="actions">
+      <div class="actions action-bar">
         <button type="submit" class="button primary">
           Save
         </button>

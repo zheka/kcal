@@ -86,7 +86,7 @@ export function App({ store }: { store: Store }) {
   const { title, body, header } = screenFor(store, path, params);
   return (
     <div class="app">
-      <header class="bar">
+      <header class="topbar">
         {header ?? (
           <>
             <button type="button" class="icon-button" aria-label="Back" onClick={() => goBack('/')}>

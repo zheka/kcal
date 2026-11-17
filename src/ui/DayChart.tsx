@@ -89,7 +89,7 @@ function Bar({
   return (
     <div class={`bar-column nutrient-${nutrient} ${sum > goal ? 'over' : ''}`}>
       <span class="bar-label">{LABEL[nutrient]}</span>
-      <div class="bar" role="img" aria-label={label}>
+      <div class="bar-track" role="img" aria-label={label}>
         <div class="bar-taken" style={{ height: pct(taken.value) }} />
         <div class="bar-meal" style={{ bottom: pct(taken.value), height: pct(mealValue) }} />
         <div class="bar-goal" style={{ bottom: pct(goal) }} />

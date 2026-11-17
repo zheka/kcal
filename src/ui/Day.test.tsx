@@ -46,9 +46,10 @@ afterEach(() => {
 });
 
 describe('day screen', () => {
-  it('shows the day against its goals, and its meals by time', () => {
+  it('shows the day against its goals, and its meals newest first', () => {
     start();
     expect(screen.getByRole('heading', { name: 'Today' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy();
     // 2 eggs (171.6 kcal, 15.12 g protein) + 100 g oat flakes (370 kcal, 13 g)
     expect(bar(/^kcal/)).toBe('kcal: 542 taken, goal 2000');
     expect(bar(/^Protein/)).toBe('Protein: 28 g taken, goal 150 g');
@@ -58,8 +59,8 @@ describe('day screen', () => {
 
     const rows = screen.getAllByRole('button', { name: /kcal ·/ });
     expect(rows.map((r) => r.textContent)).toEqual([
-      '08:30172 kcal · 15 g protein✎',
       '13:00370 kcal · 13 g protein✎',
+      '08:30172 kcal · 15 g protein✎',
     ]);
   });
 

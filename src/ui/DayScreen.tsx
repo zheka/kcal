@@ -66,7 +66,8 @@ export function DayScreen({ store, date }: { store: Store; date: string }) {
   const foods = store.foods.value;
   const set = goalSetOn(data.goals, date);
   const current = goalSetOn(data.goals, today.value);
-  const meals = mealsOn(data.meals, date);
+  // Newest first: the meal just logged is right under the chart.
+  const meals = mealsOn(data.meals, date).reverse();
 
   return (
     <div class="day">
@@ -103,13 +104,15 @@ export function DayScreen({ store, date }: { store: Store; date: string }) {
         })}
       </ul>
 
-      <button
-        type="button"
-        class="button primary wide"
-        onClick={() => navigate(`/meal/new?date=${date}`)}
-      >
-        ＋ Eat
-      </button>
+      <div class="action-bar">
+        <button
+          type="button"
+          class="button primary wide"
+          onClick={() => navigate(`/meal/new?date=${date}`)}
+        >
+          ＋ Eat
+        </button>
+      </div>
     </div>
   );
 }

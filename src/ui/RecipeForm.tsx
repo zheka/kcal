@@ -199,7 +199,7 @@ export function RecipeForm({ store, id, draftKey }: Props) {
       )}
       {saveError && <p class="error">Could not save: {saveError}</p>}
 
-      <div class="actions">
+      <div class="actions action-bar">
         <button type="submit" class="button primary">
           Save
         </button>

@@ -86,7 +86,7 @@ p {
 
 /* Header bar */
 
-.bar {
+.topbar {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -315,29 +315,43 @@ legend select.input {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
 
-.ingredient-head {
+/* One line per ingredient: name and kcal, amount, unit, remove */
+.ingredient-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5em 6.5em 40px;
+  gap: 6px;
+  align-items: center;
+}
+
+.ingredient-main .icon-button {
+  min-width: 40px;
+}
+
+.ingredient-text {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .ingredient-name {
+  overflow: hidden;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ingredient-kcal {
   color: var(--muted);
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 
-.ingredient-amount {
-  display: grid;
-  grid-template-columns: 6em 1fr auto;
-  gap: 8px;
+.ingredient-main .input {
+  padding: 0 8px;
 }
 
 /* Food picker: one line of chips that scrolls sideways */
@@ -506,19 +520,47 @@ legend select.input {
   overflow-wrap: anywhere;
 }
 
+/* The screen's main actions stay at the bottom, within thumb reach */
+
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.app {
+  padding-bottom: 0;
+}
+
 /* Day */
 
 .day-nav {
   display: flex;
   flex: 1;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  /* Balances the menu button on the right, so the date is centred. */
+  padding-left: var(--tap);
+}
+
+.day-nav h1 {
+  min-width: 7.5em;
+  text-align: center;
 }
 
 .day {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* The action bar sits at the bottom of the screen even on a short day. */
+  min-height: calc(100dvh - 72px);
+}
+
+.day .meal-list {
+  flex: 1;
 }
 
 .button.wide {
@@ -611,10 +653,10 @@ legend select.input {
   font-weight: 600;
 }
 
-.bar {
+.bar-track {
   position: relative;
-  width: 36px;
-  height: 110px;
+  width: 40px;
+  height: 96px;
   border-radius: 6px;
   background: var(--surface);
   overflow: hidden;

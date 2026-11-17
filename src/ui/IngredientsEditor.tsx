@@ -85,11 +85,11 @@ export function IngredientsEditor({
             : formatAmount(ingredientNutrition(foods, { ...row, amount }).kcal, 'kcal');
         return (
           <div class="ingredient" key={row.key}>
-            <div class="ingredient-head">
-              <span class="ingredient-name">{food.name}</span>
-              <span class="ingredient-kcal">{kcal} kcal</span>
-            </div>
-            <div class="ingredient-amount">
+            <div class="ingredient-main">
+              <div class="ingredient-text">
+                <span class="ingredient-name">{food.name}</span>
+                <span class="ingredient-kcal">{kcal} kcal</span>
+              </div>
               <input
                 class={`input number ${showErrors && amount === null ? 'invalid' : ''}`}
                 aria-label={`Amount of ${food.name}`}

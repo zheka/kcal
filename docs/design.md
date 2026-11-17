@@ -228,11 +228,17 @@ Agreed:
 ### Day (the main screen)
 
 **The whole day fits on one phone screen** (agreed): the day chart plus 5–6 meals (snacks
-included) and water, without scrolling.
+included) and water, without scrolling. The target phone is a **Pixel 8a** (412 × 915 CSS px);
+layouts are checked with screenshots at that size.
+
+- **The main actions stay at the bottom**, within thumb reach: ＋ Eat on the day screen,
+  Save/Cancel/… in the composer and the forms (a bar that stays in view while the screen
+  scrolls).
 
 - The **same chart as in the meal composer**, without a meal being edited: taken vs the
   daily goal for each nutrient that has one.
-- The **day's meals**, ordered by time. A meal row is **compact** and shows **no
+- The **day's meals**, **newest first** (the meal just logged sits right under the chart).
+  A meal row is **compact** and shows **no
   ingredients**: its time and its totals, either as numbers (`690 kcal · 48 g protein`) or as
   a small inline chart of its share of each goal _(to decide when designing the screen)_.
 - A small **edit icon** on the right of a meal row opens it in the meal composer (edit mode),
@@ -261,6 +267,7 @@ Where the planning happens.
   chart updates, so a whole meal can be added first and tuned after.
 - **Amount** is typed (numeric keypad). **Unit** is a selector of the food's units (`g` plus
   its own, e.g. `piece`, `cup`).
+- **One line per ingredient**: name with its kcal below, amount, unit, remove.
 - Ingredients can be removed from the list.
 - **The day's chart is the guidance** (agreed). One bar per nutrient with a goal, in three
   parts from the bottom: **faded** = already taken today (other meals of the day), **bright**
