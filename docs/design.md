@@ -64,7 +64,14 @@ after the UX.
   }
   ```
 
-- **Every product can always be measured in `g`.**
+- **Units belong to their food** (agreed): they are stored inside the product (or recipe)
+  and mean nothing outside it ("cup" of oats ≠ "cup" of milk). Nothing about units is shared
+  between foods except, as a typing aid, their names.
+- **Built-in measurement units** are the exception: fixed conversions defined in the code,
+  available for every food and never stored: `g` (the base) and `kg` = 1000 g. `ml` is
+  **not** built in, since grams per ml depend on the product: it is a product unit like any
+  other.
+- **Every food can always be measured in `g` (and `kg`).**
 - The **last unit and amount used** for a food are preselected the next time.
 - **Nutrients can be entered and shown per any unit** of the product (agreed in principle):
   the product form has its units section right away, and the nutrient values are entered
@@ -296,44 +303,163 @@ screen stays about today.)_
 - Goals: one form with a target per nutrient (empty = no goal); see Goals.
 - Menu: backup export/import, app version (as in Clog).
 
-## Data and storage
+## Technical design
 
-- One JSON document holds everything, shaped like the backup:
+### Stack
 
-  ```json
-  {
-    "version": "kcal 0.1.0",
-    "exportedAt": "…",
-    "goals": [],
-    "products": [],
-    "recipes": [],
-    "meals": [],
-    "weights": []
-  }
-  ```
+Clog's stack, plus **Preact** for the UI (see UI rendering):
 
-- **Versioning, strict import, problem screen, check on load:** the same rules as in Clog's
-  design (`kcal <semver>`, `0.x` minors may break, import replaces everything and is
-  all-or-nothing).
-- **Storage** _(proposal)_: IndexedDB rather than `localStorage`, storing the document as one
-  value under one key, so the model stays Clog's. Meals store only references and amounts,
-  so they are small, but years of them may still approach the ~5 MB `localStorage` cap.
-- **Ids**: the user works with **names** everywhere; how records refer to each other
-  internally (ids, names) is a technical detail, decided after the UX.
-- Persistent storage is requested, as in Clog.
-
-## Tech stack
-
-Same as Clog:
-
-- **TypeScript + Vite**, no UI framework, no runtime dependencies; `store.ts` with one-way data
-  flow (UI event → store action → new state → saved → views re-render).
-- `src/core/` pure logic (units, nutrient maths, recipes, goals), `src/data/` storage and
-  backup, `src/ui/` views. The charts are hand-drawn SVG or CSS bars, so no chart library.
-- **Vitest** for unit tests and jsdom UI tests; ESLint + Prettier.
+- **TypeScript + Vite**; one-way data flow (UI event → store action → new state → saved →
+  views update).
+- **Preact + `@preact/signals`** for views, written as JSX components.
+- `src/core/` pure logic (units, nutrient maths, recipes, goals, integrity checks), no DOM,
+  storage or Preact; `src/data/` storage, backup and exports; `src/ui/` components. Charts are
+  hand-drawn SVG, no chart library.
+- **Vitest** for unit tests and jsdom UI tests (with Preact's testing library); ESLint +
+  Prettier.
 - **vite-plugin-pwa**: installable, offline, updates applied on the next launch.
 - **GitHub Pages**, deployed by GitHub Actions on push to `main`; CI runs lint, tests, build
   and `npm audit --omit=dev`.
+
+### Stored data: sources only, references by id
+
+The data holds **only what was entered**; every number shown is derived (see Derived data).
+
+- **Records refer to each other by id, never by name.** Names are for display, so renaming
+  never touches meals or recipes. Products, recipes and meals get random UUIDs, as in Clog.
+- **Units live inside their food**, with an id unique within that food. An ingredient refers
+  to a unit through its food, or to a built-in unit (`g`, `kg`) by its code name.
+- **Nutrients are stored per 100 g** _(proposal)_: label-like and readable; values entered per
+  another unit are converted when the product is saved.
+- **Unknown is absent**: a nutrient the label does not give is missing from `per100g`, not 0.
+
+```json
+{
+  "version": "kcal 0.1.0",
+  "exportedAt": "2026-11-17T09:00:00.000Z",
+  "goals": [{ "from": "2026-11-01", "targets": { "kcal": 2000, "protein": 150 } }],
+  "products": [
+    {
+      "id": "p-6f1c…",
+      "name": "egg",
+      "per100g": { "kcal": 143, "protein": 12.6, "fat": 9.5, "carbs": 0.7 },
+      "units": [{ "id": "u1", "name": "piece", "grams": 60 }],
+      "archived": false
+    }
+  ],
+  "recipes": [
+    {
+      "id": "r-91ab…",
+      "name": "oats with honey",
+      "ingredients": [
+        { "food": "r-77c0…", "unit": "g", "amount": 300 },
+        { "food": "p-3d2e…", "unit": "u1", "amount": 1 }
+      ],
+      "cookedGrams": null,
+      "servings": 1,
+      "units": [],
+      "archived": false
+    }
+  ],
+  "meals": [
+    {
+      "id": "m-0a7f…",
+      "eatenAt": "2026-11-17T08:30",
+      "ingredients": [
+        { "food": "r-91ab…", "unit": "serving", "amount": 1 },
+        { "food": "p-6f1c…", "unit": "u1", "amount": 2 }
+      ]
+    }
+  ],
+  "weights": [{ "date": "2026-11-17", "kg": 78.4 }]
+}
+```
+
+(Field names and id formats are a sketch; `serving` is the recipe's built-in unit from its
+`servings`.)
+
+### Derived data: computed, never stored
+
+"Live" means **no cascading writes**: editing a product changes one record, and everything
+that uses it is recomputed on the next render.
+
+```
+product → per gram          (stored per100g / 100)
+recipe  → per gram          Σ(ingredient grams × ingredient per gram) / total grams
+meal    → nutrients         Σ(ingredient grams × food per gram)
+day     → nutrients         Σ meals of that date
+```
+
+- **Food table.** One derived map `foodId → { perGram, missing, units }` for all foods,
+  built by recursion with memoisation (recipes resolve their ingredients first) and a cycle
+  guard. It is **rebuilt from scratch whenever any food changes**: a few hundred foods take
+  well under a millisecond, so there is no smart invalidation.
+- **Meals, days, stats** are plain sums over the food table. A day is ~30 lookups; a year of
+  stats ~10 000, still under a millisecond. Nothing else is cached.
+- **Unknowns** travel with every value: a nutrient is `{ value, missing }` (the known part and
+  how many contributing foods lacked it), so a recipe or day with a gap shows `≥ value`.
+  Built in from the start, because it is painful to add later.
+- **"Used in N meals and M recipes"** is a scan over meals and recipes on demand
+  (milliseconds), not a stored index.
+- **Total weight of a recipe** is the sum of its ingredients in grams, unless `cookedGrams` is
+  set. _(Open: when ingredients change, the stored cooked weight may no longer match; the
+  recipe form should probably ask to re-check it.)_
+
+### Integrity
+
+Checked on every load and import, as strictly as in Clog (the problem screen when saved data
+fails):
+
+- every food reference resolves; every unit reference exists on its food (or is built in);
+- recipes have no cycles, and a positive total weight;
+- amounts and nutrient values are non-negative numbers; ids are unique; timestamps and dates
+  are valid.
+
+A food or unit that is used is never deleted, only archived.
+
+### Storage
+
+- The whole state lives **in memory** as one object, and every change saves the whole
+  document, as in Clog.
+- Size: meals hold only references and amounts, so the data grows by roughly 0.5–1 MB a year;
+  serialising it takes a few milliseconds.
+- **IndexedDB** _(proposal)_: the document is stored as one value under one key. It avoids the
+  ~5 MB `localStorage` cap (reached after ~5 years) at the cost of an async load at startup.
+- Versioning, strict import, problem screen and check on load follow Clog's design
+  (`kcal <semver>`, `0.x` minors may break, import replaces everything, all-or-nothing).
+- Persistent storage is requested, as in Clog.
+- Later sync fits this model: records with ids, plus `updatedAt` and tombstones.
+
+### Backup vs analysis export
+
+Two different files for two different readers:
+
+- **Backup**: the stored data exactly (ids, references). For restore and scripts.
+- **Analysis export** (for an AI): flattened and self-explanatory: each meal with its time, food
+  names, grams and computed nutrients; daily totals with the goals valid that day; weights.
+  Generated from the derived data, never imported. This keeps the backup exact without making
+  analysis depend on joining ids.
+
+### UI rendering
+
+Agreed: **Preact** from the start.
+
+- Kcal's UI is much more interactive than Clog's: the meal composer (an inline editable list
+  with a live chart), product and recipe forms with unit selectors, the goals form, stats.
+  Writing each screen as a function of the data avoids hand-written DOM syncing, which is
+  where bugs would come from, and typing in an amount never loses focus.
+- **Signals fit the derived-data model**: the state is a few signals (products, recipes,
+  meals, goals, weights); the food table, day totals and stats are `computed` signals over
+  them, so only what depends on a change updates.
+- `src/core/` stays framework-free: the signals wrap plain functions, which are tested
+  without Preact.
+
+**Runtime libraries are allowed**, since Vite bundles them into the app and the service
+worker caches them with it, so they work offline and update together with the app. A library
+is added only when it is small, widely used, actively maintained, has few dependencies of its
+own, and solves a real problem. Not needed so far: a chart library (a few bars and a line,
+drawn in SVG), a date library (`Intl` and `Date` suffice). Never loaded from a CDN at runtime;
+fonts and icons are bundled too.
 
 ## Later
 
@@ -341,7 +467,7 @@ Same as Clog:
 - More nutrients (`fiber`, `sugar`, `salt`).
 - Product lookup in Open Food Facts (search, barcode) to prefill a new product.
 - Sync between devices.
-- Export for AI analysis (JSON backup is enough to start; CSV if useful).
+- Analysis export for AI (see Technical design), CSV if useful.
 
 ## Open questions
 
@@ -357,20 +483,20 @@ UX details still to decide:
    the row itself does.
 5. The _(proposal)_ items above, to confirm or change while building.
 
-Technical questions, after the UX is settled:
+Technical questions (see Technical design):
 
-- How records refer to foods (ids, names); renaming.
-- Storage: IndexedDB from the start, or `localStorage` and migrate later.
-- Nutrients stored per gram or per 100 g.
+- Recipe cooked weight when ingredients change: ask to re-check it?
+- IndexedDB from the start (proposal) or `localStorage`.
 
 ## Implementation plan
 
 To be written once the open questions are settled. A likely order:
 
-1. Scaffold from Clog's setup (Vite, TS, lint, tests, PWA, deploy).
-2. Core: units, nutrient maths, recipes (pure logic + tests); backup format and strict import.
+1. Scaffold from Clog's setup (Vite, TS, lint, tests, PWA, deploy), plus Preact and signals.
+2. Core: units, food table, nutrient maths with unknowns, recipes, integrity checks (pure
+   logic + tests); backup format and strict import.
 3. Library: products and recipes.
 4. Meal composer and the day screen with the chart.
 5. Goals form and goal history.
 6. Drinks.
-7. Weight logging; then the Stats screen (reports, weight charts).
+7. Weight logging; then the Stats screen (reports, weight charts) and the analysis export.
