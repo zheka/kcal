@@ -25,16 +25,16 @@ after the UX.
 
 ## Concepts
 
-| Concept      | Meaning                                                                             |
-| ------------ | ----------------------------------------------------------------------------------- |
-| **Nutrient** | a quantity in food: `kcal`, `protein`, `fat`, `carbs`                               |
-| **Product**  | something with nutrients per 100 g, from its label                                  |
-| **Recipe**   | products (and recipes) with amounts; usable everywhere a product is                 |
-| **Unit**     | a way to measure a food, defined in grams: `piece`, `ml`, `cup`, `serving`…         |
-| **Meal**     | a logged entry: foods taken together, at a date and time                            |
-| **Water**    | plain water I drink, logged separately from meals, in ml                            |
-| **Goals**    | daily targets per nutrient                                                          |
-| **Weight**   | my body weight, at most one value per day                                           |
+| Concept      | Meaning                                                                     |
+| ------------ | --------------------------------------------------------------------------- |
+| **Nutrient** | a quantity in food: `kcal`, `protein`, `fat`, `carbs`                       |
+| **Product**  | something with nutrients per 100 g, from its label                          |
+| **Recipe**   | products (and recipes) with amounts; usable everywhere a product is         |
+| **Unit**     | a way to measure a food, defined in grams: `piece`, `ml`, `cup`, `serving`… |
+| **Meal**     | a logged entry: foods taken together, at a date and time                    |
+| **Water**    | plain water I drink, logged separately from meals, in ml                    |
+| **Goals**    | daily targets per nutrient                                                  |
+| **Weight**   | my body weight, at most one value per day                                   |
 
 "Food" below means a product or a recipe: wherever one can be used, so can the other.
 
@@ -495,14 +495,14 @@ Technical questions (see Technical design):
 
 Agreed scope: the smallest app I can use every day for eating against my goals.
 
-| In                                                                                    | Later                                                      |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Products with units, nutrients entered per any unit; created from library or composer | Water                                                      |
-| Recipes (composer + yield), recipes inside recipes                                    | Weight, Stats screen, analysis export                      |
+| In                                                                                    | Later                                                     |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Products with units, nutrients entered per any unit; created from library or composer | Water                                                     |
+| Recipes (composer + yield), recipes inside recipes                                    | Weight, Stats screen, analysis export                     |
 | Meal composer: chips, inline amounts, unit selector, date/time, the live chart        | Copy as new, archiving (editing with "used in N" warning) |
-| Day screen: chart, meal rows, ‹ › days, ＋ Eat, Eat again, delete                     | Markers for unknown values in the chart                    |
-| Goals form (effective from today, history kept)                                       |                                                            |
-| Backup export/import, installable PWA, deploy to GitHub Pages                         |                                                            |
+| Day screen: chart, meal rows, ‹ › days, ＋ Eat, Eat again, delete                     | Markers for unknown values in the chart                   |
+| Goals form (effective from today, history kept)                                       |                                                           |
+| Backup export/import, installable PWA, deploy to GitHub Pages                         |                                                           |
 
 - **No existing data to import**: the library starts empty, so creating products quickly
   (from the composer, label values copied as printed) matters most in the first days.

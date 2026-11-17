@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#1f7a4d"/>
+  <!-- A plate seen from above, with a filled wedge: a day's goal partly reached. -->
+  <circle cx="256" cy="256" r="150" fill="#ffffff"/>
+  <circle cx="256" cy="256" r="112" fill="#e3f2ea"/>
+  <path d="M256 256 L256 144 A112 112 0 1 1 158.3 310.8 Z" fill="#f2a43a"/>
+</svg>
