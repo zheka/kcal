@@ -23,6 +23,27 @@ npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ locally (the way to try offline mode and updates)
 ```
 
+## Layout
+
+```
+src/
+  config.ts       what the app tracks: nutrients, required nutrients, built-in units
+  core/           pure logic: no DOM, storage or Preact
+    types.ts        the stored data: products, recipes, meals, goals
+    nutrition.ts    the food table (everything derived live), meal and day totals
+    units.ts        units of a food, grams conversion, label conversion
+    goals.ts        goals valid on a date, saving goals
+    validate.ts     integrity checks for saved data and imports
+    foods.ts        usages, ids
+    text.ts         cleaning names
+    time.ts         local dates and times
+  data/
+    backup.ts       versioned document format, strict import, backup export
+  ui/             Preact components
+  pwa.ts          service worker registration
+  **/*.test.ts(x) tests next to the code they test
+```
+
 ## Stack
 
 - **Preact** + **@preact/signals** for the UI, JSX compiled by Vite (no Babel).

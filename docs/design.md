@@ -323,9 +323,15 @@ A static PWA with no server (see UI rendering for the choice of Preact):
 The data holds **only what was entered**; every number shown is derived (see Derived data).
 
 - **Records refer to each other by id, never by name.** Names are for display, so renaming
-  never touches meals or recipes. Products, recipes and meals get random UUIDs.
-- **Units live inside their food**, with an id unique within that food. An ingredient refers
-  to a unit through its food, or to a built-in unit (`g`, `kg`) by its code name.
+  never touches meals or recipes. Products, recipes and meals get random UUIDs, unique
+  across all three.
+- **Food names are unique** across products and recipes, ignoring case (`Skyr` = `skyr`),
+  since they share one list of chips. Names are cleaned (trimmed, whitespace collapsed,
+  Unicode NFC); case is kept for display.
+- **Units live inside their food**, with an id unique within that food (`u1`, `u2`, …). An
+  ingredient refers to a unit through its food, or to a built-in unit (`g`, `kg`, a recipe's
+  `serving`) by its code name. A food's own units may not be named like a built-in unit
+  (ignoring case); a product may have its own `serving` (from its label), a recipe may not.
 - **Nutrients are stored per 100 g** _(proposal)_: label-like and readable; values entered per
   another unit are converted when the product is saved.
 - **Unknown is absent**: a nutrient the label does not give is missing from `per100g`, not 0.
@@ -367,13 +373,13 @@ The data holds **only what was entered**; every number shown is derived (see Der
         { "food": "p-6f1c…", "unit": "u1", "amount": 2 }
       ]
     }
-  ],
-  "weights": [{ "date": "2026-11-17", "kg": 78.4 }]
+  ]
 }
 ```
 
-(Field names and id formats are a sketch; `serving` is the recipe's built-in unit from its
-`servings`.)
+(Ids shortened for readability; `serving` is the recipe's built-in unit from its `servings`.
+Schema `kcal 0.1.0` holds exactly these four lists; water and weights are added later as new
+optional lists, a patch version.)
 
 ### Derived data: computed, never stored
 
@@ -393,9 +399,9 @@ day     → nutrients         Σ meals of that date
   well under a millisecond, so there is no smart invalidation.
 - **Meals, days, stats** are plain sums over the food table. A day is ~30 lookups; a year of
   stats ~10 000, still under a millisecond. Nothing else is cached.
-- **Unknowns** travel with every value: a nutrient is `{ value, missing }` (the known part and
-  how many contributing foods lacked it), so a recipe or day with a gap shows `≥ value`.
-  Built in from the start, because it is painful to add later.
+- **Unknowns** travel with every value: a nutrient is `{ value, missing }`: the known part,
+  and how many products (all the way down through recipes) lacked it. With `missing > 0` the
+  amount is shown as `≥ value`. An ingredient with amount 0 counts nothing, unknowns included.
 - **"Used in N meals and M recipes"** is a scan over meals and recipes on demand
   (milliseconds), not a stored index.
 - **Total weight of a recipe** is the sum of its ingredients in grams, unless `cookedGrams` is
@@ -406,10 +412,19 @@ day     → nutrients         Σ meals of that date
 
 Checked on every load and on every import:
 
+- every record has exactly its fields (unknown fields are refused, which catches typos);
 - every food reference resolves; every unit reference exists on its food (or is built in);
 - recipes have no cycles, and a positive total weight;
-- amounts and nutrient values are non-negative numbers; ids are unique; timestamps and dates
-  are valid.
+- products have `kcal`; nutrient values and amounts are non-negative numbers; unit grams,
+  cooked weight, servings and goal targets are positive;
+- ids are unique; names are clean and unique as described above;
+- meals and recipes have at least one ingredient;
+- `eatenAt` is a local `YYYY-MM-DDTHH:mm`, goal dates are `YYYY-MM-DD` and strictly
+  increasing.
+
+Every problem is reported with where it is (`product #3 "egg", unit #2: grams must be a
+positive number`). References are checked only once everything else is well-formed, so each
+message has a single cause.
 
 A food or unit that is used is never deleted, only archived.
 
@@ -514,12 +529,13 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
 
 ## Implementation plan
 
-A likely order:
-
-1. Scaffold: Vite, TypeScript, Preact + signals, Vitest, ESLint + Prettier, PWA, deploy.
-2. Core: units, food table, nutrient maths with unknowns, recipes, integrity checks (pure
-   logic + tests); backup format and strict import.
-3. Library: products and recipes.
+1. **Done:** scaffold: Vite, TypeScript, Preact + signals, Vitest, ESLint + Prettier, PWA,
+   deploy.
+2. **Done:** core: units, food table, nutrient maths with unknowns, recipes, goals, integrity
+   checks (pure logic + tests, `src/core/`); backup format and strict import
+   (`src/data/backup.ts`).
+3. Storage (IndexedDB, check on load, problem screen) and the app state; library: products
+   and recipes.
 4. Meal composer and the day screen with the chart.
 5. Goals form and goal history.
 6. Water.
