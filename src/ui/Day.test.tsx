@@ -54,8 +54,10 @@ describe('day screen', () => {
     expect(bar(/^kcal/)).toBe('kcal: 542 taken, goal 2000');
     expect(bar(/^Protein/)).toBe('Protein: 28 g taken, goal 150 g');
     // No goals for fat and carbs: amounts and the macro split.
-    expect(screen.getByText('Fat 18 g')).toBeTruthy();
-    expect(screen.getByText(/^P \d+% · F \d+% · C \d+%$/)).toBeTruthy();
+    // Nutrients without a goal have bars too, without a goal line.
+    expect(bar(/^Fat/)).toBe('Fat: 18 g taken, no goal');
+    expect(bar(/^Carbs/)).toBe('Carbs: 60 g taken, no goal');
+    expect(screen.getByText(/^P \d+% · F \d+% · C \d+% of energy$/)).toBeTruthy();
 
     const rows = screen.getAllByRole('button', { name: /kcal ·/ });
     expect(rows.map((r) => r.textContent)).toEqual([
@@ -89,10 +91,10 @@ describe('day screen', () => {
     expect(bar(/^kcal/)).toBe('kcal: 0 taken, goal 1800');
   });
 
-  it('shows plain amounts before the first goals and offers to set them', () => {
+  it('shows every nutrient without goals before the first goals, and offers to set them', () => {
     start({ goals: [] });
-    expect(screen.queryByRole('img')).toBeNull();
-    expect(screen.getByText('kcal 542')).toBeTruthy();
+    expect(bar(/^kcal/)).toBe('kcal: 542 taken, no goal');
+    expect(screen.getAllByRole('img')).toHaveLength(4);
     click('Set daily goals');
     expect(screen.getByRole('heading', { name: 'Goals' })).toBeTruthy();
   });

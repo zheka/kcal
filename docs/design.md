@@ -152,8 +152,8 @@ Agreed:
 - **Days before the first goals** show plain amounts, without goal lines.
 - Goals change a few times a year: the goals form lives in the menu.
 - **Nutrients without a goal are still shown** (agreed), e.g. to see the balance of protein,
-  fat and carbs in the diet. _(proposal: the chart shows them as plain amounts, plus the macro
-  split as shares of kcal, e.g. `P 30% · F 30% · C 40%`.)_
+  fat and carbs in the diet: **the chart has a bar for every nutrient** (agreed), plus the
+  macro split as shares of the energy, e.g. `P 30% · F 30% · C 40%`.
 - Goals are **daily only**. Weekly and monthly averages are reports over the daily data, to
   add later, not goals.
 - **Direction** (whether going over is bad, like kcal, or fine, like protein) only changes
@@ -269,7 +269,7 @@ Where the planning happens.
   its own, e.g. `piece`, `cup`).
 - **One line per ingredient**: name with its kcal below, amount, unit, remove.
 - Ingredients can be removed from the list.
-- **The day's chart is the guidance** (agreed). One bar per nutrient with a goal, in three
+- **The day's chart is the guidance** (agreed). **One bar per nutrient, all of them**, in three
   parts from the bottom: **faded** = already taken today (other meals of the day), **bright**
   = this meal, **empty** = what remains to reach the goal. Updated on every change, so adding
   an ingredient or changing an amount shows at once how the meal moves the day. No per-meal
@@ -277,8 +277,10 @@ Where the planning happens.
 - **Built so:** vertical bars side by side, each in its nutrient's colour, labelled with its
   numbers (`1200 + 690` over `/ 2000`). The bar's scale is the goal, or the total when it goes
   over; the goal line then sits below the top, and the numbers turn red. A total with unknown
-  values shows `≥`. Nutrients without a goal are a line of amounts under the bars, with the
-  macro split (`P 30% · F 30% · C 40%`, shares of the energy from 4/9/4 kcal per gram).
+  values shows `≥`. A nutrient **without a goal** has a bar too, with a dashed outline and no
+  goal line: it fills to the day's own total, so it shows only the amount (`46`, `g · no goal`)
+  and, in the composer, this meal's share of it. Under the bars, the macro split
+  (`P 30% · F 30% · C 40% of energy`, from 4/9/4 kcal per gram).
 - The chart stays at the top of the composer while the ingredients scroll, with a line of
   the meal's own totals (`This meal: 690 kcal · 48 g protein · …`).
 - **Save** logs the meal. Cancel discards it.
