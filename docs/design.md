@@ -1,0 +1,376 @@
+# Kcal design
+
+High-level design of Kcal, a personal nutrition tracker.
+
+Status (2026-11-17): **UX agreed at a high level.** Items marked _(proposal)_ are suggestions
+not discussed yet; Open questions lists what is still undecided. Technical details come
+after the UX.
+
+## Goals and principles
+
+- **Purpose.** Hit daily nutrition goals (kcal, protein, other macros) by composing each meal
+  against them: while putting a meal together I see how balanced it is and how it moves the
+  day towards its goals.
+- **The meal is the unit of logging.** A meal is composed (products and recipes with amounts),
+  adjusted until it fits, and saved as one logged entry. It is usually saved **before** it is
+  eaten: composing a meal is the planning, there is no separate plan.
+- **Personal tool first.** Built for my own use. Friendliness to new users is secondary.
+- **Own product library, not a global database.** I eat a limited, repeating set of products
+  and recipes. Entering a product once from its label is fine.
+- **Natural amounts.** Amounts are entered in the unit that is convenient for that product:
+  grams, millilitres, pieces, cups, spoons, servings.
+- **Offline-first, serverless.** A PWA hosted as static files; all data on the device.
+- **Data stays easy to inspect, back up, and fix with scripts.** One versioned JSON document,
+  strict import, as in Clog.
+- **Same stack and conventions as Clog** (`../clog`).
+
+## Concepts
+
+| Concept      | Meaning                                                                             |
+| ------------ | ----------------------------------------------------------------------------------- |
+| **Nutrient** | a tracked quantity: `kcal`, `protein`, `fat`, `carbs`, `water`                      |
+| **Product**  | something with nutrients per 100 g, from its label                                  |
+| **Recipe**   | products (and recipes) with amounts; usable everywhere a product is                 |
+| **Unit**     | a way to measure a food, defined in grams: `piece`, `ml`, `cup`, `serving`…         |
+| **Meal**     | a logged entry: foods taken together, at a date and time; a drink entry is one too  |
+| **Goals**    | daily targets per nutrient                                                          |
+| **Weight**   | my body weight, at most one value per day                                           |
+
+"Food" below means a product or a recipe: wherever one can be used, so can the other.
+
+### Nutrients
+
+- `kcal`, `protein`, `fat`, `carbs` (g), `water` (shown in ml, 1 g = 1 ml). The list is **built into the code**
+  (`src/config.ts`), so adding `fiber` or `sugar` later is a config change plus an optional
+  field.
+- **Water** counts only the drinks I log, not the water in foods. A **drink** is a product
+  with a water value (water: 1 g per g; coffee with milk: some kcal, mostly water); a drink
+  with calories counts towards both. See Drinks.
+- `kcal` comes **from the label**, not from the macros (labels round and use other factors).
+
+### Products
+
+- **Grams are the only base.** Every product stores its nutrients **per 100 g**, and every
+  amount is converted to grams for calculation.
+- **All other units are defined by hand, per product**, as grams: `piece = 60 g`,
+  `ml = 1.03 g` (milk), `cup = 250 g` (my mug of milk), `scoop = 30 g`. No standard volume
+  units are built in: "cup" means whatever my cup holds of that product.
+
+  ```json
+  {
+    "name": "egg",
+    "per100g": { "kcal": 143, "protein": 12.6, "fat": 9.5, "carbs": 0.7 },
+    "units": [{ "name": "piece", "grams": 60 }]
+  }
+  ```
+
+- **Every product can always be measured in `g`.**
+- The **last unit and amount used** for a food are preselected the next time.
+- **Nutrients can be entered and shown per any unit** of the product (agreed in principle):
+  the product form has its units section right away, and the nutrient values are entered
+  "per [100 g ▾]", where the selector also offers the product's units (`per bar` = 45 g,
+  `per ml`…). So a label's per-serving or per-100-ml column is copied as printed, and the app
+  converts. Internally a single scale is stored (per gram or per 100 g, a technical detail),
+  and everything else is computed from it.
+- **Unknown values are allowed** (agreed in principle; details to discuss): a nutrient left
+  empty is **unknown**, not 0. Totals and the chart show when they include unknowns (e.g. a
+  marker on the bar: "1 food without fat"), so the numbers never silently understate.
+  _(proposal: kcal is required; protein, fat, carbs may be unknown.)_
+- _(proposal)_ A soft warning when kcal and `4·P + 4·C + 9·F` differ by more than ~15%
+  (catches typos like 25 for 2.5); it never blocks saving.
+- Amounts are decimals (`0.5 cup`); no fractions.
+- **Units are defined in two places** (agreed): in the product form (a units section:
+  name + grams), and **on the fly in the composer**: the unit selector lists `g`, the food's
+  units and **＋ new unit…**, which asks for a name and its grams, saves the unit on the food
+  and selects it. _(proposal: the new-unit form offers names already used on other foods as
+  chips, to keep names consistent.)_
+- Grams are measured with a kitchen scale, so `g` is the everyday unit; other units are a
+  convenience for things not worth weighing (an egg, a slice, my mug).
+
+### Recipes
+
+- A recipe lists **ingredients**: a food (product or recipe) + amount + unit, like a meal.
+  "Oats with honey" = 60 g oats + 200 ml milk + 1 tsp honey.
+- Its **total weight** is the sum of its ingredients in grams (every unit is defined in
+  grams, so this is exact). It can be overridden by the weighed cooked weight, for dishes that
+  lose water while cooking (soups, stews).
+- Its **units**: `g` (of the finished dish), plus `serving` when the recipe says how many
+  servings it makes (e.g. "oats with honey" makes 1 serving, so `1 serving` = the whole bowl),
+  plus any custom unit (`bowl = 350 g`).
+- Its nutrients per 100 g are **computed** from the ingredients, never typed.
+- **Recipes are for things prepared as one dish**, not for repeating meals.
+- **Recipes can contain recipes**: `oats` (oats + water, cooked), `oats with honey` (oats +
+  honey), `oats with banana` (oats + banana). Cycles are refused.
+
+### Meals
+
+A meal is the logged entry: a group of products and recipes **taken together**, at a date
+and time. It has no name; a standalone snack or a single product is a meal too.
+
+```json
+{
+  "id": "6f1c…",
+  "eatenAt": "2026-11-17T08:30",
+  "ingredients": [
+    { "food": "oats with honey", "amount": 1, "unit": "serving" },
+    { "food": "egg", "amount": 2, "unit": "piece" }
+  ]
+}
+```
+
+- Meals are **live** (see Editing foods): their nutrients are computed from the current
+  foods, not stored. (How a meal refers to a food is a technical detail; names are shown
+  here for readability.)
+- **No name.** An optional free-text name may be added later if a need shows up; nothing
+  depends on it.
+- **Date and time** (agreed): set in the meal composer with a date-time control. It defaults
+  to **now** when the composer is opened from today, and to a time on that day when opened
+  from a past day _(proposal: just after that day's last meal, or 12:00 if it has none)_. The
+  date decides which day the meal counts towards; the time orders the meals within the day.
+  It is the time the meal is (or will be) eaten, so it can be in the future.
+
+### Goals
+
+Agreed:
+
+- **One daily target per nutrient**, and only for the nutrients I care about (likely `kcal`,
+  `protein`, `water`). Nutrients without a goal are counted and shown, just not compared with
+  anything.
+- **Goals change over time, simply by editing them** (agreed). There is one "my goals" form;
+  saving it makes the new goals **effective from today** (the day of the edit), and the old
+  ones stay valid for the days before. No start dates to enter, no past or future dates. A
+  day is judged by the goals valid on that day, so changing goals never re-judges the past.
+  The history of goals is kept, so past data can later be analysed to suggest better goals.
+- **Old goals are explicit** when viewing a past day whose goals differ from the current
+  ones: the chart says so _(proposal: a small "goals of 2026-11-01: 2000 kcal…" note under the
+  chart)_.
+- **Days before the first goals** show plain amounts, without goal lines.
+- Goals change a few times a year: the goals form lives in the menu.
+- **Nutrients without a goal are still shown** (agreed), e.g. to see the balance of protein,
+  fat and carbs in the diet. _(proposal: the chart shows them as plain amounts, plus the macro
+  split as shares of kcal, e.g. `P 30% · F 30% · C 40%`.)_
+- Goals are **daily only**. Weekly and monthly averages are reports over the daily data, to
+  add later, not goals.
+- **Direction** (whether going over is bad, like kcal, or fine, like protein) only changes
+  how the chart colours a bar. Added if cheap, as an optional property of a goal; not needed
+  for v1.
+
+```json
+"goals": [
+  { "from": "2026-11-01", "targets": { "kcal": 2000, "protein": 150, "water": 2500 } },
+  { "from": "2027-01-15", "targets": { "kcal": 2200, "protein": 160, "water": 2500 } }
+]
+```
+
+(`from` is the day the goals form was saved; it is never entered by hand.)
+
+### Weight
+
+Agreed:
+
+- A **daily body weight**: at most one value per day (kg, one decimal); entering it again
+  replaces it. Days without a weight are simply gaps.
+- **Logged from the day screen**: a small weight button near the date that **shows the last
+  weight** ("78.4 kg") and opens a number field prefilled with it, for the day on screen.
+- **Weight charts belong to the Stats screen** (see Screens), with the weekly, monthly and
+  yearly reports. _(proposal: daily points plus a trend line, e.g. a 7-day moving average,
+  since daily weight jumps with water and food.)_
+- **No built-in linking** of weight with kcal (no estimated burn, no goal suggestions): deeper
+  analysis is done by exporting the data to an AI. So the export must carry everything:
+  meals, foods, goals history and weights.
+
+```json
+"weights": [{ "date": "2026-11-17", "kg": 78.4 }]
+```
+
+### Drinks
+
+Agreed:
+
+- Water is counted **orthogonally** to the macros, so drinks are usually logged **on their
+  own**: the day screen has two buttons, **＋ Eat** and **＋ Drink**.
+- **＋ Drink** opens the composer for a drink entry _(proposal: the same composer, with drink
+  chips (products with a water value) first, so a glass of water is: ＋ Drink → `water` →
+  save; amount and unit prefilled from the last time)_.
+- A drink can also be added to a meal as an ingredient (coffee with breakfast).
+- **Drinks are in the day list**, as rows of their own, among the meals by time _(proposal:
+  marked with a drink icon, showing the amount, e.g. `15:10 · 💧 250 ml`)_.
+- Water is a bar in the day chart like the others; each nutrient's bar has its own colour.
+
+### Editing foods: everything is live
+
+Agreed:
+
+- **Meals and recipes store only food + amount + unit.** All numbers are always computed from
+  the current library: a recipe from its ingredients (all the way down), a meal from its
+  foods.
+- So **editing a food changes everything that uses it**: past meals, recipes, recipes that
+  contain those recipes. That is what an edit is for: **a correction** (a typo, a better
+  weight for a unit, a fixed recipe). Changing `oats` changes `oats with honey` and every
+  meal with either.
+- **When a food really changes** (a new recipe from the manufacturer, chili cooked with more
+  beans, a different cup), it is a **new food** (or a **new unit**), and the past keeps the
+  old one.
+- **The UI makes the difference explicit.** Editing a food that is used says what it will
+  change ("used in 14 meals and 2 recipes; saving changes them too"). Next to **Edit** there
+  is **Copy as new**: a new food prefilled from this one, to change and save under a new name.
+  _(proposal: Copy as new offers to archive the old food, so the chips show only the new one.)_
+- The same holds for units: changing a unit's grams corrects every use; a different cup is a
+  new unit.
+- Foods that are used can be archived, never deleted.
+
+## Screens
+
+### Day (the main screen)
+
+**The whole day fits on one phone screen** (agreed): the day chart plus 5–6 meals (snacks
+and drinks included), without scrolling.
+
+- The **same chart as in the meal composer**, without a meal being edited: taken vs the
+  daily goal for each nutrient that has one.
+- The **day's meals**, ordered by time. A meal row is **compact** and shows **no
+  ingredients**: its time and its totals, either as numbers (`690 kcal · 48 g protein`) or as
+  a small inline chart of its share of each goal _(to decide when designing the screen)_.
+- A small **edit icon** on the right of a meal row opens it in the meal composer (edit mode),
+  which also offers **Eat again** and **Delete** (two-tap). _(What tapping the row itself does,
+  if anything, is open.)_
+- **＋ Eat** and **＋ Drink** buttons: open the composer for the day on screen (see the meal
+  time defaults and Drinks).
+- A small **weight button** near the date, showing the last weight; tapping it logs the
+  day's weight (see Weight).
+- **Other days**: small ‹ › arrows next to the date. No swiping: going back is rare. A date
+  picker may be added to the menu.
+- _(proposal)_ Library, goals and backup are reached from a menu, as in Clog.
+
+### Meal composer
+
+Where the planning happens.
+
+- A list of ingredients, each with an amount and a unit, and its nutrients.
+- **Finding a food** (agreed): a text field with a row of chips, as in Clog; typing filters
+  the chips. Products and recipes are in the same list. _(proposal: chips ordered by recency,
+  as in Clog.)_
+- **Added inline** (agreed): tapping a food adds it to the ingredient list at once, with its
+  last-used unit and amount prefilled. Amounts are adjusted right there in the list while the
+  chart updates, so a whole meal can be added first and tuned after.
+- **Amount** is typed (numeric keypad). **Unit** is a selector of the food's units (`g` plus
+  its own, e.g. `piece`, `cup`).
+- Ingredients can be removed from the list.
+- **The day's chart is the guidance** (agreed). One bar per nutrient with a goal, in three
+  parts from the bottom: **faded** = already taken today (other meals of the day), **bright**
+  = this meal, **empty** = what remains to reach the goal. Updated on every change, so adding
+  an ingredient or changing an amount shows at once how the meal moves the day. No per-meal
+  target and no suggestions: I judge the meal's size myself.
+- _(proposal)_ Each bar is labelled with its numbers: taken + this meal / goal, e.g.
+  `1200 + 690 / 2000 kcal`. Going over the goal: the bright part continues past a goal line,
+  so the overshoot is visible.
+- **Save** logs the meal. Cancel discards it.
+- **Eat again** (agreed): open any past meal and press **Eat again**; the composer opens with a
+  copy of its ingredients and amounts as a new meal for **now**, to adjust and save. This is how
+  repeated meals are logged; there are no meal templates or recent-meal chips (a meal has no
+  name to show on a chip).
+
+### Library
+
+- **Products can be created from several places** (agreed): from the library (to add a
+  product without eating it) and from the composer, when the typed name matches nothing (a
+  "＋ create" chip opens the product form with the name filled in; after saving, the product
+  is added to the meal).
+- **Product form**: name, units, and nutrients entered per any unit (see Products).
+- **Recipe form = the meal composer** (agreed): ingredients with amounts and units, inline,
+  with live totals. After composing, the recipe gets its **yield**: how many servings it makes
+  (giving it a `serving` unit) and/or the weighed total weight.
+- No "save meal as recipe": a meal and a dish are different things.
+- Products and recipes can be edited and archived.
+- Archived foods are hidden from the chips but kept, since meals and recipes refer to them. A
+  food in use cannot be deleted.
+
+### Stats and reports
+
+A separate screen (from the menu) for looking back: weekly, monthly and yearly averages of
+the nutrients against the goals, and weight charts. _(Contents to design later; the day
+screen stays about today.)_
+
+### Goals and menu
+
+- Goals: one form with a target per nutrient (empty = no goal); see Goals.
+- Menu: backup export/import, app version (as in Clog).
+
+## Data and storage
+
+- One JSON document holds everything, shaped like the backup:
+
+  ```json
+  {
+    "version": "kcal 0.1.0",
+    "exportedAt": "…",
+    "goals": [],
+    "products": [],
+    "recipes": [],
+    "meals": [],
+    "weights": []
+  }
+  ```
+
+- **Versioning, strict import, problem screen, check on load:** the same rules as in Clog's
+  design (`kcal <semver>`, `0.x` minors may break, import replaces everything and is
+  all-or-nothing).
+- **Storage** _(proposal)_: IndexedDB rather than `localStorage`, storing the document as one
+  value under one key, so the model stays Clog's. Meals store only references and amounts,
+  so they are small, but years of them may still approach the ~5 MB `localStorage` cap.
+- **Ids**: the user works with **names** everywhere; how records refer to each other
+  internally (ids, names) is a technical detail, decided after the UX.
+- Persistent storage is requested, as in Clog.
+
+## Tech stack
+
+Same as Clog:
+
+- **TypeScript + Vite**, no UI framework, no runtime dependencies; `store.ts` with one-way data
+  flow (UI event → store action → new state → saved → views re-render).
+- `src/core/` pure logic (units, nutrient maths, recipes, goals), `src/data/` storage and
+  backup, `src/ui/` views. The charts are hand-drawn SVG or CSS bars, so no chart library.
+- **Vitest** for unit tests and jsdom UI tests; ESLint + Prettier.
+- **vite-plugin-pwa**: installable, offline, updates applied on the next launch.
+- **GitHub Pages**, deployed by GitHub Actions on push to `main`; CI runs lint, tests, build
+  and `npm audit --omit=dev`.
+
+## Later
+
+- Stats screen contents: weekly/monthly/yearly averages against goals, weight charts.
+- More nutrients (`fiber`, `sugar`, `salt`).
+- Product lookup in Open Food Facts (search, barcode) to prefill a new product.
+- Sync between devices.
+- Export for AI analysis (JSON backup is enough to start; CSV if useful).
+
+## Open questions
+
+UX details still to decide:
+
+1. **Unknown nutrient values**: which nutrients may be unknown (kcal too?), and how the chart
+   and totals show them. Agreed in principle (see Products).
+2. **New food replacing an old one**: when `milk` is copied as new and the old one archived,
+   may the new one also be called `milk` (names repeating among archived foods)?
+3. **Drink entries**: does a drink entry differ from a meal in the data, or only by what it
+   contains? What makes a product a drink (having a water value)?
+4. **Meal rows** on the day screen: totals as numbers or as a small inline chart; what tapping
+   the row itself does.
+5. The _(proposal)_ items above, to confirm or change while building.
+
+Technical questions, after the UX is settled:
+
+- How records refer to foods (ids, names); renaming.
+- Storage: IndexedDB from the start, or `localStorage` and migrate later.
+- Nutrients stored per gram or per 100 g.
+
+## Implementation plan
+
+To be written once the open questions are settled. A likely order:
+
+1. Scaffold from Clog's setup (Vite, TS, lint, tests, PWA, deploy).
+2. Core: units, nutrient maths, recipes (pure logic + tests); backup format and strict import.
+3. Library: products and recipes.
+4. Meal composer and the day screen with the chart.
+5. Goals form and goal history.
+6. Drinks.
+7. Weight logging; then the Stats screen (reports, weight charts).
