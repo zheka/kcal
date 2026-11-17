@@ -11,7 +11,8 @@ import { isReservedUnitName } from './units';
  * found, each saying where it is; an empty list means the data can be used as it is.
  * Nothing is fixed.
  */
-export function validateAppData(doc: Readonly<Record<string, unknown>>): string[] {
+export function validateAppData(data: object): string[] {
+  const doc = data as Readonly<Record<string, unknown>>;
   const problems: string[] = [];
   const check = new Checker(problems);
 

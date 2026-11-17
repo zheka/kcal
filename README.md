@@ -2,7 +2,7 @@
 
 A personal nutrition tracker: compose each meal from products and recipes while a chart shows
 how it moves the day towards its goals (kcal, protein, …), then save it. Offline-first PWA;
-all data stays on the device.
+all data stays on the device (`localStorage`).
 
 Live: https://zheka.github.io/kcal/
 
@@ -37,9 +37,14 @@ src/
     foods.ts        usages, ids
     text.ts         cleaning names
     time.ts         local dates and times
+    format.ts       reading typed numbers, formatting amounts
   data/
     backup.ts       versioned document format, strict import, backup export
-  ui/             Preact components
+    storage.ts      saved data in localStorage, checked on load
+  state/
+    store.ts        app state (signals) and the only functions that change it
+  ui/             Preact components: screens, forms, the ingredient editor
+    router.ts       hash routes, back navigation
   pwa.ts          service worker registration
   **/*.test.ts(x) tests next to the code they test
 ```

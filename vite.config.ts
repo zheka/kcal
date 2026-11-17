@@ -1,10 +1,16 @@
 /// <reference types="vitest/config" />
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   // Served from https://zheka.github.io/kcal/
   base: '/kcal/',
+  define: {
+    __APP_VERSION__: JSON.stringify(
+      (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version,
+    ),
+  },
   // Preact's JSX, compiled by Vite itself (no Babel).
   oxc: {
     jsx: { runtime: 'automatic', importSource: 'preact' },

@@ -8,3 +8,8 @@ export function registerServiceWorker(): void {
   if (!('serviceWorker' in navigator)) return;
   registerSW({ immediate: true });
 }
+
+/** Asks the browser not to evict the saved data under storage pressure. */
+export function requestPersistentStorage(): void {
+  void navigator.storage?.persist?.();
+}

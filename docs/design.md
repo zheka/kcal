@@ -434,8 +434,15 @@ A food or unit that is used is never deleted, only archived.
   document.
 - Size: meals hold only references and amounts, so the data grows by roughly 0.5–1 MB a year;
   serialising it takes a few milliseconds.
-- **IndexedDB** _(proposal)_: the document is stored as one value under one key. It avoids the
-  ~5 MB `localStorage` cap (reached after ~5 years) at the cost of an async load at startup.
+- **`localStorage`** (agreed): the document is stored as one value under the key `kcal`. It
+  loads synchronously at startup (no loading state), is simple to test and easy to inspect in
+  the browser's tools. Its cap of about 5 million characters is roughly 5+ years of data away;
+  the menu shows the saved size and warns past 3 million. Storage sits behind
+  `loadSaved()`/`saveData()`, so moving to IndexedDB later is a contained change: read the old
+  key once, write it to IndexedDB, remove the key. Eviction and persistent storage are the same
+  for both.
+- **Every change is checked before it is saved**: the store runs the integrity check on the new
+  data and saves it before showing it; an invalid change or a failed save changes nothing.
 - **Versioning.** The document carries `"version": "kcal <semver>"`, which marks it as a Kcal
   file and versions its schema (independent of app releases). While `0.x`, a minor bump may
   break (needs a migration) and a patch only adds optional fields. The app accepts the same
@@ -504,7 +511,6 @@ UX details still to decide:
 Technical questions (see Technical design):
 
 - Recipe cooked weight when ingredients change: ask to re-check it?
-- IndexedDB from the start (proposal) or `localStorage`.
 
 ## First prototype
 
@@ -525,7 +531,7 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
   screen are judged on the phone, then adjusted in rounds.
 - Prototype defaults for open questions: kcal required, other nutrients optional; meal rows
   show time and `kcal · protein`; tapping a row opens it like the edit icon; storage in
-  IndexedDB.
+  `localStorage`.
 
 ## Implementation plan
 
@@ -534,8 +540,10 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
 2. **Done:** core: units, food table, nutrient maths with unknowns, recipes, goals, integrity
    checks (pure logic + tests, `src/core/`); backup format and strict import
    (`src/data/backup.ts`).
-3. Storage (IndexedDB, check on load, problem screen) and the app state; library: products
-   and recipes.
+3. **Done:** storage (`localStorage`, check on load, problem screen), the app state
+   (`src/state/store.ts`), backup export/import in the menu; library: product form (values per
+   any unit, units, typo hint), recipe form (ingredient editor with food chips, create product
+   from the picker, new unit from a row, live totals, yield); delete unused foods.
 4. Meal composer and the day screen with the chart.
 5. Goals form and goal history.
 6. Water.
