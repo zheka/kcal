@@ -14,13 +14,13 @@ Requires Node 26 (see `.nvmrc`).
 
 ```bash
 npm install
-npm run dev        # dev server at http://localhost:5173/kcal/
+npm run dev        # dev server at http://localhost:5280/kcal/
 npm test           # unit and UI tests (Vitest, jsdom)
 npm run lint       # ESLint
 npm run format     # Prettier
 npm run typecheck  # TypeScript
 npm run build      # type-check + production build into dist/
-npm run preview    # serve dist/ locally (the way to try offline mode and updates)
+npm run preview    # serve dist/ at http://localhost:4280/kcal/ (offline mode, updates)
 ```
 
 ## Layout
