@@ -16,29 +16,29 @@ def f(x):
 def pt(x, y):
     return f"{f(x)},{f(y)}"
 
-# --- croissant: puffy lobes along a crescent whose tips curl in, hugging from below -----------
-cx, cy, rc = 256, 246, 138          # centre line of the crescent
-a0, a1 = math.radians(-30), math.radians(210)   # right tip, down through the bottom, left tip
+# --- croissant: wraps around from behind; its tips curl round to the front, hugging -----------
+cx, cy, rc = 256, 266, 136          # centre line of the ring
+a0, a1 = math.radians(100), math.radians(440)   # left front tip, up over the back, right front tip
 
 def centre(s):
-    """A point on the centre line at s in [0, 1]; the tips curl inwards."""
+    """A point on the centre line at s in [0, 1]; the tips curl in towards the front."""
     a = a0 + (a1 - a0) * s
     curl = abs(s - 0.5) * 2
-    r = rc - 34 * curl ** 3
+    r = rc - 28 * curl ** 2.2
     return a, r
 
 def thickness(s):
-    """Half-thickness of the croissant: thick in the middle, thin at the tips."""
-    return 9 + 40 * math.sin(math.pi * s) ** 0.9
+    """Half-thickness of the croissant: thick at the back (the middle), thin at the tips."""
+    return 7 + 43 * math.sin(math.pi * s) ** 1.3
 
 def at(s, offset):
     a, r = centre(s)
     return cx + (r + offset) * math.cos(a), cy + (r + offset) * math.sin(a)
 
-LOBES = 7
-lobe_paths = []
-# from both tips towards the middle, so the middle lobe overlaps its neighbours
-order = sorted(range(LOBES), key=lambda i: -abs(i - (LOBES - 1) / 2))
+LOBES = 9
+back_lobes, front_lobes = [], []
+# from the back (the middle) towards the tips, so nearer lobes overlap farther ones
+order = sorted(range(LOBES), key=lambda i: abs(i - (LOBES - 1) / 2))
 for i in order:
     s_from = max(0.0, (i - 0.08) / LOBES)
     s_to = min(1.0, (i + 1.08) / LOBES)
@@ -51,29 +51,54 @@ for i in order:
     im = at(s_mid, -t - puff * 0.5)
     e1 = at(s_from - 0.02, 0)    # round the ends where lobes meet
     e2 = at(s_to + 0.02, 0)
-    lobe_paths.append(
+    hx_, hy_ = at(s_mid, t * 0.45)
+    angle = math.degrees(centre(s_mid)[0]) + 90
+    path = (
         f'<path d="M{pt(*i1)} Q{pt(*e1)} {pt(*o1)} Q{pt(*om)} {pt(*o2)} '
         f'Q{pt(*e2)} {pt(*i2)} Q{pt(*im)} {pt(*i1)} Z" fill="url(#lobe)"/>'
+        f'<ellipse cx="{f(hx_)}" cy="{f(hy_)}" rx="{f(t * 0.5)}" ry="{f(t * 0.18)}" '
+        f'transform="rotate({f(angle)} {f(hx_)} {f(hy_)})" fill="#fff3d0" opacity="0.55" stroke="none"/>'
     )
+    # lobes low enough to be in front of the hedgehog's tummy are drawn over it
+    (front_lobes if at(s_mid, 0)[1] > cy + 25 else back_lobes).append(path)
 
-# a highlight along the top of the middle lobes
-hl = [at(0.30 + 0.40 * k / 30, thickness(0.30 + 0.40 * k / 30) * 0.35) for k in range(31)]
-highlight = "M" + " L".join(pt(*p) for p in hl)
+# the paws push against the croissant's sides
+paw_l = at(0.16, -thickness(0.16) * 0.55)
+paw_r = at(0.84, -thickness(0.84) * 0.55)
 
-# --- hedgehog --------------------------------------------------------------------------------
-hx, hy = 256, 214                    # centre of the quill crown
-rx, ry, spike = 106, 94, 26
+# the croissant's happy face, on its top lobe
+face_x, face_y = at(0.5, 10)
 
-def spikes(rx, ry, spike, n, a_from, a_to, cy_):
+# --- hedgehog, emoji-style: a bold spiky crown, a light face mask with a widow's peak --------
+hx, hy = 256, 268                    # centre of the head
+
+def crown(rx, ry, spike, n, a_from, a_to):
+    """A zigzag of n big spikes around the head."""
     pts = []
     for i in range(n * 2 + 1):
         a = a_from + (a_to - a_from) * i / (n * 2)
         k = 1 + (spike / rx if i % 2 else 0)
-        pts.append((hx + rx * k * math.cos(a), cy_ + ry * k * math.sin(a)))
+        pts.append((hx + rx * k * math.cos(a), hy + ry * k * math.sin(a)))
     return "M" + " L".join(pt(*p) for p in pts) + " Z"
 
-quills_back = spikes(rx, ry, spike, 13, math.radians(150), math.radians(390), hy)
-quills_front = spikes(rx * 0.86, ry * 0.86, spike * 0.8, 11, math.radians(158), math.radians(382), hy + 6)
+quills = crown(100, 88, 30, 15, math.radians(152), math.radians(388))
+
+# the face mask: wide at the brow with a widow's peak, narrowing to a pointed snout
+face = (
+    "M180,274 C178,242 200,224 226,224 L256,250 L286,224 "
+    "C312,224 334,242 332,274 C330,302 300,324 276,340 "
+    "Q256,354 236,340 C212,324 182,302 180,274 Z"
+)
+
+def drop(x, y, size):
+    """A big sweat drop: a teardrop pointing up and leaning outwards (to the right)."""
+    top = (x + size * 0.22, y - size)
+    return (
+        f"M{pt(*top)} "
+        f"C{pt(x + size * 0.55, y - size * 0.45)} {pt(x + size * 0.62, y)} {pt(x + size * 0.3, y + size * 0.22)} "
+        f"C{pt(x, y + size * 0.42)} {pt(x - size * 0.42, y + size * 0.12)} {pt(x - size * 0.3, y - size * 0.18)} "
+        f"C{pt(x - size * 0.2, y - size * 0.45)} {pt(x + size * 0.05, y - size * 0.7)} {pt(*top)} Z"
+    )
 
 svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {W}">
   <!-- Kcal: a hedgehog hugged by a croissant. Generated by scripts/make-icon.py; content stays inside
@@ -99,42 +124,70 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {W}">
   </defs>
 
   <rect width="{W}" height="{W}" fill="url(#bg)"/>
-  <ellipse cx="256" cy="420" rx="170" ry="26" fill="#0f4a2c" opacity="0.35"/>
+  <ellipse cx="256" cy="420" rx="140" ry="18" fill="#0f4a2c" opacity="0.35"/>
 
-  <!-- hedgehog: quills, body, ears, face -->
-  <path d="{quills_back}" fill="url(#quills)"/>
-  <path d="{quills_front}" fill="#9a7150"/>
-  <ellipse cx="256" cy="298" rx="92" ry="58" fill="#8a6344"/>
-  <circle cx="196" cy="196" r="17" fill="#e7c9a0"/>
-  <circle cx="196" cy="196" r="9" fill="#d59a8a"/>
-  <circle cx="316" cy="196" r="17" fill="#e7c9a0"/>
-  <circle cx="316" cy="196" r="9" fill="#d59a8a"/>
-  <ellipse cx="256" cy="244" rx="76" ry="64" fill="url(#face)"/>
-  <ellipse cx="256" cy="268" rx="40" ry="30" fill="#fbefdc"/>
-  <circle cx="221" cy="234" r="12" fill="#2a1d15"/>
-  <circle cx="291" cy="234" r="12" fill="#2a1d15"/>
-  <circle cx="225" cy="230" r="4.2" fill="#ffffff"/>
-  <circle cx="295" cy="230" r="4.2" fill="#ffffff"/>
-  <circle cx="203" cy="262" r="12" fill="#f29a8c" opacity="0.55"/>
-  <circle cx="309" cy="262" r="12" fill="#f29a8c" opacity="0.55"/>
-  <ellipse cx="256" cy="262" rx="14" ry="10.5" fill="#2a1d15"/>
-  <ellipse cx="252" cy="258.5" rx="4" ry="2.6" fill="#ffffff" opacity="0.7"/>
-  <path d="M246 280 Q256 288 266 280" fill="none" stroke="#2a1d15" stroke-width="3.5" stroke-linecap="round"/>
-
-  <!-- croissant, in front of the hedgehog's body -->
-  <g stroke="#8f4a1b" stroke-width="3.5" stroke-linejoin="round">
-    {chr(10).join("    " + p for p in lobe_paths).strip()}
+  <!-- croissant, the part behind the hedgehog -->
+  <g stroke="#7a3d14" stroke-width="5" stroke-linejoin="round">
+    {chr(10).join("    " + p for p in back_lobes).strip()}
   </g>
 
-  <!-- paws resting on the croissant -->
-  <g fill="#efd6b1" stroke="#9c7a55" stroke-width="2.5">
-    <ellipse cx="214" cy="338" rx="21" ry="13"/>
-    <ellipse cx="298" cy="338" rx="21" ry="13"/>
+  <!-- the croissant's happy face: it won't let go -->
+  <g stroke="#7a3d14" stroke-width="4" stroke-linecap="round" fill="none">
+    <path d="M{f(face_x - 25)},{f(face_y - 2)} Q{f(face_x - 17)},{f(face_y - 11)} {f(face_x - 9)},{f(face_y - 2)}"/>
+    <path d="M{f(face_x + 9)},{f(face_y - 2)} Q{f(face_x + 17)},{f(face_y - 11)} {f(face_x + 25)},{f(face_y - 2)}"/>
+    <path d="M{f(face_x - 11)},{f(face_y + 7)} Q{f(face_x)},{f(face_y + 17)} {f(face_x + 11)},{f(face_y + 7)}"/>
   </g>
-  <g stroke="#9c7a55" stroke-width="2.5" stroke-linecap="round">
-    <path d="M207 331 v8 M214 330 v9 M221 331 v8"/>
-    <path d="M291 331 v8 M298 330 v9 M305 331 v8"/>
+  <circle cx="{f(face_x - 33)}" cy="{f(face_y + 6)}" r="6" fill="#f08a6f" opacity="0.6"/>
+  <circle cx="{f(face_x + 33)}" cy="{f(face_y + 6)}" r="6" fill="#f08a6f" opacity="0.6"/>
+
+  <!-- hedgehog, inside the hug: wants out -->
+  <g stroke="#3a2416" stroke-width="5" stroke-linejoin="round">
+    <ellipse cx="256" cy="344" rx="74" ry="44" fill="#b98a62"/>
+    <path d="{quills}" fill="#5e3c26"/>
+    <circle cx="188" cy="236" r="13" fill="#e2bf94"/>
+    <circle cx="324" cy="236" r="13" fill="#e2bf94"/>
+    <path d="{face}" fill="#f6e4c6"/>
   </g>
+  <circle cx="229" cy="282" r="13" fill="#221710"/>
+  <circle cx="283" cy="282" r="13" fill="#221710"/>
+  <circle cx="233" cy="277" r="4.5" fill="#ffffff"/>
+  <circle cx="287" cy="277" r="4.5" fill="#ffffff"/>
+  <g stroke="#3a2416" stroke-width="6" stroke-linecap="round" fill="none">
+    <path d="M208,262 Q219,252 236,256"/>
+    <path d="M304,262 Q293,252 276,256"/>
+  </g>
+  <circle cx="206" cy="306" r="11" fill="#f29a8c" opacity="0.55"/>
+  <circle cx="306" cy="306" r="11" fill="#f29a8c" opacity="0.55"/>
+  <ellipse cx="256" cy="336" rx="18" ry="13.5" fill="#221710"/>
+  <ellipse cx="250.5" cy="331" rx="5.5" ry="3.3" fill="#ffffff" opacity="0.75"/>
+
+  <!-- big sweat drops -->
+  <g id="sweat">
+    <path d="{drop(338, 236, 36)}" fill="#8fd6fa" stroke="#2f7fb3" stroke-width="3.5" stroke-linejoin="round"/>
+    <ellipse cx="331" cy="236" rx="4" ry="7.5" transform="rotate(-15 331 236)" fill="#ffffff" opacity="0.9"/>
+  </g>
+  <use href="#sweat" transform="translate(512 0) scale(-1 1)"/>
+
+  <!-- struggle marks: the hedgehog wriggles to get out -->
+  <g stroke="#e9f6ee" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M86,206 Q78,226 84,246"/>
+    <path d="M70,196 Q60,226 68,256"/>
+    <path d="M426,206 Q434,226 428,246"/>
+    <path d="M442,196 Q452,226 444,256"/>
+  </g>
+
+  <!-- croissant tips, curled round in front of the hedgehog -->
+  <g stroke="#7a3d14" stroke-width="5" stroke-linejoin="round">
+    {chr(10).join("    " + p for p in front_lobes).strip()}
+  </g>
+
+  <!-- paws pushing against the croissant -->
+  <g id="paw">
+    <ellipse cx="{f(paw_l[0])}" cy="{f(paw_l[1])}" rx="19" ry="15" fill="#f6e4c6" stroke="#3a2416" stroke-width="4.5"/>
+    <path d="M{f(paw_l[0] - 7)},{f(paw_l[1] - 9)} v7 M{f(paw_l[0])},{f(paw_l[1] - 10)} v8 M{f(paw_l[0] + 7)},{f(paw_l[1] - 9)} v7"
+      stroke="#3a2416" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+  <use href="#paw" transform="translate(512 0) scale(-1 1)"/>
 </svg>
 '''
 open(sys.argv[1], 'w').write(svg)
