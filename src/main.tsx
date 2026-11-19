@@ -31,10 +31,16 @@ function start(): void {
 
 if (import.meta.env.DEV) {
   // Development: show the app in a phone-sized frame on desktop browsers (see dev/phoneFrame.ts).
-  void import('./dev/phoneFrame').then(({ showPhoneFrame, wantsPhoneFrame }) => {
-    if (wantsPhoneFrame()) showPhoneFrame();
-    else start();
-  });
+  void import('./dev/phoneFrame').then(
+    ({ showBackToPhoneLink, showPhoneFrame, wantsFullWidth, wantsPhoneFrame }) => {
+      if (wantsPhoneFrame()) {
+        showPhoneFrame();
+      } else {
+        start();
+        if (wantsFullWidth()) showBackToPhoneLink();
+      }
+    },
+  );
 } else {
   start();
 }

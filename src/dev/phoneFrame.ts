@@ -83,3 +83,32 @@ export function showPhoneFrame(): void {
     sync();
   });
 }
+
+/** Whether the app was asked for at full width (`?full`) on a screen wide enough for the frame. */
+export function wantsFullWidth(): boolean {
+  const inFrame = window.self !== window.top;
+  const narrow = window.matchMedia(`(max-width: ${PHONE.width + 100}px)`).matches;
+  return !inFrame && !narrow && new URLSearchParams(location.search).has('full');
+}
+
+/** At full width, a small link in the window's corner leads back to the phone frame. */
+export function showBackToPhoneLink(): void {
+  const back = new URL(location.href);
+  back.searchParams.delete('full');
+  const link = document.createElement('a');
+  link.href = back.href;
+  link.textContent = 'Phone frame';
+  link.setAttribute(
+    'style',
+    'position: fixed; left: 12px; bottom: 12px; z-index: 100; padding: 8px 12px;' +
+      'border-radius: 8px; background: #1c1f1e; color: #ffffff; font: 13px system-ui, sans-serif;' +
+      'text-decoration: none; opacity: 0.85;',
+  );
+  // Go back to the screen shown now (the app moves between screens with pushState, no event).
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    back.hash = location.hash;
+    location.href = back.href;
+  });
+  document.body.append(link);
+}
