@@ -2,9 +2,9 @@
 
 High-level design of Kcal, a personal nutrition tracker.
 
-Status (2026-11-17): **UX agreed at a high level.** Items marked _(proposal)_ are suggestions
-not discussed yet; Open questions lists what is still undecided. Technical details come
-after the UX.
+Status (2026-11-19): **UX agreed at a high level; backup format agreed** (see
+[backup-format.md](backup-format.md), not implemented yet). Items marked _(proposal)_ are
+suggestions not discussed yet; Open questions lists what is still undecided.
 
 ## Goals and principles
 
@@ -25,16 +25,16 @@ after the UX.
 
 ## Concepts
 
-| Concept      | Meaning                                                                     |
-| ------------ | --------------------------------------------------------------------------- |
-| **Nutrient** | a quantity in food: `kcal`, `protein`, `fat`, `carbs`                       |
-| **Product**  | something with nutrients per 100 g, from its label                          |
-| **Recipe**   | products (and recipes) with amounts; usable everywhere a product is         |
-| **Unit**     | a way to measure a food, defined in grams: `piece`, `ml`, `cup`, `serving`… |
-| **Meal**     | a logged entry: foods taken together, at a date and time                    |
-| **Water**    | plain water I drink, logged separately from meals, in ml                    |
-| **Goals**    | daily targets per nutrient                                                  |
-| **Weight**   | my body weight, at most one value per day                                   |
+| Concept      | Meaning                                                                       |
+| ------------ | ----------------------------------------------------------------------------- |
+| **Nutrient** | a quantity in food: `kcal`, `protein`, `fat`, `carbs`                         |
+| **Product**  | something with nutrients per gram, from its label                             |
+| **Recipe**   | products (and recipes) with amounts; usable everywhere a product is           |
+| **Unit**     | a way to measure a food: `piece`, `ml`, `cup` (in grams), `serving` (a share) |
+| **Meal**     | a logged entry: foods taken together, at a date and time                      |
+| **Water**    | plain water I drink, logged separately from meals, in ml                      |
+| **Goals**    | daily targets per nutrient                                                    |
+| **Weight**   | my body weight, at most one value per day                                     |
 
 "Food" below means a product or a recipe: wherever one can be used, so can the other.
 
@@ -48,35 +48,25 @@ after the UX.
 
 ### Products
 
-- **Grams are the only base.** Every product stores its nutrients **per 100 g**, and every
-  amount is converted to grams for calculation.
+- **Everything goes through grams** (agreed). Every product stores its nutrients **per 1 g**,
+  and every amount is converted to grams for calculation. A unit that is not really a weight
+  (ml of a drink, an egg of size M) gets a reasonable figure in grams, corrected later if
+  needed: that error is far below the tolerances of labels.
 - **All other units are defined by hand, per product**, as grams: `piece = 60 g`,
   `ml = 1.03 g` (milk), `cup = 250 g` (my mug of milk), `scoop = 30 g`. No standard volume
   units are built in: "cup" means whatever my cup holds of that product.
-
-  ```json
-  {
-    "name": "egg",
-    "per100g": { "kcal": 143, "protein": 12.6, "fat": 9.5, "carbs": 0.7 },
-    "units": [{ "name": "piece", "grams": 60 }]
-  }
-  ```
-
-- **Units belong to their food** (agreed): they are stored inside the product (or recipe)
-  and mean nothing outside it ("cup" of oats ≠ "cup" of milk). Nothing about units is shared
-  between foods except, as a typing aid, their names.
-- **Built-in measurement units** are the exception: fixed conversions defined in the code,
-  available for every food and never stored: `g` (the base) and `kg` = 1000 g. `ml` is
-  **not** built in, since grams per ml depend on the product: it is a product unit like any
-  other.
-- **Every food can always be measured in `g` (and `kg`).**
+- **Units belong to their food** (agreed): they are stored inside the product and mean
+  nothing outside it ("cup" of oats ≠ "cup" of milk). Nothing about units is shared between
+  foods except, as a typing aid, their names.
+- **Grams are built in** (agreed): every product can be measured in `g`, which is never stored
+  and is reserved as a unit name. There is no `kg`.
+- How products are stored: see [backup-format.md](backup-format.md).
 - The **last unit and amount used** for a food are preselected the next time.
 - **Nutrients can be entered and shown per any unit** of the product (agreed in principle):
   the product form has its units section right away, and the nutrient values are entered
   "per [100 g ▾]", where the selector also offers the product's units (`per bar` = 45 g,
   `per ml`…). So a label's per-serving or per-100-ml column is copied as printed, and the app
-  converts. Internally a single scale is stored (per gram or per 100 g, a technical detail),
-  and everything else is computed from it.
+  converts it to per gram, rounded once when stored.
 - **Unknown values are allowed** (agreed in principle; details to discuss): a nutrient left
   empty is **unknown**, not 0. Totals and the chart show when they include unknowns (e.g. a
   marker on the bar: "1 food without fat"), so the numbers never silently understate.
@@ -96,13 +86,14 @@ after the UX.
 
 - A recipe lists **ingredients**: a food (product or recipe) + amount + unit, like a meal.
   "Oats with honey" = 60 g oats + 200 ml milk + 1 tsp honey.
-- Its **total weight** is the sum of its ingredients in grams (every unit is defined in
-  grams, so this is exact). It can be overridden by the weighed cooked weight, for dishes that
-  lose water while cooking (soups, stews).
-- Its **units**: `g` (of the finished dish), plus `serving` when the recipe says how many
-  servings it makes (e.g. "oats with honey" makes 1 serving, so `1 serving` = the whole bowl),
-  plus any custom unit (`bowl = 350 g`).
-- Its nutrients per 100 g are **computed** from the ingredients, never typed.
+- **A recipe is eaten only in its own units** (agreed): the form asks what it makes
+  ("makes 6 servings", "makes 4 pieces"), and a recipe has at least one such unit. There is no
+  built-in unit for recipes, not even grams.
+- **"Makes 1600 g"** is one more unit: the weighed pot. Then "350 g of soup" from the scale is
+  right even when cooking changed the weight.
+- Its nutrients are **computed** from the ingredients, never typed. Internally a recipe is
+  measured by the sum of its ingredients in grams; one of a unit is that sum divided by what
+  it makes.
 - **Recipes are for things prepared as one dish**, not for repeating meals.
 - **Recipes can contain recipes**: `oats` (oats + water, cooked), `oats with honey` (oats +
   honey), `oats with banana` (oats + banana). Cycles are refused.
@@ -112,20 +103,9 @@ after the UX.
 A meal is the logged entry: a group of products and recipes **taken together**, at a date
 and time. It has no name; a standalone snack or a single product is a meal too.
 
-```json
-{
-  "id": "6f1c…",
-  "eatenAt": "2026-11-17T08:30",
-  "ingredients": [
-    { "food": "oats with honey", "amount": 1, "unit": "serving" },
-    { "food": "egg", "amount": 2, "unit": "piece" }
-  ]
-}
-```
-
-- Meals are **live** (see Editing foods): their nutrients are computed from the current
-  foods, not stored. (How a meal refers to a food is a technical detail; names are shown
-  here for readability.)
+- Meals are **live** (see Editing foods): they store only their foods, amounts and units;
+  their nutrients are computed from the current foods. How meals are stored: see
+  [backup-format.md](backup-format.md).
 - **No name.** An optional free-text name may be added later if a need shows up; nothing
   depends on it.
 - **Date and time** (agreed): set in the meal composer with a date-time control. It defaults
@@ -133,6 +113,9 @@ and time. It has no name; a standalone snack or a single product is a meal too.
   from another day: one minute after that day's last meal, or 12:00 if it has none. The
   date decides which day the meal counts towards; the time orders the meals within the day.
   It is the time the meal is (or will be) eaten, so it can be in the future.
+- **Stored as a UTC timestamp** (agreed); the day and time are shown in the device's current
+  time zone. The composer edits only the minute; the hidden seconds keep meals in the same
+  minute in the order they were logged.
 
 ### Goals
 
@@ -167,7 +150,8 @@ Agreed:
 ]
 ```
 
-(`from` is the day the goals form was saved; it is never entered by hand.)
+(`from` is when the goals form was saved; it is never entered by hand. Whether it is stored as
+a date or a UTC timestamp is open: see [backup-format.md](backup-format.md).)
 
 ### Weight
 
@@ -299,12 +283,12 @@ Where the planning happens.
   is added to the meal).
 - **Product form**: name, units, and nutrients entered per any unit (see Products).
 - **Recipe form = the meal composer** (agreed): ingredients with amounts and units, inline,
-  with live totals. After composing, the recipe gets its **yield**: how many servings it makes
-  (giving it a `serving` unit) and/or the weighed total weight.
+  with live totals. After composing, the recipe gets its **units**: what it makes ("6
+  servings", "4 pieces", "1600 g" if the pot is weighed), at least one.
 - No "save meal as recipe": a meal and a dish are different things.
-- Products and recipes can be edited and archived.
-- Archived foods are hidden from the chips but kept, since meals and recipes refer to them. A
-  food in use cannot be deleted.
+- Products and recipes can be edited. A food in use cannot be deleted.
+- _(Later)_ Archiving: archived foods are hidden from the chips but kept, since meals and
+  recipes refer to them.
 
 ### Stats and reports
 
@@ -335,68 +319,44 @@ A static PWA with no server (see UI rendering for the choice of Preact):
 - **GitHub Pages**, deployed by GitHub Actions on push to `main`; CI runs lint, tests, build
   and `npm audit --omit=dev`.
 
-### Stored data: sources only, references by id
+### Stored data
 
-The data holds **only what was entered**; every number shown is derived (see Derived data).
+**The format of the stored data and the backup is specified in
+[backup-format.md](backup-format.md).** In short: only what was entered is stored, every
+number shown is derived; records refer to each other by UUID; units live inside their
+product; the file is deterministic (fixed field and list order).
 
-- **Records refer to each other by id, never by name.** Names are for display, so renaming
-  never touches meals or recipes. Products, recipes and meals get random UUIDs, unique
-  across all three.
-- **Food names are unique** across products and recipes, ignoring case (`Skyr` = `skyr`),
-  since they share one list of chips. Names are cleaned (trimmed, whitespace collapsed,
-  Unicode NFC); case is kept for display.
-- **Units live inside their food**, with an id unique within that food (`u1`, `u2`, …). An
-  ingredient refers to a unit through its food, or to a built-in unit (`g`, `kg`, a recipe's
-  `serving`) by its code name. A food's own units may not be named like a built-in unit
-  (ignoring case); a product may have its own `serving` (from its label), a recipe may not.
-- **Nutrients are stored per 100 g** _(proposal)_: label-like and readable; values entered per
-  another unit are converted when the product is saved.
-- **Unknown is absent**: a nutrient the label does not give is missing from `per100g`, not 0.
+**Three forms of the data** (agreed, the guiding principle):
 
-```json
-{
-  "version": "kcal 0.1.0",
-  "exportedAt": "2026-11-17T09:00:00.000Z",
-  "goals": [{ "from": "2026-11-01", "targets": { "kcal": 2000, "protein": 150 } }],
-  "products": [
-    {
-      "id": "p-6f1c…",
-      "name": "egg",
-      "per100g": { "kcal": 143, "protein": 12.6, "fat": 9.5, "carbs": 0.7 },
-      "units": [{ "id": "u1", "name": "piece", "grams": 60 }],
-      "archived": false
-    }
-  ],
-  "recipes": [
-    {
-      "id": "r-91ab…",
-      "name": "oats with honey",
-      "ingredients": [
-        { "food": "r-77c0…", "unit": "g", "amount": 300 },
-        { "food": "p-3d2e…", "unit": "u1", "amount": 1 }
-      ],
-      "cookedGrams": null,
-      "servings": 1,
-      "units": [],
-      "archived": false
-    }
-  ],
-  "meals": [
-    {
-      "id": "m-0a7f…",
-      "eatenAt": "2026-11-17T08:30",
-      "ingredients": [
-        { "food": "r-91ab…", "unit": "serving", "amount": 1 },
-        { "food": "p-6f1c…", "unit": "u1", "amount": 2 }
-      ]
-    }
-  ]
-}
+```
+forms ──(save: check, convert, round)──▶ stored data ──(derive)──▶ in-memory tables
+  ▲                                          │
+  └────────────(open a form to edit)─────────┘
 ```
 
-(Ids shortened for readability; `serving` is the recipe's built-in unit from its `servings`.
-Schema `kcal 0.1.0` holds exactly these four lists; water and weights are added later as new
-optional lists, a patch version.)
+| Form                 | Made for            | What it holds                                                                           |
+| -------------------- | ------------------- | --------------------------------------------------------------------------------------- |
+| **Forms**            | easy to enter       | text as typed, values per a label's column ("per bar"), "makes 6 servings", local times |
+| **Stored data**      | consistent to store | the canonical data in exactly the format of this file; the single source of truth       |
+| **In-memory tables** | easy to use         | foods by id, units with exact grams, nutrients per gram, meals by day; all derived      |
+
+- **The stored data is primary**: the one source of truth, and every other form is converted
+  to it (forms, on save) or derived from it (tables, and forms opened for editing). It is:
+  - **normalized**: every fact is stored once; nothing derived, duplicated or cached is stored;
+  - **consistent**: checked on every change and every load, so it is always valid.
+- The app keeps the stored data in memory in exactly this format; saving writes it out,
+  restoring reads it in.
+- **Data flows one way.** Saving a form converts what was typed into stored data; the tables
+  are then recomputed from the stored data. Tables are never edited and never written back;
+  opening a form to edit starts from the stored data.
+- **Conversion and rounding happen in one place**: form → stored. That is where "rounded once,
+  when stored" lives.
+- **One integrity check**, on stored data, for form saves and imports alike; forms only give
+  friendly messages first.
+- **No cascading writes**: an edit changes stored data, and everything derived is recomputed.
+- **Only the stored format is versioned**; forms and tables can change freely.
+- **Tests** cover the three conversions (form → stored, stored → form, stored → tables) and the
+  round trip stored → file → stored, byte for byte.
 
 ### Derived data: computed, never stored
 
@@ -404,7 +364,7 @@ optional lists, a patch version.)
 that uses it is recomputed on the next render.
 
 ```
-product → per gram          (stored per100g / 100)
+product → per gram          (stored per gram)
 recipe  → per gram          Σ(ingredient grams × ingredient per gram) / total grams
 meal    → nutrients         Σ(ingredient grams × food per gram)
 day     → nutrients         Σ meals of that date
@@ -421,29 +381,18 @@ day     → nutrients         Σ meals of that date
   amount is shown as `≥ value`. An ingredient with amount 0 counts nothing, unknowns included.
 - **"Used in N meals and M recipes"** is a scan over meals and recipes on demand
   (milliseconds), not a stored index.
-- **Total weight of a recipe** is the sum of its ingredients in grams, unless `cookedGrams` is
-  set. _(Open: when ingredients change, the stored cooked weight may no longer match; the
-  recipe form should probably ask to re-check it.)_
+- **The weight basis of a recipe** is the sum of its ingredients in grams; one of its units
+  is that sum divided by what the unit makes, divided last.
+- **The in-memory food table** holds, for every product and recipe, the exact grams of each
+  of its units (integer thousandths) and the nutrients per gram, so an amount becomes exact
+  grams first and nutrients last: 100 g and 4 × 25 g give exactly the same result.
 
 ### Integrity
 
-Checked on every load and on every import:
-
-- every record has exactly its fields (unknown fields are refused, which catches typos);
-- every food reference resolves; every unit reference exists on its food (or is built in);
-- recipes have no cycles, and a positive total weight;
-- products have `kcal`; nutrient values and amounts are non-negative numbers; unit grams,
-  cooked weight, servings and goal targets are positive;
-- ids are unique; names are clean and unique as described above;
-- meals and recipes have at least one ingredient;
-- `eatenAt` is a local `YYYY-MM-DDTHH:mm`, goal dates are `YYYY-MM-DD` and strictly
-  increasing.
-
-Every problem is reported with where it is (`product #3 "egg", unit #2: grams must be a
-positive number`). References are checked only once everything else is well-formed, so each
-message has a single cause.
-
-A food or unit that is used is never deleted, only archived.
+Checked on every load and every import: see [backup-format.md](backup-format.md). Every
+problem is reported with where it is (`product #3 "egg", unit #2: grams must be a positive
+number`). References are checked only once everything else is well-formed, so each message
+has a single cause.
 
 ### Storage
 
