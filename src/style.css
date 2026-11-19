@@ -521,6 +521,34 @@ legend select.input {
   cursor: pointer;
 }
 
+/* App version: title, version and build, and what a tap does */
+.menu-item.version {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding-block: 10px;
+}
+
+.menu-item.version:disabled {
+  cursor: default;
+}
+
+.menu-item-detail {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-item-status {
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+
+.menu-item.version.update .menu-item-status {
+  font-weight: 600;
+}
+
 .menu-item.file input {
   position: absolute;
   width: 1px;

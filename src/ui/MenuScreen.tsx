@@ -1,4 +1,5 @@
 import { APP_NAME } from '../config';
+import { checkForUpdate, installUpdate, updateState, type UpdateState } from '../pwa';
 import { useState } from 'preact/hooks';
 import type { AppData } from '../core/types';
 import { localDate } from '../core/time';
@@ -100,13 +101,12 @@ export function MenuScreen({ store }: { store: Store }) {
         {importing.step === 'done' && <p class="notice">Imported.</p>}
       </section>
 
+      <AppVersion />
+
       <section class="section about">
         <p>
           Saved data: {(size / 1_000_000).toFixed(2)} MB of about 5 MB
           {size > SIZE_WARNING_CHARS && ' (getting full: time to move the data to IndexedDB)'}
-        </p>
-        <p>
-          {APP_NAME} {__APP_VERSION__}
         </p>
       </section>
     </div>
@@ -119,4 +119,39 @@ function summary(data: AppData): string {
     plural(data.recipes.length, 'recipe'),
     plural(data.meals.length, 'meal'),
   ].join(', ');
+}
+
+const STATUS: Record<UpdateState, string> = {
+  unavailable: import.meta.env.DEV
+    ? 'Updates work in the built app (npm run preview)'
+    : 'Updates are not available in this browser',
+  idle: 'Tap to check for updates',
+  checking: 'Checking for updates…',
+  'up-to-date': 'Up to date. Tap to check again',
+  available: 'Update available: tap to install',
+  installing: 'Installing the update…',
+  offline: 'Offline: connect to check for updates',
+  failed: 'Could not check for updates. Tap to try again',
+};
+
+/** The app's version and build; a tap checks for an update, or installs one that is ready. */
+function AppVersion() {
+  const state = updateState.value;
+  const busy = state === 'checking' || state === 'installing' || state === 'unavailable';
+  return (
+    <button
+      type="button"
+      class={`menu-item version ${state === 'available' ? 'update' : ''}`}
+      disabled={busy}
+      onClick={() => void (state === 'available' ? installUpdate() : checkForUpdate())}
+    >
+      <span class="menu-item-title">App version</span>
+      <span class="menu-item-detail">
+        {APP_NAME} {__APP_VERSION__} · {__APP_BUILD__}
+      </span>
+      <span class="menu-item-status" aria-live="polite">
+        {STATUS[state]}
+      </span>
+    </button>
+  );
 }

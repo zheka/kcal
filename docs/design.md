@@ -325,7 +325,12 @@ screen stays about today.)_
 ### Goals and menu
 
 - Goals: one form with a target per nutrient (empty = no goal); see Goals.
-- Menu: backup export/import, app version and update.
+- Menu: backup export/import, and **App version** (agreed): the version and the build (the
+  short commit hash, so two deploys of the same version can be told apart), and what a tap
+  does: check for an update ("Tap to check for updates", "Up to date", "Offline: connect to
+  check for updates"), or install one that is ready ("Update available: tap to install"), which
+  reloads into the new version. A new version otherwise downloads in the background and takes
+  over on the next launch; the app never reloads by itself.
 
 ## Technical design
 

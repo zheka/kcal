@@ -78,6 +78,14 @@ The frame is development-only (`src/dev/phoneFrame.ts`) and not part of the prod
 
 Runtime libraries are bundled into the app and cached with it; nothing is loaded from a CDN.
 
+## Installing on a phone
+
+kcal is a PWA: open https://zheka.github.io/kcal/ in Chrome and choose **⋮ → Add to Home screen
+→ Install**. It then opens full-screen and works offline; the data stays on the device. A new
+version downloads in the background and takes over on the next launch, or right away from the
+menu: **App version** shows the version and build, and a tap checks for an update or installs
+one that is ready.
+
 ## Dependencies
 
 CI runs `npm audit --omit=dev`, which covers everything that ships. For the build tooling,

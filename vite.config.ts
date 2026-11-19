@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import { APP_NAME } from './src/config.ts';
@@ -15,6 +16,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(
       (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version,
     ),
+    __APP_BUILD__: JSON.stringify(buildId()),
   },
   // Preact's JSX, compiled by Vite itself (no Babel).
   oxc: {
@@ -29,6 +31,8 @@ export default defineConfig({
       // Icons are generated from public/icon.svg at build time (see pwa-assets.config.ts).
       pwaAssets: { config: true, overrideManifestIcons: true },
       manifest: {
+        // A stable identity for the installed app, whatever its start URL becomes.
+        id: '/kcal/',
         name: APP_NAME,
         short_name: APP_NAME,
         description: 'Compose meals against daily nutrition goals',
@@ -57,4 +61,16 @@ function appName(): Plugin {
     name: 'kcal-app-name',
     transformIndexHtml: (html) => html.replaceAll('%APP_NAME%', APP_NAME),
   };
+}
+
+/** Which build this is: the commit it was built from (CI sets GITHUB_SHA), or `dev`. */
+function buildId(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    return 'dev';
+  }
 }
