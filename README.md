@@ -81,6 +81,13 @@ The app's font is Roboto (`@fontsource-variable/roboto`, SIL Open Font License),
 own font, shipped with the app so text has the same width on the phone, in `npm run dev` and in
 the layout tests; only its Latin file (43 KB) is cached for offline use.
 
+## Open Food Facts
+
+Scanning a barcode in a new product looks it up on [Open Food Facts](https://world.openfoodfacts.org),
+the free open food database, to fill in the name and the macros. Only the barcode is sent;
+nothing else leaves the device. Scanning uses the browser's built-in barcode reader (Chrome on
+Android), so the button only appears where the browser has one.
+
 ## Installing on a phone
 
 kcal is a PWA: open https://zheka.github.io/kcal/ in Chrome and choose **⋮ → Add to Home screen

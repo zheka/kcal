@@ -47,6 +47,7 @@ interface FoodInfo {
 class Checker {
   private readonly ids = new Map<string, string>();
   private readonly names = new Map<string, string>();
+  private readonly barcodes = new Map<string, string>();
   private readonly foods = new Map<string, FoodInfo>();
   /** Every ingredient seen, checked against the foods once all of them are known. */
   private readonly ingredients: { where: string; food: string; unit: string }[] = [];
@@ -211,7 +212,7 @@ class Checker {
 
   product(value: unknown, index: number): void {
     const where = this.describe('product', value, index);
-    const product = this.record(value, where, ['id', 'name', 'perGram', 'units']);
+    const product = this.record(value, where, ['id', 'name', 'perGram', 'units'], ['barcode']);
     if (!product) return;
     this.products.push(product);
     this.food(product, 'product', where, (unit, at) => {
@@ -221,6 +222,18 @@ class Checker {
       this.number(unit.grams, at, 'grams', true);
     });
     this.nutrients(product.perGram, `${where}, perGram`, false);
+    if ('barcode' in product) this.barcode(product.barcode, where);
+  }
+
+  /** A barcode: 8 to 14 digits (EAN-8, UPC, EAN-13, GTIN-14), unique among products. */
+  private barcode(value: unknown, where: string): void {
+    if (typeof value !== 'string' || !/^\d{8,14}$/.test(value)) {
+      this.problem(where, 'barcode must be 8 to 14 digits');
+      return;
+    }
+    const seen = this.barcodes.get(value);
+    if (seen) this.problem(where, `barcode ${value} is also used by ${seen}`);
+    else this.barcodes.set(value, where);
   }
 
   recipe(value: unknown, index: number): void {

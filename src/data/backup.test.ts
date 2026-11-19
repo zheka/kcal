@@ -19,13 +19,15 @@ const data = appData({
 const now = new Date('2026-11-17T19:45:03.207Z');
 
 describe('versions', () => {
-  it('accepts its own version', () => {
-    expect(VERSION_TAG).toBe('kcal 0.1.0');
+  it('accepts its own version and older patches of it', () => {
+    expect(VERSION_TAG).toBe('kcal 0.1.1');
+    expect(versionProblem('kcal 0.1.1')).toBeNull();
+    // 0.1.1 only added an optional field (barcode): 0.1.0 files are read as they are
     expect(versionProblem('kcal 0.1.0')).toBeNull();
   });
 
   it('refuses newer versions, older minors and non-kcal files', () => {
-    expect(versionProblem('kcal 0.1.1')).toMatch(/newer than this app .*update the app/);
+    expect(versionProblem('kcal 0.1.2')).toMatch(/newer than this app .*update the app/);
     expect(versionProblem('kcal 0.0.9')).toMatch(/older than this app .*needs an upgrade/);
     expect(versionProblem(undefined)).toBe('no version: this is not a kcal file');
     expect(versionProblem('other 0.1.0')).toMatch(/not a kcal file/);
@@ -58,6 +60,13 @@ describe('backup', () => {
     expect(parsed.ok && documentJson(parsed.data)).toBe(documentJson(data));
   });
 
+  it('reads a 0.1.0 file and saves it as 0.1.1', () => {
+    const old = JSON.parse(documentJson(data));
+    old.version = 'kcal 0.1.0';
+    const parsed = parseDocument(JSON.stringify(old));
+    expect(parsed.ok && JSON.parse(documentJson(parsed.data)).version).toBe('kcal 0.1.1');
+  });
+
   it('accepts another order and stores it canonically', () => {
     const doc = JSON.parse(documentJson(data));
     doc.products.reverse();
@@ -83,7 +92,7 @@ describe('backup', () => {
       validateDocument({ ...JSON.parse(documentJson(data)), exportedAt: 'yesterday' }),
     ).toEqual(['exportedAt must be a UTC timestamp like 2026-11-17T07:30:41.512Z']);
     expect(validateDocument({ version: 'kcal 0.2.0', meals: 'whatever' })).toEqual([
-      'version "kcal 0.2.0" is newer than this app (kcal 0.1.0): update the app',
+      'version "kcal 0.2.0" is newer than this app (kcal 0.1.1): update the app',
     ]);
   });
 

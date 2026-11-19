@@ -99,6 +99,23 @@ describe('validateAppData', () => {
     });
   });
 
+  describe('barcodes', () => {
+    it('are optional, 8 to 14 digits, and unique among products', () => {
+      expect(problemsAfter((d) => (d.products[0]!.barcode = '4006040002093'))).toEqual([]);
+      expect(problemsAfter((d) => (d.products[0]!.barcode = '12345'))).toEqual([
+        'product #1 "egg": barcode must be 8 to 14 digits',
+      ]);
+      expect(
+        problemsAfter((d) => {
+          d.products[0]!.barcode = '4006040002093';
+          d.products[1]!.barcode = '4006040002093';
+        }),
+      ).toEqual([
+        'product #2 "oat flakes": barcode 4006040002093 is also used by product #1 "egg"',
+      ]);
+    });
+  });
+
   describe('recipes', () => {
     it('need at least one ingredient and one unit, with positive makes', () => {
       expect(

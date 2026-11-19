@@ -1,9 +1,13 @@
 # kcal backup format
 
-The format of kcal's backup file and of the data the app saves in the browser: `kcal 0.1.0`.
+The format of kcal's backup file and of the data the app saves in the browser: `kcal 0.1.1`.
 
-Status (2026-11-19): **agreed and implemented.** It replaced an earlier draft of `0.1.0` in
-place, with no migration, since no real data existed yet.
+Status (2026-11-19): **agreed and implemented.**
+
+| Version | Change                                                                                |
+| ------- | ------------------------------------------------------------------------------------- |
+| `0.1.0` | the format below, without `barcode` (it replaced an earlier draft in place)           |
+| `0.1.1` | products may have a `barcode` (an optional field: `0.1.0` files are read as they are) |
 
 ## Purpose and principles
 
@@ -98,7 +102,7 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
   "meals": [],
   "products": [],
   "recipes": [],
-  "version": "kcal 0.1.0"
+  "version": "kcal 0.1.1"
 }
 ```
 
@@ -136,6 +140,7 @@ it.
 
 | Field     | Required | Meaning                                                                      |
 | --------- | -------- | ---------------------------------------------------------------------------- |
+| `barcode` | no       | the barcode it was scanned with: 8 to 14 digits, unique among products       |
 | `id`      | yes      | UUID                                                                         |
 | `name`    | yes      | unique among products and recipes, ignoring case; not a built-in food's name |
 | `perGram` | yes      | nutrients in 1 g of the product; an omitted nutrient counts as 0             |

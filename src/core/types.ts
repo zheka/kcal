@@ -16,6 +16,8 @@ export interface ProductUnit {
 }
 
 export interface Product {
+  /** The barcode (EAN/UPC digits), when the product was scanned; unique among products. */
+  barcode?: string;
   id: string;
   name: string;
   /** Nutrients in 1 g of the product. */

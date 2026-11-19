@@ -306,6 +306,14 @@ Where the planning happens.
   "＋ create" chip opens the product form with the name filled in; after saving, the product
   is added to the meal).
 - **Product form**: name, units, and nutrients entered per any unit (see Products).
+- **Scanning a barcode** (agreed) in a new product, with the browser's built-in barcode reader
+  (Chrome on Android; where a browser has none, the button isn't shown, and there is no typing
+  of numbers). A barcode already in the library opens that product instead of making a
+  duplicate. Otherwise it is looked up on Open Food Facts, which fills the name (with brand) and
+  kcal, protein, fat and carbs per 100 g, or for drinks per 100 ml with an `ml` unit counted as
+  1 g (correctable under Units). Water isn't in Open Food Facts. Nothing is saved until Save,
+  and the barcode is kept with the product, also when Open Food Facts doesn't know it. Only
+  the barcode is sent.
 - **Recipe form = the meal composer** (agreed): ingredients with amounts and units, inline,
   with live totals. After composing, the recipe gets its **units**: what it makes ("6
   servings", "4 pieces", "1600 g" if the pot is weighed), at least one.

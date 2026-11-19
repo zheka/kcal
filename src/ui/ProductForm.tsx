@@ -1,6 +1,7 @@
-import { useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { canScan } from '../barcode';
 import { GRAMS, NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
-import { newId, unitUsages, usages } from '../core/foods';
+import { newId, productWithBarcode, unitUsages, usages } from '../core/foods';
 import { formatNumber, parseNumber } from '../core/format';
 import { cleanText, nameKey } from '../core/text';
 import { isBuiltinName } from '../core/builtins';
@@ -9,8 +10,16 @@ import { perGramFrom } from '../core/units';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
 import { handOverCreatedFood } from './drafts';
-import { goBack } from './router';
-import { productUnitRows, readProductUnits, UnitsEditor, type UnitRow } from './UnitsEditor';
+import { lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
+import { BarcodeScanner } from './BarcodeScanner';
+import { goBack, replaceRoute } from './router';
+import {
+  emptyUnitRow,
+  productUnitRows,
+  readProductUnits,
+  UnitsEditor,
+  type UnitRow,
+} from './UnitsEditor';
 
 interface Props {
   store: Store;
@@ -42,6 +51,51 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
   });
   const [submitted, setSubmitted] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [barcode, setBarcode] = useState(existing?.barcode);
+  const [scanning, setScanning] = useState(false);
+  const [lookup, setLookup] = useState<ScanStatus | null>(null);
+  // The current units, for the lookup that finishes after a scan.
+  const unitRowsRef = useRef(unitRows);
+  useEffect(() => {
+    unitRowsRef.current = unitRows;
+  }, [unitRows]);
+
+  /** A barcode was read: open the product if it's in the library, else look it up and fill the form. */
+  const onCode = useCallback(
+    (code: string) => {
+      setScanning(false);
+      const known = productWithBarcode(store.data.value, code);
+      if (known) {
+        setLookup({ kind: 'known', code, product: { id: known.id, name: known.name } });
+        return;
+      }
+      setBarcode(code);
+      setLookup({ kind: 'looking', code });
+      void lookUpBarcode(code).then((result) => {
+        setLookup({ kind: 'result', code, result });
+        if (result.kind !== 'found') return;
+        if (result.name) setName(result.name);
+        const filled = {} as Record<Nutrient, string>;
+        for (const n of NUTRIENTS) {
+          const v = result.per100[n];
+          filled[n] = v === undefined ? '' : formatNumber(v, 3);
+        }
+        setValues(filled);
+        if (result.liquid) {
+          // Values are per 100 ml: an ml unit, counted as 1 g unless corrected under Units.
+          const rows = unitRowsRef.current;
+          const ml = rows.find((r) => nameKey(r.name) === 'ml');
+          const row = ml ?? { ...emptyUnitRow(), name: 'ml', valueText: '1' };
+          if (!ml) setUnitRows([...rows, row]);
+          setBasisUnit(row.id);
+        } else {
+          setBasisUnit(GRAMS);
+        }
+        setBasisAmount('100');
+      });
+    },
+    [store],
+  );
 
   if (id !== null && !existing) return <p class="empty">This product does not exist.</p>;
 
@@ -86,6 +140,7 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
       name: cleanName,
       perGram: perGramFrom(parsed, basisGrams),
       units,
+      ...(barcode !== undefined && { barcode }),
     };
     try {
       store.saveProduct(product);
@@ -107,6 +162,29 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
         save();
       }}
     >
+      {scanning && <BarcodeScanner onCode={onCode} onClose={() => setScanning(false)} />}
+      {id === null && canScan() && (
+        <button type="button" class="button scan" onClick={() => setScanning(true)}>
+          Scan barcode
+        </button>
+      )}
+      {lookup && <ScanMessage status={lookup} />}
+      {barcode !== undefined && (
+        <p class="barcode">
+          Barcode <span class="barcode-digits">{barcode}</span>
+          <button
+            type="button"
+            class="button link"
+            onClick={() => {
+              setBarcode(undefined);
+              setLookup(null);
+            }}
+          >
+            Remove
+          </button>
+        </p>
+      )}
+
       <label class="field">
         <span class="label">Name</span>
         <input
@@ -220,4 +298,44 @@ function macroHint(v: NutrientValues): string {
   const larger = Math.max(kcal, fromMacros);
   if (larger < 20 || Math.abs(kcal - fromMacros) <= 0.15 * larger) return '';
   return `The macros give about ${formatNumber(fromMacros, 0)} kcal: check for a typo.`;
+}
+
+type ScanStatus =
+  | { kind: 'known'; code: string; product: { id: string; name: string } }
+  | { kind: 'looking'; code: string }
+  | { kind: 'result'; code: string; result: LookupResult };
+
+/** What happened to a scanned barcode. */
+function ScanMessage({ status }: { status: ScanStatus }) {
+  if (status.kind === 'known') {
+    return (
+      <div class="notice">
+        <p>
+          Already in your library: <strong>{status.product.name}</strong>
+        </p>
+        <div class="actions">
+          <button
+            type="button"
+            class="button primary"
+            onClick={() => replaceRoute(`/product/${status.product.id}`)}
+          >
+            Open it
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (status.kind === 'looking') return <p class="notice">Looking up {status.code}…</p>;
+  const { result } = status;
+  const text =
+    result.kind === 'found'
+      ? result.liquid
+        ? 'Filled from Open Food Facts, per 100 ml: check the values against the label. ml is counted as 1 g; correct it under Units if you know better.'
+        : 'Filled from Open Food Facts, per 100 g: check the values against the label.'
+      : result.kind === 'not-found'
+        ? `${status.code} isn’t in Open Food Facts. Enter the product from its label.`
+        : result.kind === 'offline'
+          ? `Offline: couldn’t look up ${status.code}. Enter the product from its label.`
+          : 'Couldn’t reach Open Food Facts. Enter the product from its label.';
+  return <p class="notice">{text}</p>;
 }

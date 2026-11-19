@@ -2,7 +2,7 @@ import { GRAMS, MILLILITRES } from '../config';
 import { WATER_ID } from './builtins';
 import { byTime, type FoodEntry, type FoodTable } from './nutrition';
 import { nameKey } from './text';
-import type { AppData, Ingredient, Meal, Recipe } from './types';
+import type { AppData, Ingredient, Meal, Product, Recipe } from './types';
 
 /** How many meals and recipes use a food directly (shown before editing a used food). */
 export function usages(data: AppData, foodId: string): { meals: number; recipes: number } {
@@ -17,6 +17,11 @@ export function usages(data: AppData, foodId: string): { meals: number; recipes:
 export function unitUsages(data: AppData, foodId: string, unitId: string): number {
   const all = [...data.meals, ...data.recipes].flatMap((x) => x.ingredients);
   return all.filter((i) => i.food === foodId && i.unit === unitId).length;
+}
+
+/** The product with this barcode, if one was scanned before. */
+export function productWithBarcode(data: AppData, barcode: string): Product | undefined {
+  return data.products.find((p) => p.barcode === barcode);
 }
 
 /** Id for a new product, recipe, meal or unit. */

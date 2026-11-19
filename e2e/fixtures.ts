@@ -69,7 +69,7 @@ export function sampleDocument(now: Date): object {
         units: [{ id: 'u-bowl', makes: 1, name: 'bowl' }],
       },
     ],
-    version: 'kcal 0.1.0',
+    version: 'kcal 0.1.1',
   };
 }
 
