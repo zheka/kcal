@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { matchFoods } from '../core/foods';
-import { formatAmount } from '../core/format';
+import { GRAMS } from '../config';
+import { formatNutrient } from '../core/format';
 import type { FoodEntry } from '../core/nutrition';
 import type { Store } from '../state/store';
 import { navigate } from './router';
@@ -8,7 +9,9 @@ import { navigate } from './router';
 /** All products and recipes, by name; tap one to edit it. */
 export function LibraryScreen({ store }: { store: Store }) {
   const [text, setText] = useState('');
-  const all = [...store.foods.value.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const all = [...store.foods.value.values()]
+    .filter((f) => f.kind !== 'builtin')
+    .sort((a, b) => a.name.localeCompare(b.name));
   const shown = matchFoods(all, text);
 
   return (
@@ -46,7 +49,7 @@ export function LibraryScreen({ store }: { store: Store }) {
                 {food.name}
                 {food.kind === 'recipe' && <span class="tag">recipe</span>}
               </span>
-              <span class="food-per100">{per100g(food)}</span>
+              <span class="food-per100">{summary(food)}</span>
             </button>
           </li>
         ))}
@@ -55,16 +58,16 @@ export function LibraryScreen({ store }: { store: Store }) {
   );
 }
 
-/** `143 kcal · 12.6 g protein / 100 g`; unknown protein shows as `?`. */
-function per100g(food: FoodEntry): string {
-  const kcal = formatAmount(scaled(food, 'kcal'), 'kcal');
-  const protein =
-    food.kind === 'product' && food.perGram.protein.missing > 0
-      ? '?'
-      : formatAmount(scaled(food, 'protein'), 'protein');
-  return `${kcal} kcal · ${protein} g protein / 100 g`;
-}
-
-function scaled(food: FoodEntry, n: 'kcal' | 'protein') {
-  return { value: food.perGram[n].value * 100, missing: food.perGram[n].missing };
+/**
+ * What a food gives: per 100 g for products and built-in foods (`143 kcal · 13 g protein /
+ * 100 g`), per its first unit for recipes (`410 kcal · 15 g protein / bowl`).
+ */
+function summary(food: FoodEntry): string {
+  const unit = food.kind === 'recipe' ? food.units[0] : { id: GRAMS, name: '100 g' };
+  const portion = unit && food.portion(unit.id, food.kind === 'recipe' ? 1 : 100);
+  if (!portion) return '';
+  const n = portion.nutrients;
+  const parts = [formatNutrient(n.kcal, 'kcal'), formatNutrient(n.protein, 'protein')];
+  if (n.water > 0) parts.push(formatNutrient(n.water, 'water'));
+  return `${parts.join(' · ')} / ${unit.name}`;
 }

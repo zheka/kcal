@@ -43,6 +43,8 @@ export default defineConfig({
   ],
   test: {
     environment: 'jsdom',
+    // A fixed time zone with daylight saving, so tests of local times are the same everywhere.
+    env: { TZ: 'Europe/Berlin' },
     include: ['src/**/*.test.{ts,tsx}'],
   },
 });

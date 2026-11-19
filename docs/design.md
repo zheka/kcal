@@ -524,5 +524,8 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
    date and time, live chart, Eat again, two-tap delete).
 5. **Done:** goals form in the menu (effective from today, history listed); past days show
    their own goals and say so.
-6. Water.
+6. **Done:** the backup format of [backup-format.md](backup-format.md): stored data as the
+   primary form (per-gram products, recipes eaten in their own units, UTC times, canonical
+   JSON, at most 3 decimals, exact quantities); water as a nutrient with built-in foods (water,
+   protein, fat, carbs) and ＋ Water; meal rows showing the nutrients that have goals.
 7. Weight logging; then the Stats screen (reports, weight charts) and the analysis export.

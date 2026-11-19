@@ -1,6 +1,8 @@
-import type { FoodEntry, FoodTable } from './nutrition';
+import { GRAMS, MILLILITRES } from '../config';
+import { WATER_ID } from './builtins';
+import { byTime, type FoodEntry, type FoodTable } from './nutrition';
 import { nameKey } from './text';
-import type { AppData, Ingredient, Recipe } from './types';
+import type { AppData, Ingredient, Meal, Recipe } from './types';
 
 /** How many meals and recipes use a food directly (shown before editing a used food). */
 export function usages(data: AppData, foodId: string): { meals: number; recipes: number } {
@@ -17,43 +19,43 @@ export function unitUsages(data: AppData, foodId: string, unitId: string): numbe
   return all.filter((i) => i.food === foodId && i.unit === unitId).length;
 }
 
-/** Id for a new product, recipe or meal. */
+/** Id for a new product, recipe, meal or unit. */
 export function newId(): string {
   return crypto.randomUUID();
 }
 
+function newestFirst(meals: readonly Meal[]): Meal[] {
+  return [...meals].sort((a, b) => byTime(b, a));
+}
+
 /**
- * The ingredient to add when a food is picked: the amount and unit of its most recent use
- * (in meals by time, then in recipes), otherwise a sensible default for the food.
+ * The ingredient to add when a food is picked: the amount and unit of its most recent use (in
+ * meals by time, then in recipes), otherwise a default: 250 ml of water, 1 of a recipe's first
+ * unit or of a product's own first unit, else 100 g.
  */
 export function pickIngredient(data: AppData, food: FoodEntry): Ingredient {
-  const meals = [...data.meals].sort((a, b) => b.eatenAt.localeCompare(a.eatenAt));
-  const recipes = [...data.recipes].reverse();
-  for (const { ingredients } of [...meals, ...recipes]) {
+  for (const { ingredients } of [...newestFirst(data.meals), ...[...data.recipes].reverse()]) {
     const last = ingredients.find((i) => i.food === food.id);
     if (last && food.units.some((u) => u.id === last.unit)) return { ...last };
   }
-  return { food: food.id, ...defaultAmount(food) };
+  if (food.id === WATER_ID) return { amount: 250, food: food.id, unit: MILLILITRES };
+  const own = food.units.find((u) => u.id !== GRAMS);
+  return own
+    ? { amount: 1, food: food.id, unit: own.id }
+    : { amount: 100, food: food.id, unit: GRAMS };
 }
 
-/** One serving, else one of the food's own units, else 100 g. */
-function defaultAmount(food: FoodEntry): { unit: string; amount: number } {
-  const own = food.units.find((u) => u.id !== 'g' && u.id !== 'kg');
-  return own ? { unit: own.id, amount: 1 } : { unit: 'g', amount: 100 };
-}
-
-/** Foods for chips: the most recently eaten first, then the rest by name. Archived ones are left out. */
+/** Foods for chips: the most recently consumed first, then the rest by name. */
 export function foodsByRecency(data: AppData, table: FoodTable): FoodEntry[] {
   const order: string[] = [];
-  const meals = [...data.meals].sort((a, b) => b.eatenAt.localeCompare(a.eatenAt));
-  for (const meal of meals) {
+  for (const meal of newestFirst(data.meals)) {
     for (const { food } of meal.ingredients) if (!order.includes(food)) order.push(food);
   }
   const recent = order.flatMap((id) => table.get(id) ?? []);
   const rest = [...table.values()]
     .filter((f) => !order.includes(f.id))
     .sort((a, b) => a.name.localeCompare(b.name));
-  return [...recent, ...rest].filter((f) => !f.archived);
+  return [...recent, ...rest];
 }
 
 /**

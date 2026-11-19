@@ -32,7 +32,7 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
   const draftKey = `${path}?${params.toString()}`;
   if (path === '/meal/new') {
     return {
-      title: params.has('from') ? 'Eat again' : 'New meal',
+      title: params.has('from') ? 'Eat again' : params.has('start') ? 'Drink' : 'New meal',
       body: (
         <MealComposer
           store={store}
@@ -40,6 +40,7 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
           draftKey={draftKey}
           {...(params.get('date') ? { date: params.get('date')! } : {})}
           {...(params.get('from') ? { copyOf: params.get('from')! } : {})}
+          {...(params.get('start') ? { startWith: params.get('start')! } : {})}
         />
       ),
     };

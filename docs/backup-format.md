@@ -2,8 +2,8 @@
 
 The format of Kcal's backup file and of the data the app saves in the browser: `kcal 0.1.0`.
 
-Status (2026-11-19): **agreed, not implemented yet.** The app still writes an earlier draft of
-`0.1.0`. Since no real data exists yet, `0.1.0` is changed in place, with no migration.
+Status (2026-11-19): **agreed and implemented.** It replaced an earlier draft of `0.1.0` in
+place, with no migration, since no real data existed yet.
 
 ## Purpose and principles
 
@@ -271,6 +271,8 @@ The shared structure of a meal's and a recipe's ingredient list.
   current time zone): goals saved at 15:00 apply to the whole of that day. Each day uses the
   latest set that applies to it; days before the first set have no goals.
 - **At most one goal set per local day**: saving again on the same day replaces that day's set.
+  This is a rule of saving, not of the integrity check: which day a timestamp falls on depends
+  on the device's time zone, so a check of it would not be deterministic.
 - Without `perDay`, a set means no goals from that day on.
 - Goal sets have no ids.
 
@@ -300,4 +302,4 @@ Checked on every load and every import, with every problem reported and located:
 - numbers are non-negative, positive where stated (amounts, grams, `makes`, daily targets), and
   have at most 3 decimals;
 - timestamps are valid UTC timestamps in the form above; goal sets have strictly increasing
-  `setAt`, at most one per local day.
+  `setAt`.

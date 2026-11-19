@@ -1,47 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { goalsOn, saveGoals } from './goals';
+import { goalSetOn, goalsOn, saveGoals } from './goals';
 import type { GoalSet } from './types';
 
+// Europe/Berlin: 2026-11-01T18:20Z is 19:20 local, 2027-01-14T23:30Z is 00:30 on Jan 15.
 const goals: GoalSet[] = [
-  { from: '2026-11-01', targets: { kcal: 2000, protein: 150 } },
-  { from: '2027-01-15', targets: { kcal: 2200, protein: 160 } },
+  { perDay: { kcal: 2000, protein: 150 }, setAt: '2026-11-01T18:20:05.114Z' },
+  { perDay: { kcal: 2200, protein: 160, water: 2000 }, setAt: '2027-01-14T23:30:00.000Z' },
 ];
 
-describe('goalsOn', () => {
-  it('is null before the first goals', () => {
+describe('goals on a day', () => {
+  it('apply from the start of the local day they were saved on', () => {
     expect(goalsOn(goals, '2026-10-31')).toBeNull();
-    expect(goalsOn([], '2026-11-17')).toBeNull();
-  });
-
-  it('gives the goals valid on a date, from their first day until the next set', () => {
+    // saved in the evening, but valid for the whole day
     expect(goalsOn(goals, '2026-11-01')?.kcal).toBe(2000);
     expect(goalsOn(goals, '2027-01-14')?.kcal).toBe(2000);
-    expect(goalsOn(goals, '2027-01-15')?.kcal).toBe(2200);
-    expect(goalsOn(goals, '2030-01-01')?.kcal).toBe(2200);
+    // 23:30 UTC on Jan 14 is already Jan 15 locally
+    expect(goalsOn(goals, '2027-01-15')?.water).toBe(2000);
+    expect(goalSetOn(goals, '2030-01-01')).toBe(goals[1]);
+  });
+
+  it('are none after a set without perDay', () => {
+    const cleared = [...goals, { setAt: '2027-03-01T10:00:00.000Z' }];
+    expect(goalsOn(cleared, '2027-03-01')).toBeNull();
+    expect(goalsOn(cleared, '2027-02-28')?.kcal).toBe(2200);
   });
 });
 
-describe('saveGoals', () => {
-  it('adds new goals effective from today, keeping the old ones for the past', () => {
-    const saved = saveGoals(goals, { kcal: 1900, protein: 160 }, '2027-03-01');
-    expect(saved).toHaveLength(3);
+describe('saving goals', () => {
+  it('adds a set at now; earlier days keep their goals', () => {
+    const now = new Date('2027-03-01T14:00:00.000Z');
+    const saved = saveGoals(goals, { kcal: 1900 }, now);
+    expect(saved.at(-1)).toEqual({ perDay: { kcal: 1900 }, setAt: '2027-03-01T14:00:00.000Z' });
     expect(goalsOn(saved, '2027-02-28')?.kcal).toBe(2200);
     expect(goalsOn(saved, '2027-03-01')?.kcal).toBe(1900);
   });
 
-  it('replaces goals saved earlier the same day', () => {
-    const saved = saveGoals(goals, { kcal: 2100 }, '2027-01-15');
-    expect(saved).toHaveLength(2);
-    expect(saved[1]).toEqual({ from: '2027-01-15', targets: { kcal: 2100 } });
+  it('replaces a set saved earlier the same local day', () => {
+    const morning = saveGoals(goals, { kcal: 1900 }, new Date('2027-03-01T07:00:00.000Z'));
+    const evening = saveGoals(morning, { kcal: 1800 }, new Date('2027-03-01T20:00:00.000Z'));
+    expect(evening).toHaveLength(3);
+    expect(evening.at(-1)?.perDay).toEqual({ kcal: 1800 });
   });
 
-  it('changes nothing when the targets are the same', () => {
-    expect(saveGoals(goals, { protein: 160, kcal: 2200 }, '2027-03-01')).toEqual(goals);
-    expect(saveGoals([], {}, '2027-03-01')).toEqual([]);
-  });
-
-  it('can remove a goal from today on', () => {
-    const saved = saveGoals(goals, { kcal: 2200 }, '2027-03-01');
-    expect(goalsOn(saved, '2027-03-01')).toEqual({ kcal: 2200 });
+  it('changes nothing for the same targets, and stores no perDay for no goals', () => {
+    const now = new Date('2027-03-01T14:00:00.000Z');
+    expect(saveGoals(goals, { kcal: 2200, protein: 160, water: 2000 }, now)).toEqual(goals);
+    expect(saveGoals([], {}, now)).toEqual([]);
+    expect(saveGoals(goals, {}, now).at(-1)).toEqual({ setAt: '2027-03-01T14:00:00.000Z' });
   });
 });

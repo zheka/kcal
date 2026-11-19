@@ -1,69 +1,148 @@
-import { NUTRIENTS, type Nutrient } from '../config';
-import type { Ingredient, Meal, Product, Recipe } from './types';
-import { toGrams, unitOptions, type UnitOption } from './units';
+import { GRAMS, NUTRIENTS, type Nutrient } from '../config';
+import { BUILTIN_FOODS } from './builtins';
+import { THOUSANDTHS, thousandths } from './decimal';
+import { localDateOf } from './time';
+import type { Ingredient, Meal, NutrientValues, Product, Recipe } from './types';
 
 /**
- * An amount of one nutrient that may include unknowns: `value` is the known part, `missing`
- * counts the contributing foods that lacked the nutrient. With `missing > 0` the true amount
- * is at least `value`.
+ * The in-memory food table: derived from the stored products and recipes plus the built-in
+ * foods, never stored, rebuilt whenever a food changes. Amounts are turned into nutrients
+ * exactly the same way whatever the unit:
+ *
+ * - products and built-in foods: amount × unit grams is computed in integer millionths of a
+ *   gram, so 100 g and 4 × a 25 g unit give exactly the same result;
+ * - recipes: k of a unit is whole × k / makes, divided last, so `makes` of a unit is exactly
+ *   the whole recipe.
  */
-export interface NutrientAmount {
-  readonly value: number;
-  readonly missing: number;
+
+export type Nutrients = Readonly<Record<Nutrient, number>>;
+
+function nutrients(of: (n: Nutrient) => number): Nutrients {
+  return Object.fromEntries(NUTRIENTS.map((n) => [n, of(n)])) as Record<Nutrient, number>;
 }
 
-export type Nutrition = Readonly<Record<Nutrient, NutrientAmount>>;
+export const ZERO: Nutrients = nutrients(() => 0);
 
-function nutrition(of: (n: Nutrient) => NutrientAmount): Nutrition {
-  return Object.fromEntries(NUTRIENTS.map((n) => [n, of(n)])) as Record<Nutrient, NutrientAmount>;
+/** Stored values (an omitted nutrient counts as 0) as complete nutrients. */
+export function fromValues(values: NutrientValues): Nutrients {
+  return nutrients((n) => values[n] ?? 0);
 }
 
-export const ZERO: Nutrition = nutrition(() => ({ value: 0, missing: 0 }));
-
-export function addNutrition(a: Nutrition, b: Nutrition): Nutrition {
-  return nutrition((n) => ({
-    value: a[n].value + b[n].value,
-    missing: a[n].missing + b[n].missing,
-  }));
+export function addNutrients(a: Nutrients, b: Nutrients): Nutrients {
+  return nutrients((n) => a[n] + b[n]);
 }
 
-export function sumNutrition(items: Iterable<Nutrition>): Nutrition {
+export function sumNutrients(items: Iterable<Nutrients>): Nutrients {
   let total = ZERO;
-  for (const item of items) total = addNutrition(total, item);
+  for (const item of items) total = addNutrients(total, item);
   return total;
 }
 
-/** A food with everything derived from the library: nutrients per gram and its units. */
-export interface FoodEntry {
-  id: string;
-  kind: 'product' | 'recipe';
-  name: string;
-  archived: boolean;
-  /** Nutrients in one gram; `missing` counts the products (all the way down) without a value. */
-  perGram: Nutrition;
-  /** Every unit the food can be measured in, built-in ones included. */
-  units: readonly UnitOption[];
-  /** Recipes: grams the recipe makes (cooked weight, or the sum of its ingredients). */
-  totalGrams: number | null;
+/** How much of a food an amount in a unit is. */
+export interface Portion {
+  nutrients: Nutrients;
+  /** Weight in grams (for a recipe: of its ingredients). */
+  grams: number;
 }
 
-/** All foods by id. Rebuilt from scratch whenever a product or recipe changes. */
+/** A unit a food can be measured in. */
+export interface UnitOption {
+  /** What an ingredient stores: `g`, `ml`, or the id of the food's unit. */
+  id: string;
+  name: string;
+}
+
+export interface FoodEntry {
+  id: string;
+  kind: 'product' | 'recipe' | 'builtin';
+  name: string;
+  /** Every unit the food can be measured in, in selector order. */
+  units: readonly UnitOption[];
+  /** The portion of `amount` of a unit, or undefined when the food has no such unit. */
+  portion(unitId: string, amount: number): Portion | undefined;
+  /** Nutrients in 1 g (products and built-in foods) or in the whole recipe (recipes). */
+  reference: Nutrients;
+}
+
+/** All foods by id. */
 export type FoodTable = ReadonlyMap<string, FoodEntry>;
 
 /** Thrown when the foods can't be resolved; the integrity check reports these as problems. */
 export class FoodTableError extends Error {}
 
+/** A food measured in grams: products and built-in foods. */
+function gramFood(
+  id: string,
+  kind: 'product' | 'builtin',
+  name: string,
+  perGram: NutrientValues,
+  units: readonly { id: string; name: string; grams: number }[],
+): FoodEntry {
+  const reference = fromValues(perGram);
+  const milliGrams = new Map<string, number>([[GRAMS, THOUSANDTHS]]);
+  for (const u of units) milliGrams.set(u.id, thousandths(u.grams));
+  return {
+    id,
+    kind,
+    name,
+    units: [
+      { id: GRAMS, name: GRAMS },
+      ...units.map(({ id: uid, name: uname }) => ({ id: uid, name: uname })),
+    ],
+    reference,
+    portion(unitId, amount) {
+      const unit = milliGrams.get(unitId);
+      if (unit === undefined) return undefined;
+      // Exact: an integer number of millionths of a gram.
+      const microGrams = thousandths(amount) * unit;
+      return {
+        nutrients: nutrients((n) => (reference[n] * microGrams) / THOUSANDTHS ** 2),
+        grams: microGrams / THOUSANDTHS ** 2,
+      };
+    },
+  };
+}
+
+function recipeFood(recipe: Recipe, resolve: (id: string) => FoodEntry): FoodEntry {
+  let whole = ZERO;
+  let grams = 0;
+  for (const ingredient of recipe.ingredients) {
+    const portion = portionOf(resolve(ingredient.food), ingredient, `recipe "${recipe.name}"`);
+    whole = addNutrients(whole, portion.nutrients);
+    grams += portion.grams;
+  }
+  const makes = new Map(recipe.units.map((u) => [u.id, u.makes]));
+  return {
+    id: recipe.id,
+    kind: 'recipe',
+    name: recipe.name,
+    units: recipe.units.map(({ id, name }) => ({ id, name })),
+    reference: whole,
+    portion(unitId, amount) {
+      const count = makes.get(unitId);
+      if (count === undefined) return undefined;
+      // Divided last: `makes` of a unit is exactly the whole recipe.
+      return {
+        nutrients: nutrients((n) => (whole[n] * amount) / count),
+        grams: (grams * amount) / count,
+      };
+    },
+  };
+}
+
 /**
- * Derives every food's nutrients per gram and units. Recipes are resolved through their
+ * Derives every food: built-in foods, products, and recipes resolved through their
  * ingredients, recipes inside recipes included. Throws `FoodTableError` on a reference to an
- * unknown food or unit, a cycle, or a recipe that weighs nothing.
+ * unknown food or unit, or recipes that contain each other.
  */
 export function buildFoodTable(
   products: readonly Product[],
   recipes: readonly Recipe[],
 ): FoodTable {
   const table = new Map<string, FoodEntry>();
-  for (const product of products) table.set(product.id, productEntry(product));
+  for (const b of BUILTIN_FOODS)
+    table.set(b.id, gramFood(b.id, 'builtin', b.name, b.perGram, b.units));
+  for (const p of products) table.set(p.id, gramFood(p.id, 'product', p.name, p.perGram, p.units));
 
   const recipesById = new Map(recipes.map((r) => [r.id, r]));
   const resolving: string[] = [];
@@ -78,7 +157,7 @@ export function buildFoodTable(
       throw new FoodTableError(`recipes contain each other: ${names.join(' → ')}`);
     }
     resolving.push(id);
-    const entry = recipeEntry(recipe, resolve);
+    const entry = recipeFood(recipe, resolve);
     resolving.pop();
     table.set(id, entry);
     return entry;
@@ -87,63 +166,10 @@ export function buildFoodTable(
   return table;
 }
 
-function productEntry(product: Product): FoodEntry {
-  return {
-    id: product.id,
-    kind: 'product',
-    name: product.name,
-    archived: product.archived,
-    perGram: nutrition((n) => {
-      const per100g = product.per100g[n];
-      return per100g === undefined
-        ? { value: 0, missing: 1 }
-        : { value: per100g / 100, missing: 0 };
-    }),
-    units: unitOptions(product.units, null),
-    totalGrams: null,
-  };
-}
-
-function recipeEntry(recipe: Recipe, resolve: (id: string) => FoodEntry): FoodEntry {
-  let total = ZERO;
-  let ingredientGrams = 0;
-  for (const ingredient of recipe.ingredients) {
-    const food = resolve(ingredient.food);
-    const grams = gramsIn(food, ingredient, `recipe "${recipe.name}"`);
-    ingredientGrams += grams;
-    total = addNutrition(total, portion(food, grams));
-  }
-  const totalGrams = recipe.cookedGrams ?? ingredientGrams;
-  if (!(totalGrams > 0)) {
-    throw new FoodTableError(`recipe "${recipe.name}" weighs nothing: its total weight is 0 g`);
-  }
-  const servingGrams = recipe.servings ? totalGrams / recipe.servings : null;
-  return {
-    id: recipe.id,
-    kind: 'recipe',
-    name: recipe.name,
-    archived: recipe.archived,
-    perGram: nutrition((n) => ({ value: total[n].value / totalGrams, missing: total[n].missing })),
-    units: unitOptions(recipe.units, servingGrams),
-    totalGrams,
-  };
-}
-
-function gramsIn(food: FoodEntry, ingredient: Ingredient, where: string): number {
-  const grams = toGrams(food.units, ingredient.unit, ingredient.amount);
-  if (grams === undefined) {
-    throw new FoodTableError(`${where}: "${food.name}" has no unit ${ingredient.unit}`);
-  }
-  return grams;
-}
-
-/** Nutrients in `grams` of a food. Nothing eaten counts nothing, unknowns included. */
-function portion(food: FoodEntry, grams: number): Nutrition {
-  if (grams === 0) return ZERO;
-  return nutrition((n) => ({
-    value: food.perGram[n].value * grams,
-    missing: food.perGram[n].missing,
-  }));
+function portionOf(food: FoodEntry, ingredient: Ingredient, where: string): Portion {
+  const portion = food.portion(ingredient.unit, ingredient.amount);
+  if (!portion) throw new FoodTableError(`${where}: "${food.name}" has no unit ${ingredient.unit}`);
+  return portion;
 }
 
 export function foodOf(table: FoodTable, id: string): FoodEntry {
@@ -152,36 +178,37 @@ export function foodOf(table: FoodTable, id: string): FoodEntry {
   return food;
 }
 
-/** Grams of an ingredient. */
-export function ingredientGrams(table: FoodTable, ingredient: Ingredient): number {
-  return gramsIn(foodOf(table, ingredient.food), ingredient, 'ingredient');
-}
-
-export function ingredientNutrition(table: FoodTable, ingredient: Ingredient): Nutrition {
-  const food = foodOf(table, ingredient.food);
-  return portion(food, gramsIn(food, ingredient, 'ingredient'));
+export function ingredientPortion(table: FoodTable, ingredient: Ingredient): Portion {
+  return portionOf(foodOf(table, ingredient.food), ingredient, 'ingredient');
 }
 
 /** Nutrients of a list of ingredients: a meal, or a recipe or meal being composed. */
-export function ingredientsNutrition(
+export function ingredientsNutrients(
   table: FoodTable,
   ingredients: readonly Ingredient[],
-): Nutrition {
-  return sumNutrition(ingredients.map((i) => ingredientNutrition(table, i)));
+): Nutrients {
+  return sumNutrients(ingredients.map((i) => ingredientPortion(table, i).nutrients));
 }
 
-/** The date a meal counts towards: the date part of `eatenAt`. */
+/** The day a meal counts towards: its local date. */
 export function mealDate(meal: Meal): string {
-  return meal.eatenAt.slice(0, 10);
+  return localDateOf(meal.consumedAt);
 }
 
-/** The meals of one local date, ordered by time. */
+/** Meals in time order (then by id, if ever equal). Timestamps in UTC compare as text. */
+export function byTime(a: Meal, b: Meal): number {
+  return compare(a.consumedAt, b.consumedAt) || compare(a.id, b.id);
+}
+
+function compare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** The meals of one local date, in time order. */
 export function mealsOn(meals: readonly Meal[], date: string): Meal[] {
-  return meals
-    .filter((m) => mealDate(m) === date)
-    .sort((a, b) => a.eatenAt.localeCompare(b.eatenAt));
+  return meals.filter((m) => mealDate(m) === date).sort(byTime);
 }
 
-export function dayNutrition(table: FoodTable, meals: readonly Meal[], date: string): Nutrition {
-  return sumNutrition(mealsOn(meals, date).map((m) => ingredientsNutrition(table, m.ingredients)));
+export function dayNutrients(table: FoodTable, meals: readonly Meal[], date: string): Nutrients {
+  return sumNutrients(mealsOn(meals, date).map((m) => ingredientsNutrients(table, m.ingredients)));
 }

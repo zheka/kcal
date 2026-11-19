@@ -1,67 +1,71 @@
 import type { Nutrient } from '../config';
 
-/** Nutrient values; a missing nutrient is unknown, not 0. */
+/**
+ * The stored data: the primary form of the data, exactly as in a backup (see
+ * docs/backup-format.md). Normalized (every fact once, nothing derived) and always valid.
+ * An omitted field is undefined; an omitted nutrient counts as 0.
+ */
+
 export type NutrientValues = Partial<Record<Nutrient, number>>;
 
-/** A unit of one food, defined in grams: `piece = 60 g`, `cup = 250 g`. */
-export interface Unit {
-  /** Unique within its food; never a built-in unit id. */
+/** A unit of a product: how many grams one of it weighs. */
+export interface ProductUnit {
+  grams: number;
   id: string;
   name: string;
-  grams: number;
-}
-
-/** A food in a recipe or a meal: how much of which food, in which of its units. */
-export interface Ingredient {
-  /** Id of a product or a recipe. */
-  food: string;
-  /** A built-in unit (`g`, `kg`, a recipe's `serving`) or the id of one of the food's units. */
-  unit: string;
-  amount: number;
 }
 
 export interface Product {
   id: string;
   name: string;
-  /** Nutrients per 100 g, as on the label. */
-  per100g: NutrientValues;
-  units: Unit[];
-  archived: boolean;
+  /** Nutrients in 1 g of the product. */
+  perGram: NutrientValues;
+  units: ProductUnit[];
+}
+
+/** A unit of a recipe: how many of it the whole recipe makes. */
+export interface RecipeUnit {
+  id: string;
+  makes: number;
+  name: string;
 }
 
 export interface Recipe {
   id: string;
+  ingredients: Ingredient[];
   name: string;
-  ingredients: Ingredient[];
-  /** Weighed weight of the finished dish; null = the sum of the ingredients. */
-  cookedGrams: number | null;
-  /** How many servings it makes; gives the recipe a `serving` unit. */
-  servings: number | null;
-  units: Unit[];
-  archived: boolean;
+  /** At least one: a recipe is eaten only in its own units. */
+  units: RecipeUnit[];
 }
 
-/** A logged meal: foods taken together. */
+/** How much of which food, in which of its units. Shared by meals and recipes. */
+export interface Ingredient {
+  amount: number;
+  /** Id of a product, a recipe or a built-in food. */
+  food: string;
+  /** `g` (products and built-in foods), `ml` (water), or the id of one of the food's units. */
+  unit: string;
+}
+
+/** Anything consumed together, drinks included. */
 export interface Meal {
+  /** UTC timestamp to the millisecond. */
+  consumedAt: string;
   id: string;
-  /** Local date and time the meal is (to be) eaten: `YYYY-MM-DDTHH:mm`. */
-  eatenAt: string;
   ingredients: Ingredient[];
 }
 
-/** Daily targets, valid from `from` until the next goal set starts. */
+/** Daily targets, applying from the start of the local day containing `setAt`. */
 export interface GoalSet {
-  /** Local date: `YYYY-MM-DD`. */
-  from: string;
-  /** Only nutrients with a goal. */
-  targets: NutrientValues;
+  /** Omitted: no goals from that day on. */
+  perDay?: NutrientValues;
+  /** UTC timestamp to the millisecond. */
+  setAt: string;
 }
 
-/** Everything the app stores (the backup without its header). */
 export interface AppData {
-  /** Ordered by `from`, strictly increasing. */
   goals: GoalSet[];
+  meals: Meal[];
   products: Product[];
   recipes: Recipe[];
-  meals: Meal[];
 }

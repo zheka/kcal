@@ -1,15 +1,16 @@
 import { useState } from 'preact/hooks';
-import { NUTRIENT_UNIT, NUTRIENTS, REQUIRED_NUTRIENTS, type Nutrient } from '../config';
+import { GRAMS, NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
 import { newId, unitUsages, usages } from '../core/foods';
-import { formatNumber, parseNumber, roundStored } from '../core/format';
+import { formatNumber, parseNumber } from '../core/format';
 import { cleanText, nameKey } from '../core/text';
+import { isBuiltinName } from '../core/builtins';
 import type { NutrientValues, Product } from '../core/types';
-import { per100gFrom } from '../core/units';
+import { perGramFrom } from '../core/units';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
 import { handOverCreatedFood } from './drafts';
 import { goBack } from './router';
-import { readUnits, unitRowsFrom, UnitsEditor, type UnitRow } from './UnitsEditor';
+import { productUnitRows, readProductUnits, UnitsEditor, type UnitRow } from './UnitsEditor';
 
 interface Props {
   store: Store;
@@ -21,27 +22,21 @@ interface Props {
   addToPicker?: boolean;
 }
 
-const NUTRIENT_LABEL: Record<Nutrient, string> = {
-  kcal: 'kcal',
-  protein: 'Protein',
-  fat: 'Fat',
-  carbs: 'Carbs',
-};
-
 export function ProductForm({ store, id, initialName = '', addToPicker = false }: Props) {
   const data = store.data.value;
   const existing = id === null ? undefined : data.products.find((p) => p.id === id);
 
   const [name, setName] = useState(existing?.name ?? initialName);
-  const [unitRows, setUnitRows] = useState<UnitRow[]>(() => unitRowsFrom(existing?.units ?? []));
+  const [unitRows, setUnitRows] = useState<UnitRow[]>(() => productUnitRows(existing?.units ?? []));
   // Values are entered per an amount of a unit, as on the label's column: per 100 g, per 1 bar…
   const [basisAmount, setBasisAmount] = useState('100');
-  const [basisUnit, setBasisUnit] = useState('g');
+  const [basisUnit, setBasisUnit] = useState(GRAMS);
+  // An existing product is shown per 100 g; empty means 0.
   const [values, setValues] = useState<Record<Nutrient, string>>(() => {
     const v = {} as Record<Nutrient, string>;
     for (const n of NUTRIENTS) {
-      const x = existing?.per100g[n];
-      v[n] = x === undefined ? '' : formatNumber(x, 3);
+      const x = existing?.perGram[n];
+      v[n] = x === undefined ? '' : formatNumber(x * 100, 3);
     }
     return v;
   });
@@ -50,8 +45,8 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
 
   if (id !== null && !existing) return <p class="empty">This product does not exist.</p>;
 
-  const { units, errors: unitErrors } = readUnits(unitRows, 'product');
-  const basisUnits = [{ id: 'g', name: 'g', grams: 1 }, ...units];
+  const { units, errors: unitErrors } = readProductUnits(unitRows);
+  const basisUnits = [{ grams: 1, id: GRAMS, name: GRAMS }, ...units];
   const basisGrams =
     (parseNumber(basisAmount) ?? 0) * (basisUnits.find((u) => u.id === basisUnit)?.grams ?? 0);
 
@@ -59,10 +54,7 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
   const valueErrors = new Map<Nutrient, string>();
   for (const n of NUTRIENTS) {
     const text = values[n].trim();
-    if (text === '') {
-      if (REQUIRED_NUTRIENTS.includes(n)) valueErrors.set(n, `Add ${NUTRIENT_LABEL[n]}`);
-      continue;
-    }
+    if (text === '') continue; // counts as 0
     const x = parseNumber(text);
     if (x === null) valueErrors.set(n, 'Not a number');
     else parsed[n] = x;
@@ -72,7 +64,13 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
   const taken = [...store.foods.value.values()].find(
     (f) => f.id !== id && nameKey(f.name) === nameKey(cleanName),
   );
-  const nameError = !cleanName ? 'Add a name' : taken ? `“${taken.name}” already exists` : '';
+  const nameError = !cleanName
+    ? 'Add a name'
+    : isBuiltinName(cleanName)
+      ? `“${cleanName}” is a built-in food`
+      : taken
+        ? `“${taken.name}” already exists`
+        : '';
   const basisError = basisGrams > 0 ? '' : 'Check the amount';
   const valid = !nameError && !basisError && valueErrors.size === 0 && unitErrors.size === 0;
 
@@ -83,16 +81,11 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
   function save() {
     setSubmitted(true);
     if (!valid) return;
-    const per100g: NutrientValues = {};
-    for (const [n, x] of Object.entries(per100gFrom(parsed, basisGrams)) as [Nutrient, number][]) {
-      per100g[n] = roundStored(x);
-    }
     const product: Product = {
       id: existing?.id ?? newId(),
       name: cleanName,
-      per100g,
+      perGram: perGramFrom(parsed, basisGrams),
       units,
-      archived: existing?.archived ?? false,
     };
     try {
       store.saveProduct(product);
@@ -142,7 +135,7 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
             onChange={(e) => {
               const unit = e.currentTarget.value;
               setBasisUnit(unit);
-              setBasisAmount(unit === 'g' ? '100' : '1');
+              setBasisAmount(unit === GRAMS ? '100' : '1');
             }}
           >
             {basisUnits.map((u) => (
@@ -163,7 +156,7 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
               <input
                 class="input number"
                 inputMode="decimal"
-                placeholder={REQUIRED_NUTRIENTS.includes(n) ? '' : 'unknown'}
+                placeholder="0"
                 value={values[n]}
                 onInput={(e) => setValues({ ...values, [n]: e.currentTarget.value })}
               />
@@ -177,6 +170,7 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
       <fieldset class="section">
         <legend class="label">Units</legend>
         <UnitsEditor
+          kind="product"
           rows={unitRows}
           onChange={setUnitRows}
           usesOf={(unitId) => (id ? unitUsages(data, id, unitId) : 0)}

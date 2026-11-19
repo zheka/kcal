@@ -27,27 +27,30 @@ npm run preview    # serve dist/ at http://localhost:4280/kcal/ (offline mode, u
 
 ```
 src/
-  config.ts       what the app tracks: nutrients, required nutrients, built-in units
+  config.ts       what the app tracks: nutrients, g and ml
   core/           pure logic: no DOM, storage or Preact
-    types.ts        the stored data: products, recipes, meals, goals
-    nutrition.ts    the food table (everything derived live), meal and day totals
-    units.ts        units of a food, grams conversion, label conversion
-    goals.ts        goals valid on a date, saving goals
-    meals.ts        default meal time, macro split
+    types.ts        the stored data (docs/backup-format.md): products, recipes, meals, goals
+    builtins.ts     built-in foods: water, protein, fat, carbs
+    nutrition.ts    the in-memory food table (derived, exact quantities), meal and day totals
+    canonical.ts    canonical order and JSON: the same data always gives the same file
     validate.ts     integrity checks for saved data and imports
-    foods.ts        usages, ids
+    decimal.ts      rounding stored numbers to 3 decimals, exact thousandths
+    goals.ts        goals that apply to a day, saving goals
+    meals.ts        meal times (UTC, minute edits), macro split
+    foods.ts        picking foods, chip order, usages, ids
+    units.ts        product units, converting label values to per gram
     text.ts         cleaning names
-    time.ts         local dates and times
+    time.ts         UTC timestamps and local dates and minutes
     format.ts       reading typed numbers, formatting amounts
   data/
-    backup.ts       versioned document format, strict import, backup export
+    backup.ts       versioned document, strict import, backup export
     storage.ts      saved data in localStorage, checked on load
   state/
-    store.ts        app state (signals) and the only functions that change it
+    store.ts        app state (signals): stored data and derived tables; the only changes
   ui/             Preact components: screens, forms, the ingredient editor
     router.ts       hash routes, back navigation
   pwa.ts          service worker registration
-  **/*.test.ts(x) tests next to the code they test
+  **/*.test.ts(x) tests next to the code they test (run in Europe/Berlin time)
 ```
 
 ## Stack

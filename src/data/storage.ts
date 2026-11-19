@@ -1,5 +1,5 @@
 import type { AppData } from '../core/types';
-import { parseDocument, toDocument } from './backup';
+import { documentJson, parseDocument } from './backup';
 
 /** All data lives under one key, as one document shaped like a backup (without `exportedAt`). */
 export const STORAGE_KEY = 'kcal';
@@ -7,7 +7,7 @@ export const STORAGE_KEY = 'kcal';
 /** Saved data beyond this many characters gets a warning: `localStorage` holds about 5 million. */
 export const SIZE_WARNING_CHARS = 3_000_000;
 
-export const EMPTY_DATA: AppData = { goals: [], products: [], recipes: [], meals: [] };
+export const EMPTY_DATA: AppData = { goals: [], meals: [], products: [], recipes: [] };
 
 export type LoadResult =
   | { ok: true; data: AppData }
@@ -27,7 +27,7 @@ export function loadSaved(storage: Storage = localStorage): LoadResult {
 
 /** Saves all data. Throws when the browser refuses (e.g. storage full); nothing is changed then. */
 export function saveData(data: AppData, storage: Storage = localStorage): void {
-  storage.setItem(STORAGE_KEY, JSON.stringify(toDocument(data)));
+  storage.setItem(STORAGE_KEY, documentJson(data));
 }
 
 /** Deletes the saved data (start fresh). */

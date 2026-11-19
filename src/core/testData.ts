@@ -1,49 +1,69 @@
-import type { AppData, Ingredient, Meal, NutrientValues, Product, Recipe, Unit } from './types';
+import type {
+  AppData,
+  Ingredient,
+  Meal,
+  NutrientValues,
+  Product,
+  ProductUnit,
+  Recipe,
+  RecipeUnit,
+} from './types';
 
-/** Test builders: readable ids derived from names (`egg` → `p:egg`). */
+/**
+ * Test builders: readable ids derived from names (`egg` → `p:egg`). Ids must be unique across
+ * the whole file, units included.
+ */
 
-export function product(name: string, per100g: NutrientValues, units: Unit[] = []): Product {
-  return { id: `p:${name}`, name, per100g, units, archived: false };
+export function product(name: string, perGram: NutrientValues, units: ProductUnit[] = []): Product {
+  return { id: `p:${name}`, name, perGram, units };
 }
 
-export function recipe(
-  name: string,
-  ingredients: Ingredient[],
-  options: Partial<Pick<Recipe, 'cookedGrams' | 'servings' | 'units'>> = {},
-): Recipe {
-  return {
-    id: `r:${name}`,
-    name,
-    ingredients,
-    cookedGrams: options.cookedGrams ?? null,
-    servings: options.servings ?? null,
-    units: options.units ?? [],
-    archived: false,
-  };
+export function recipe(name: string, ingredients: Ingredient[], units: RecipeUnit[]): Recipe {
+  return { id: `r:${name}`, ingredients, name, units };
 }
 
-export function ing(food: Product | Recipe, amount: number, unit = 'g'): Ingredient {
-  return { food: food.id, unit, amount };
+/** A recipe unit: the whole recipe makes `makes` of it. */
+export function makes(makesCount: number, name = 'serving', id = `u:${name}`): RecipeUnit {
+  return { id, makes: makesCount, name };
 }
 
-export function meal(eatenAt: string, ingredients: Ingredient[], id = `m:${eatenAt}`): Meal {
-  return { id, eatenAt, ingredients };
+export function ing(food: { id: string }, amount: number, unit = 'g'): Ingredient {
+  return { amount, food: food.id, unit };
+}
+
+/** A meal at a UTC timestamp (tests run in Europe/Berlin: UTC+1 in winter). */
+export function meal(consumedAt: string, ingredients: Ingredient[], id = `m:${consumedAt}`): Meal {
+  return { consumedAt, id, ingredients };
 }
 
 export function appData(data: Partial<AppData> = {}): AppData {
-  return { goals: [], products: [], recipes: [], meals: [], ...data };
+  return { goals: [], meals: [], products: [], recipes: [], ...data };
 }
 
-/** A small library used across tests. */
-export const egg = product('egg', { kcal: 143, protein: 12.6, fat: 9.5, carbs: 0.7 }, [
-  { id: 'u1', name: 'piece', grams: 60 },
+export const water = { id: 'water' };
+
+/** A small library used across tests, per gram. */
+export const egg = product('egg', { carbs: 0.007, fat: 0.095, kcal: 1.43, protein: 0.126 }, [
+  { grams: 60, id: 'u:piece', name: 'piece' },
 ]);
-export const oatFlakes = product('oat flakes', { kcal: 370, protein: 13, fat: 7, carbs: 59 });
-export const milk = product('milk', { kcal: 64, protein: 3.3, fat: 3.5, carbs: 4.8 }, [
-  { id: 'u1', name: 'ml', grams: 1.03 },
+export const oatFlakes = product('oat flakes', {
+  carbs: 0.59,
+  fat: 0.07,
+  kcal: 3.7,
+  protein: 0.13,
+});
+export const milk = product(
+  'milk',
+  { carbs: 0.048, fat: 0.035, kcal: 0.64, protein: 0.033, water: 0.88 },
+  [
+    { grams: 1.03, id: 'u:ml', name: 'ml' },
+    { grams: 250, id: 'u:cup', name: 'cup' },
+  ],
+);
+export const honey = product('honey', { carbs: 0.82, kcal: 3.04 }, [
+  { grams: 7, id: 'u:tsp', name: 'tsp' },
 ]);
-/** Honey with no protein value on its label: protein is unknown. */
-export const honey = product('honey', { kcal: 304, fat: 0, carbs: 82 }, [
-  { id: 'u1', name: 'tsp', grams: 7 },
+export const coffee = product('coffee', { kcal: 0.02, protein: 0.001, water: 0.99 }, [
+  { grams: 1, id: 'u:coffee-ml', name: 'ml' },
+  { grams: 300, id: 'u:mug', name: 'mug' },
 ]);
-export const water = product('water', { kcal: 0, protein: 0, fat: 0, carbs: 0 });

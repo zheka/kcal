@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'preact/hooks';
-import { NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
+import { NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
+import { isBuiltinName } from '../core/builtins';
 import { newId, pickIngredient, recipesContaining, unitUsages, usages } from '../core/foods';
-import { formatAmount, formatNumber, parseNumber } from '../core/format';
-import { ingredientGrams, ingredientsNutrition, type Nutrition } from '../core/nutrition';
+import { formatNutrientValue } from '../core/format';
+import { ingredientsNutrients, type Nutrients } from '../core/nutrition';
 import { cleanText, nameKey } from '../core/text';
-import type { Recipe } from '../core/types';
+import type { Recipe, RecipeUnit } from '../core/types';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
 import { dropDraft, keepDraft, loadDraft, takeCreatedFood } from './drafts';
@@ -16,7 +17,13 @@ import {
 } from './IngredientsEditor';
 import { plural } from './ProductForm';
 import { goBack, navigate } from './router';
-import { readUnits, unitRowsFrom, UnitsEditor, type UnitRow } from './UnitsEditor';
+import {
+  emptyUnitRow,
+  readRecipeUnits,
+  recipeUnitRows,
+  UnitsEditor,
+  type UnitRow,
+} from './UnitsEditor';
 
 interface Props {
   store: Store;
@@ -29,11 +36,13 @@ interface Props {
 interface Draft {
   name: string;
   rows: IngredientRow[];
-  servingsText: string;
-  cookedText: string;
   unitRows: UnitRow[];
 }
 
+/**
+ * A recipe is composed like a meal, then says what it makes ("makes 6 servings", "makes
+ * 1600 g" for a weighed pot): it is eaten only in those units.
+ */
 export function RecipeForm({ store, id, draftKey }: Props) {
   const data = store.data.value;
   const foods = store.foods.value;
@@ -58,25 +67,24 @@ export function RecipeForm({ store, id, draftKey }: Props) {
 
   const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
   const { ingredients, invalid } = readIngredients(draft.rows);
-  const { units, errors: unitErrors } = readUnits(draft.unitRows, 'recipe');
-  const servings = optionalPositive(draft.servingsText);
-  const cooked = optionalPositive(draft.cookedText);
-
-  const ingredientsWeight = ingredients.reduce((sum, i) => sum + ingredientGrams(foods, i), 0);
-  const weight = cooked.value ?? ingredientsWeight;
-  const total = ingredientsNutrition(foods, ingredients);
+  const { units, errors: unitErrors } = readRecipeUnits(draft.unitRows);
+  const whole = ingredientsNutrients(foods, ingredients);
 
   const cleanName = cleanText(draft.name);
   const taken = [...foods.values()].find(
     (f) => f.id !== id && nameKey(f.name) === nameKey(cleanName),
   );
   const errors = {
-    name: !cleanName ? 'Add a name' : taken ? `“${taken.name}” already exists` : '',
+    name: !cleanName
+      ? 'Add a name'
+      : isBuiltinName(cleanName)
+        ? `“${cleanName}” is a built-in food`
+        : taken
+          ? `“${taken.name}” already exists`
+          : '',
     ingredients:
       draft.rows.length === 0 ? 'Add ingredients' : invalid.size > 0 ? 'Check the amounts' : '',
-    servings: servings.error,
-    cooked: cooked.error,
-    weight: draft.rows.length > 0 && weight <= 0 ? 'The recipe weighs nothing' : '',
+    units: units.length === 0 && unitErrors.size === 0 ? 'Say what it makes, e.g. 6 servings' : '',
   };
   const valid = Object.values(errors).every((e) => !e) && unitErrors.size === 0;
 
@@ -91,15 +99,7 @@ export function RecipeForm({ store, id, draftKey }: Props) {
   function save() {
     setSubmitted(true);
     if (!valid) return;
-    const recipe: Recipe = {
-      id: existing?.id ?? newId(),
-      name: cleanName,
-      ingredients,
-      cookedGrams: cooked.value,
-      servings: servings.value,
-      units,
-      archived: existing?.archived ?? false,
-    };
+    const recipe: Recipe = { id: existing?.id ?? newId(), ingredients, name: cleanName, units };
     try {
       store.saveRecipe(recipe);
     } catch (err) {
@@ -146,50 +146,22 @@ export function RecipeForm({ store, id, draftKey }: Props) {
       </fieldset>
 
       <fieldset class="section">
-        <legend class="label">Makes</legend>
-        <div class="yield">
-          <label class="field">
-            <span class="label">Servings</span>
-            <input
-              class="input number"
-              inputMode="decimal"
-              placeholder="optional"
-              value={draft.servingsText}
-              onInput={(e) => set({ servingsText: e.currentTarget.value })}
-            />
-            {show(errors.servings)}
-          </label>
-          <label class="field">
-            <span class="label">Weighed when ready (g)</span>
-            <input
-              class="input number"
-              inputMode="decimal"
-              placeholder={formatNumber(ingredientsWeight, 0)}
-              value={draft.cookedText}
-              onInput={(e) => set({ cookedText: e.currentTarget.value })}
-            />
-            {show(errors.cooked)}
-          </label>
-        </div>
-        <p class="hint">
-          {cooked.value === null
-            ? `Weighs ${formatNumber(ingredientsWeight, 0)} g: the sum of its ingredients.`
-            : `Ingredients weigh ${formatNumber(ingredientsWeight, 0)} g; the dish ${formatNumber(cooked.value, 0)} g.`}
-        </p>
-        {show(errors.weight)}
-      </fieldset>
-
-      <Totals total={total} weight={weight} servings={servings.value} />
-
-      <fieldset class="section">
-        <legend class="label">Units</legend>
+        <legend class="label">What it makes</legend>
         <UnitsEditor
+          kind="recipe"
           rows={draft.unitRows}
           onChange={(unitRows) => set({ unitRows })}
           usesOf={(unitId) => (id ? unitUsages(data, id, unitId) : 0)}
           errors={submitted ? unitErrors : new Map()}
         />
+        <p class="hint">
+          The recipe is eaten in these units. Weighed the finished pot? Add its grams as a unit
+          named “g”, e.g. makes 1600 g.
+        </p>
+        {show(errors.units)}
       </fieldset>
+
+      <Totals whole={whole} units={units} />
 
       {inUse && (
         <p class="notice">
@@ -226,34 +198,17 @@ function fromRecipe(recipe: Recipe | undefined): Draft {
   return {
     name: recipe?.name ?? '',
     rows: (recipe?.ingredients ?? []).map(ingredientRow),
-    servingsText: recipe?.servings ? formatNumber(recipe.servings, 3) : '',
-    cookedText: recipe?.cookedGrams ? formatNumber(recipe.cookedGrams, 3) : '',
-    unitRows: unitRowsFrom(recipe?.units ?? []),
+    unitRows: recipe ? recipeUnitRows(recipe.units) : [emptyUnitRow()],
   };
 }
 
-/** An optional positive number field: empty is null. */
-function optionalPositive(text: string): { value: number | null; error: string } {
-  if (text.trim() === '') return { value: null, error: '' };
-  const n = parseNumber(text);
-  return n !== null && n > 0 ? { value: n, error: '' } : { value: null, error: 'Not a number' };
-}
-
-/** The recipe's nutrients: the whole dish, per serving and per 100 g. */
-function Totals({
-  total,
-  weight,
-  servings,
-}: {
-  total: Nutrition;
-  weight: number;
-  servings: number | null;
-}) {
-  const columns: [string, number][] = [['Whole', 1]];
-  if (servings) columns.push(['Serving', 1 / servings]);
-  if (weight > 0) columns.push(['100 g', 100 / weight]);
-  const cell = (n: Nutrient, factor: number) =>
-    formatAmount({ value: total[n].value * factor, missing: total[n].missing }, n);
+/** The recipe's nutrients: the whole recipe, and one of each of its first two units. */
+function Totals({ whole, units }: { whole: Nutrients; units: RecipeUnit[] }) {
+  const columns: [string, number][] = [
+    ['Whole', 1],
+    ...units.slice(0, 2).map((u): [string, number] => [`1 ${u.name}`, 1 / u.makes]),
+  ];
+  const cell = (n: Nutrient, factor: number) => formatNutrientValue(whole[n] * factor, n);
 
   return (
     <table class="totals">
@@ -269,7 +224,7 @@ function Totals({
         {NUTRIENTS.map((n) => (
           <tr key={n}>
             <th>
-              {n}
+              {NUTRIENT_LABEL[n]}
               {n !== 'kcal' && ` (${NUTRIENT_UNIT[n]})`}
             </th>
             {columns.map(([label, factor]) => (

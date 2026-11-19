@@ -14,6 +14,7 @@
   --protein: #2f6fd1;
   --fat: #c98a00;
   --carbs: #8a4fc9;
+  --water: #1f8fc9;
   --tap: 48px;
   --radius: 10px;
   font-family:
@@ -42,6 +43,7 @@
     --protein: #6aa1ff;
     --fat: #f2bf4a;
     --carbs: #b98cf0;
+    --water: #5cc0f2;
   }
 }
 
@@ -219,6 +221,8 @@ select.input {
 }
 
 .section {
+  /* A fieldset won't shrink below its content's width by default. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -281,13 +285,26 @@ legend select.input {
 
 .unit-fields {
   display: grid;
-  grid-template-columns: auto 1fr auto 6em auto auto;
   gap: 8px;
   align-items: center;
 }
 
-.new-unit .unit-fields {
+/* 1 [piece] = [60] g × */
+.unit-fields.product {
+  grid-template-columns: auto 1fr auto 6em auto auto;
+}
+
+/* makes [6] [servings] × */
+.unit-fields.recipe {
+  grid-template-columns: auto 6em 1fr auto;
+}
+
+.unit-fields.product.new {
   grid-template-columns: auto 1fr auto 6em auto;
+}
+
+.unit-fields.recipe.new {
+  grid-template-columns: auto 6em 1fr;
 }
 
 .unit-one {
@@ -647,6 +664,10 @@ legend select.input {
   --color: var(--carbs);
 }
 
+.nutrient-water {
+  --color: var(--water);
+}
+
 .bar-label {
   color: var(--muted);
   font-size: 0.8125rem;
@@ -696,13 +717,23 @@ legend select.input {
   outline-offset: -1px;
 }
 
-.bar-column.over .bar-numbers {
-  color: var(--danger);
-}
-
 .bar-numbers {
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+/* The meal being composed: its own line, in the nutrient's colour */
+.bar-meal-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color);
+  white-space: nowrap;
+}
+
+/* Over the goal: the total turns red */
+.bar-column.over .bar-numbers,
+.bar-column.over .bar-meal-value {
+  color: var(--danger);
 }
 
 .bar-goal-text {
@@ -738,4 +769,17 @@ legend select.input {
   text-align: center;
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* Two main actions sharing the bottom bar */
+
+.action-bar.actions .grow {
+  flex: 1;
+}
+
+.button.water {
+  border-color: var(--water);
+  background: transparent;
+  color: var(--water);
+  font-weight: 600;
 }

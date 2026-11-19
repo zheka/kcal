@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'preact/hooks';
-import { NUTRIENT_UNIT, NUTRIENTS } from '../config';
+import { NUTRIENTS } from '../config';
 import { newId, pickIngredient } from '../core/foods';
-import { formatAmount } from '../core/format';
+import { formatNutrient } from '../core/format';
 import { goalsOn } from '../core/goals';
-import { defaultMealTime } from '../core/meals';
-import { dayNutrition, ingredientsNutrition } from '../core/nutrition';
-import { isValidDateTime } from '../core/time';
+import { consumedAtFor, defaultMealMinute } from '../core/meals';
+import { dayNutrients, ingredientsNutrients } from '../core/nutrition';
+import { isValidLocalMinute, localMinuteOf } from '../core/time';
 import type { AppData, Meal } from '../core/types';
+import type { FoodTable } from '../core/nutrition';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
 import { DayChart } from './DayChart';
@@ -28,11 +29,14 @@ interface Props {
   date?: string;
   /** New meal: copy the ingredients of this meal (Eat again). */
   copyOf?: string;
+  /** New meal: start with this food (＋ Water). */
+  startWith?: string;
   draftKey: string;
 }
 
 interface Draft {
-  eatenAt: string;
+  /** The local minute, as in the datetime-local input. */
+  minute: string;
   rows: IngredientRow[];
 }
 
@@ -40,13 +44,15 @@ interface Draft {
  * Where a meal is put together: foods and amounts, while the day chart shows what was taken
  * (faded), this meal (bright) and what remains. Saving logs the meal.
  */
-export function MealComposer({ store, id, date, copyOf, draftKey }: Props) {
+export function MealComposer({ store, id, date, copyOf, startWith, draftKey }: Props) {
   const data = store.data.value;
   const foods = store.foods.value;
   const existing = id === null ? undefined : data.meals.find((m) => m.id === id);
 
   const [draft, setDraft] = useState<Draft>(() => {
-    const loaded = loadDraft<Draft>(draftKey) ?? initialDraft(data, existing, copyOf, date);
+    const loaded =
+      loadDraft<Draft>(draftKey) ??
+      initialDraft(data, foods, existing, { date, copyOf, startWith });
     const kept = { ...loaded, rows: loaded.rows.filter((r) => foods.has(r.food)) };
     const created = takeCreatedFood();
     const food = created ? foods.get(created) : undefined;
@@ -61,12 +67,14 @@ export function MealComposer({ store, id, date, copyOf, draftKey }: Props) {
   if (id !== null && !existing) return <p class="empty">This meal does not exist.</p>;
 
   const { ingredients, invalid } = readIngredients(draft.rows);
-  const timeValid = isValidDateTime(draft.eatenAt);
+  const timeValid = isValidLocalMinute(draft.minute);
   const day = timeValid
-    ? draft.eatenAt.slice(0, 10)
-    : (existing?.eatenAt ?? draft.eatenAt).slice(0, 10);
+    ? draft.minute.slice(0, 10)
+    : existing
+      ? localMinuteOf(existing.consumedAt).slice(0, 10)
+      : (date ?? today.value);
   const others = data.meals.filter((m) => m.id !== id);
-  const meal = ingredientsNutrition(foods, ingredients);
+  const meal = ingredientsNutrients(foods, ingredients);
   const errors = {
     time: timeValid ? '' : 'Set the date and time',
     ingredients: draft.rows.length === 0 ? 'Add food' : invalid.size > 0 ? 'Check the amounts' : '',
@@ -81,7 +89,11 @@ export function MealComposer({ store, id, date, copyOf, draftKey }: Props) {
   function save() {
     setSubmitted(true);
     if (!valid) return;
-    const saved: Meal = { id: existing?.id ?? newId(), eatenAt: draft.eatenAt, ingredients };
+    const saved: Meal = {
+      consumedAt: consumedAtFor(draft.minute, existing, new Date()),
+      id: existing?.id ?? newId(),
+      ingredients,
+    };
     try {
       store.saveMeal(saved);
     } catch (err) {
@@ -92,6 +104,9 @@ export function MealComposer({ store, id, date, copyOf, draftKey }: Props) {
   }
 
   const show = (error: string) => submitted && error && <p class="error">{error}</p>;
+  const summary = NUTRIENTS.filter((n) => n !== 'water' || meal.water > 0)
+    .map((n) => formatNutrient(meal[n], n))
+    .join(' · ');
 
   return (
     <form
@@ -104,16 +119,10 @@ export function MealComposer({ store, id, date, copyOf, draftKey }: Props) {
       <div class="composer-chart">
         <DayChart
           goals={goalsOn(data.goals, day)}
-          taken={dayNutrition(foods, others, day)}
+          taken={dayNutrients(foods, others, day)}
           meal={meal}
         />
-        <p class="meal-summary">
-          This meal:{' '}
-          {NUTRIENTS.map(
-            (n) =>
-              `${formatAmount(meal[n], n)} ${n === 'kcal' ? 'kcal' : `${NUTRIENT_UNIT[n]} ${n}`}`,
-          ).join(' · ')}
-        </p>
+        <p class="meal-summary">This meal: {summary}</p>
       </div>
 
       <section class="section">
@@ -130,13 +139,13 @@ export function MealComposer({ store, id, date, copyOf, draftKey }: Props) {
       </section>
 
       <label class="field">
-        <span class="label">Eaten at</span>
+        <span class="label">Consumed at</span>
         <input
           class="input"
           type="datetime-local"
-          aria-label="Eaten at"
-          value={draft.eatenAt}
-          onInput={(e) => setDraft({ ...draft, eatenAt: e.currentTarget.value })}
+          aria-label="Consumed at"
+          value={draft.minute}
+          onInput={(e) => setDraft({ ...draft, minute: e.currentTarget.value })}
         />
         {show(errors.time)}
       </label>
@@ -180,15 +189,31 @@ export function MealComposer({ store, id, date, copyOf, draftKey }: Props) {
 
 function initialDraft(
   data: AppData,
+  foods: FoodTable,
   existing: Meal | undefined,
-  copyOf: string | undefined,
-  date: string | undefined,
+  {
+    date,
+    copyOf,
+    startWith,
+  }: { date?: string | undefined; copyOf?: string | undefined; startWith?: string | undefined },
 ): Draft {
-  if (existing) return { eatenAt: existing.eatenAt, rows: existing.ingredients.map(ingredientRow) };
+  if (existing) {
+    return {
+      minute: localMinuteOf(existing.consumedAt),
+      rows: existing.ingredients.map(ingredientRow),
+    };
+  }
+  const now = new Date();
   // Eat again: the same foods, now.
   const source = copyOf ? data.meals.find((m) => m.id === copyOf) : undefined;
+  const start = startWith ? foods.get(startWith) : undefined;
+  const rows = source
+    ? source.ingredients.map(ingredientRow)
+    : start
+      ? [ingredientRow(pickIngredient(data, start))]
+      : [];
   return {
-    eatenAt: defaultMealTime(data.meals, source ? today.value : (date ?? today.value), new Date()),
-    rows: (source?.ingredients ?? []).map(ingredientRow),
+    minute: defaultMealMinute(data.meals, source ? today.value : (date ?? today.value), now),
+    rows,
   };
 }

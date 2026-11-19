@@ -1,17 +1,19 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
-import { buildFoodTable, type FoodTable } from '../core/nutrition';
+import { canonical } from '../core/canonical';
 import { usages } from '../core/foods';
 import { saveGoals } from '../core/goals';
+import { buildFoodTable, type FoodTable } from '../core/nutrition';
 import type { AppData, Meal, NutrientValues, Product, Recipe } from '../core/types';
 import { validateAppData } from '../core/validate';
 
 /**
- * The app state and the only functions that change it. Every change is checked like an
- * import and saved before it takes effect, so invalid data is never stored or shown.
+ * The app state: the stored data (primary, canonical, always valid) and the in-memory tables
+ * derived from it. Every change goes through here: it is checked like an import, put in
+ * canonical order and saved before it takes effect, so invalid data is never stored or shown.
  */
 export interface Store {
   readonly data: ReadonlySignal<AppData>;
-  /** Every food with its derived nutrients and units; rebuilt only when foods change. */
+  /** Every food (built-in, product, recipe) with its units and portions; rebuilt only when foods change. */
   readonly foods: ReadonlySignal<FoodTable>;
   /** Adds a product or replaces the one with its id. */
   saveProduct(product: Product): void;
@@ -22,8 +24,8 @@ export interface Store {
   /** Adds a meal or replaces the one with its id. */
   saveMeal(meal: Meal): void;
   deleteMeal(id: string): void;
-  /** New daily targets, effective from `today`; the days before keep their goals. */
-  saveGoals(targets: NutrientValues, today: string): void;
+  /** New daily targets, saved now, effective from the start of today. */
+  saveGoals(perDay: NutrientValues, now: Date): void;
   /** Replaces all data (import). */
   replaceAll(data: AppData): void;
 }
@@ -31,16 +33,17 @@ export interface Store {
 export class InvalidChangeError extends Error {}
 
 export function createStore(initial: AppData, persist: (data: AppData) => void): Store {
-  const data = signal(initial);
+  const data = signal(canonical(initial));
   // Separate computeds keep the same list when only meals or goals change, so the food
   // table is not rebuilt for them.
   const products = computed(() => data.value.products);
   const recipes = computed(() => data.value.recipes);
   const foods = computed(() => buildFoodTable(products.value, recipes.value));
 
-  function commit(next: AppData): void {
-    const problems = validateAppData(next);
+  function commit(change: AppData): void {
+    const problems = validateAppData(change);
     if (problems.length > 0) throw new InvalidChangeError(problems.join('\n'));
+    const next = canonical(change);
     persist(next); // first: if saving fails, nothing changes
     data.value = next;
   }
@@ -75,8 +78,8 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
     deleteMeal(id) {
       commit({ ...data.value, meals: data.value.meals.filter((m) => m.id !== id) });
     },
-    saveGoals(targets, today) {
-      commit({ ...data.value, goals: saveGoals(data.value.goals, targets, today) });
+    saveGoals(perDay, now) {
+      commit({ ...data.value, goals: saveGoals(data.value.goals, perDay, now) });
     },
     replaceAll(next) {
       commit(next);

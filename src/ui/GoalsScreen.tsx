@@ -1,13 +1,15 @@
 import { useState } from 'preact/hooks';
-import { NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
+import { NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
+import { roundStored } from '../core/decimal';
 import { formatNumber, parseNumber } from '../core/format';
 import { goalsOn } from '../core/goals';
+import { localDateOf } from '../core/time';
 import type { NutrientValues } from '../core/types';
 import type { Store } from '../state/store';
 import { describeTargets } from './DayScreen';
 import { goBack, today } from './router';
 
-/** Daily targets: saving makes them effective from today; earlier days keep their goals. */
+/** Daily targets: saving makes them effective from the start of today; earlier days keep theirs. */
 export function GoalsScreen({ store }: { store: Store }) {
   const goals = store.data.value.goals;
   const current = goalsOn(goals, today.value) ?? {};
@@ -18,19 +20,20 @@ export function GoalsScreen({ store }: { store: Store }) {
   });
   const [submitted, setSubmitted] = useState(false);
 
-  const targets: NutrientValues = {};
+  const perDay: NutrientValues = {};
   const errors = new Map<Nutrient, string>();
   for (const n of NUTRIENTS) {
     if (texts[n].trim() === '') continue;
     const x = parseNumber(texts[n]);
-    if (x === null || x <= 0) errors.set(n, 'Not a positive number');
-    else targets[n] = x;
+    const stored = x === null ? null : roundStored(x);
+    if (stored === null || stored <= 0) errors.set(n, 'Not a positive number');
+    else perDay[n] = stored;
   }
 
   function save() {
     setSubmitted(true);
     if (errors.size > 0) return;
-    store.saveGoals(targets, today.value);
+    store.saveGoals(perDay, new Date());
     goBack('/');
   }
 
@@ -43,14 +46,14 @@ export function GoalsScreen({ store }: { store: Store }) {
       }}
     >
       <p class="hint">
-        One daily target per nutrient; leave empty for no goal. New goals apply from today; the days
-        before keep the goals they had.
+        One daily target per nutrient; leave empty for no goal. New goals apply from the start of
+        today; the days before keep the goals they had.
       </p>
       <div class="nutrient-grid">
         {NUTRIENTS.map((n) => (
           <label class="field" key={n}>
             <span class="label">
-              {n}
+              {NUTRIENT_LABEL[n]}
               {n !== 'kcal' && ` (${NUTRIENT_UNIT[n]})`}
             </span>
             <input
@@ -77,8 +80,8 @@ export function GoalsScreen({ store }: { store: Store }) {
           <h2 class="label">History</h2>
           <ul class="goal-history">
             {[...goals].reverse().map((g) => (
-              <li key={g.from}>
-                From {g.from}: {describeTargets(g.targets) || 'no goals'}
+              <li key={g.setAt}>
+                From {localDateOf(g.setAt)}: {describeTargets(g.perDay) || 'no goals'}
               </li>
             ))}
           </ul>

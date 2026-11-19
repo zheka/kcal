@@ -1,10 +1,11 @@
 import { useState } from 'preact/hooks';
-import { foodsByRecency, pickIngredient } from '../core/foods';
-import { formatAmount, formatNumber, parseNumber } from '../core/format';
-import { ingredientNutrition, type FoodEntry } from '../core/nutrition';
+import { foodsByRecency, newId, pickIngredient } from '../core/foods';
+import { formatNumber, formatNutrientValue, parseNumber } from '../core/format';
+import { ingredientPortion, type FoodEntry } from '../core/nutrition';
 import { cleanText, nameKey } from '../core/text';
 import type { Ingredient } from '../core/types';
-import { isReservedUnitName, newUnitId } from '../core/units';
+import { roundStored } from '../core/decimal';
+import { isReservedProductUnitName } from '../core/units';
 import type { Store } from '../state/store';
 import { FoodPicker } from './FoodPicker';
 
@@ -82,7 +83,10 @@ export function IngredientsEditor({
         const kcal =
           amount === null
             ? '–'
-            : formatAmount(ingredientNutrition(foods, { ...row, amount }).kcal, 'kcal');
+            : formatNutrientValue(
+                ingredientPortion(foods, { ...row, amount }).nutrients.kcal,
+                'kcal',
+              );
         return (
           <div class="ingredient" key={row.key}>
             <div class="ingredient-main">
@@ -118,7 +122,7 @@ export function IngredientsEditor({
                     {u.name}
                   </option>
                 ))}
-                <option value={NEW_UNIT}>＋ new unit…</option>
+                {food.kind !== 'builtin' && <option value={NEW_UNIT}>＋ new unit…</option>}
               </select>
               <button
                 type="button"
@@ -153,7 +157,10 @@ export function IngredientsEditor({
   );
 }
 
-/** Adds a unit to a food right from an ingredient row, and selects it. */
+/**
+ * Adds a unit to a food right from an ingredient row, and selects it: for a product, how many
+ * grams one weighs; for a recipe, how many of it the whole recipe makes.
+ */
 function NewUnitForm({
   store,
   food,
@@ -164,60 +171,85 @@ function NewUnitForm({
   onDone: (unitId: string | null) => void;
 }) {
   const [name, setName] = useState('');
-  const [gramsText, setGramsText] = useState('');
+  const [valueText, setValueText] = useState('');
   const [error, setError] = useState('');
+  const isProduct = food.kind === 'product';
 
   function add() {
     const unitName = cleanText(name);
-    const grams = parseNumber(gramsText);
+    const parsed = parseNumber(valueText);
+    const value = parsed === null ? null : roundStored(parsed);
     if (!unitName) return setError('Add a name');
-    if (
-      isReservedUnitName(food.kind, unitName) ||
-      food.units.some((u) => nameKey(u.name) === nameKey(unitName))
-    ) {
+    if (isProduct && isReservedProductUnitName(unitName)) {
+      return setError('“g” is built in: every product has grams');
+    }
+    if (food.units.some((u) => nameKey(u.name) === nameKey(unitName))) {
       return setError(`“${unitName}” already exists`);
     }
-    if (grams === null || grams <= 0) return setError('Add its weight in grams');
+    if (value === null || value <= 0) {
+      return setError(isProduct ? 'Add its weight in grams' : 'Add how many the recipe makes');
+    }
     const data = store.data.value;
+    const id = newId();
     try {
-      if (food.kind === 'product') {
+      if (isProduct) {
         const product = data.products.find((p) => p.id === food.id)!;
-        const unit = { id: newUnitId(product.units), name: unitName, grams };
-        store.saveProduct({ ...product, units: [...product.units, unit] });
-        onDone(unit.id);
+        store.saveProduct({
+          ...product,
+          units: [...product.units, { grams: value, id, name: unitName }],
+        });
       } else {
         const recipe = data.recipes.find((r) => r.id === food.id)!;
-        const unit = { id: newUnitId(recipe.units), name: unitName, grams };
-        store.saveRecipe({ ...recipe, units: [...recipe.units, unit] });
-        onDone(unit.id);
+        store.saveRecipe({
+          ...recipe,
+          units: [...recipe.units, { id, makes: value, name: unitName }],
+        });
       }
+      onDone(id);
     } catch (err) {
       setError((err as Error).message);
     }
   }
 
+  const nameInput = (
+    <input
+      class="input"
+      aria-label="New unit name"
+      placeholder={isProduct ? 'cup' : 'servings'}
+      value={name}
+      onInput={(e) => setName(e.currentTarget.value)}
+    />
+  );
+  const valueInput = (
+    <input
+      class="input number"
+      aria-label={isProduct ? 'New unit grams' : 'New unit makes'}
+      inputMode="decimal"
+      placeholder={isProduct ? '250' : '6'}
+      value={valueText}
+      onInput={(e) => setValueText(e.currentTarget.value)}
+    />
+  );
+
   return (
     <div class="new-unit">
       <span class="label">New unit of {food.name}</span>
-      <div class="unit-fields">
-        <span class="unit-one">1</span>
-        <input
-          class="input"
-          aria-label="New unit name"
-          placeholder="cup"
-          value={name}
-          onInput={(e) => setName(e.currentTarget.value)}
-        />
-        <span>=</span>
-        <input
-          class="input number"
-          aria-label="New unit grams"
-          inputMode="decimal"
-          placeholder="250"
-          value={gramsText}
-          onInput={(e) => setGramsText(e.currentTarget.value)}
-        />
-        <span>g</span>
+      <div class={`unit-fields ${isProduct ? 'product' : 'recipe'} new`}>
+        {isProduct ? (
+          <>
+            <span class="unit-one">1</span>
+            {nameInput}
+            <span>=</span>
+            {valueInput}
+            <span>g</span>
+          </>
+        ) : (
+          <>
+            <span class="unit-one">makes</span>
+            {valueInput}
+            {nameInput}
+          </>
+        )}
       </div>
       {error && <p class="error">{error}</p>}
       <div class="actions">

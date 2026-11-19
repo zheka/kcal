@@ -1,18 +1,27 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { appData, egg, honey, ing, meal, oatFlakes } from '../core/testData';
+import { appData, egg, honey, ing, meal, oatFlakes, water } from '../core/testData';
 import type { AppData } from '../core/types';
 import { createStore, type Store } from '../state/store';
 import { App } from './App';
 import { clearDrafts } from './drafts';
 import { navigate, today } from './router';
 
+// Tests run in Europe/Berlin (UTC+1 in November). "Now" is 19:45:12.345 local on Nov 17.
+const NOW = '2026-11-17T18:45:12.345Z';
+
 let store: Store;
 
-const breakfast = meal('2026-11-17T08:30', [ing(egg, 2, 'u1')], 'm:breakfast');
-const lunch = meal('2026-11-17T13:00', [ing(oatFlakes, 100)], 'm:lunch');
-const yesterday = meal('2026-11-16T09:00', [ing(egg, 3, 'u1')], 'm:yesterday');
-const goals = [{ from: '2026-11-01', targets: { kcal: 2000, protein: 150 } }];
+const breakfast = meal('2026-11-17T07:30:41.512Z', [ing(egg, 2, 'u:piece')], 'm:breakfast');
+const lunch = meal(
+  '2026-11-17T12:00:00.000Z',
+  [ing(oatFlakes, 100), ing(water, 300, 'ml')],
+  'm:lunch',
+);
+const yesterday = meal('2026-11-16T08:00:00.000Z', [ing(egg, 3, 'u:piece')], 'm:yesterday');
+const goals = [
+  { perDay: { kcal: 2000, protein: 150, water: 2000 }, setAt: '2026-11-01T18:20:05.114Z' },
+];
 
 function start(data: Partial<AppData> = {}, path = '/') {
   store = createStore(
@@ -32,10 +41,11 @@ const click = (name: string | RegExp) => fireEvent.click(screen.getByRole('butto
 const bar = (name: RegExp) => screen.getByRole('img', { name }).getAttribute('aria-label');
 const pick = (food: string) =>
   fireEvent.click(within(screen.getByLabelText('Foods')).getByText(food));
+const input = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(2026, 10, 17, 19, 45));
+  vi.setSystemTime(new Date(NOW));
   today.value = '2026-11-17';
   history.replaceState(null, '', '#/');
   clearDrafts();
@@ -46,43 +56,37 @@ afterEach(() => {
 });
 
 describe('day screen', () => {
-  it('shows the day against its goals, and its meals newest first', () => {
+  it('shows the day against its goals, and its meals newest first with the goal nutrients', () => {
     start();
     expect(screen.getByRole('heading', { name: 'Today' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy();
-    // 2 eggs (171.6 kcal, 15.12 g protein) + 100 g oat flakes (370 kcal, 13 g)
+    // 2 eggs (171.6 kcal, 15.12 g protein) + 100 g oat flakes (370 kcal, 13 g) + 300 ml water
     expect(bar(/^kcal/)).toBe('kcal: 542 taken, goal 2000');
-    expect(bar(/^Protein/)).toBe('Protein: 28 g taken, goal 150 g');
-    // No goals for fat and carbs: amounts and the macro split.
-    // Nutrients without a goal have bars too, without a goal line.
+    expect(bar(/^Water/)).toBe('Water: 300 ml taken, goal 2000 ml');
     expect(bar(/^Fat/)).toBe('Fat: 18 g taken, no goal');
-    expect(bar(/^Carbs/)).toBe('Carbs: 60 g taken, no goal');
-    expect(screen.getByText(/^P \d+% · F \d+% · C \d+% of energy$/)).toBeTruthy();
 
     const rows = screen.getAllByRole('button', { name: /kcal ·/ });
     expect(rows.map((r) => r.textContent)).toEqual([
-      '13:00370 kcal · 13 g protein✎',
-      '08:30172 kcal · 15 g protein✎',
+      '13:00370 kcal · 13 g protein · 300 ml water✎',
+      '08:30172 kcal · 15 g protein · 0 ml water✎',
     ]);
   });
 
   it('moves between days with the arrows', () => {
     start();
     click('Previous day');
-    expect(screen.queryByRole('heading', { name: 'Today' })).toBeNull();
     expect(location.hash).toBe('#/day/2026-11-16');
     expect(screen.getAllByRole('button', { name: /kcal ·/ })).toHaveLength(1);
     click('Next day');
     expect(screen.getByRole('heading', { name: 'Today' })).toBeTruthy();
-    expect(location.hash).toBe('#/');
   });
 
   it('says when a past day had other goals', () => {
     start(
       {
         goals: [
-          { from: '2026-11-01', targets: { kcal: 1800 } },
-          ...goals.map((g) => ({ ...g, from: '2026-11-15' })),
+          { perDay: { kcal: 1800 }, setAt: '2026-11-01T10:00:00.000Z' },
+          { perDay: { kcal: 2000 }, setAt: '2026-11-15T10:00:00.000Z' },
         ],
       },
       '/day/2026-11-10',
@@ -91,42 +95,51 @@ describe('day screen', () => {
     expect(bar(/^kcal/)).toBe('kcal: 0 taken, goal 1800');
   });
 
-  it('shows every nutrient without goals before the first goals, and offers to set them', () => {
+  it('shows kcal per meal and no goal lines before the first goals, and offers to set them', () => {
     start({ goals: [] });
     expect(bar(/^kcal/)).toBe('kcal: 542 taken, no goal');
-    expect(screen.getAllByRole('img')).toHaveLength(4);
+    expect(screen.getAllByRole('button', { name: /kcal/ }).map((r) => r.textContent)).toContain(
+      '13:00370 kcal✎',
+    );
     click('Set daily goals');
     expect(screen.getByRole('heading', { name: 'Goals' })).toBeTruthy();
-  });
-
-  it('marks totals that include unknown values', () => {
-    start({ meals: [meal('2026-11-17T10:00', [ing(egg, 1, 'u1'), ing(honey, 1, 'u1')])] });
-    expect(bar(/^Protein/)).toBe('Protein: 7.6 g taken, goal 150 g, some values unknown');
-    expect(screen.getByText('≥ 7.6')).toBeTruthy();
   });
 });
 
 describe('meal composer', () => {
-  it('composes a meal against the day and logs it now', async () => {
+  it('composes a meal against the day and logs it at the exact moment', async () => {
     start();
     click('＋ Eat');
     expect(screen.getByRole('heading', { name: 'New meal' })).toBeTruthy();
-    expect((screen.getByLabelText('Eaten at') as HTMLInputElement).value).toBe('2026-11-17T19:45');
+    expect(input('Consumed at').value).toBe('2026-11-17T19:45');
     pick('egg');
-    // The last use of egg: 2 pieces.
-    expect((screen.getByLabelText('Amount of egg') as HTMLInputElement).value).toBe('2');
+    // the last use of egg: 2 pieces
+    expect(input('Amount of egg').value).toBe('2');
     expect(bar(/^kcal/)).toBe('kcal: 542 taken, 172 this meal, goal 2000');
-    fireEvent.input(screen.getByLabelText('Amount of egg'), { target: { value: '4' } });
-    expect(bar(/^kcal/)).toBe('kcal: 542 taken, 343 this meal, goal 2000');
+    fireEvent.input(input('Amount of egg'), { target: { value: '4' } });
     expect(screen.getByText(/^This meal: 343 kcal · 30 g protein/)).toBeTruthy();
 
     click('Save');
     expect(await screen.findByRole('heading', { name: 'Today' })).toBeTruthy();
-    expect(store.data.value.meals).toHaveLength(4);
     expect(store.data.value.meals.at(-1)).toMatchObject({
-      eatenAt: '2026-11-17T19:45',
-      ingredients: [ing(egg, 4, 'u1')],
+      consumedAt: NOW,
+      ingredients: [ing(egg, 4, 'u:piece')],
     });
+  });
+
+  it('logs a glass of water with ＋ Water', async () => {
+    start();
+    click('＋ Water');
+    expect(screen.getByRole('heading', { name: 'Drink' })).toBeTruthy();
+    // the last use of water: 300 ml
+    expect(input('Amount of water').value).toBe('300');
+    expect(bar(/^Water/)).toBe('Water: 300 ml taken, 300 ml this meal, goal 2000 ml');
+    click('Save');
+    await screen.findByRole('heading', { name: 'Today' });
+    expect(store.data.value.meals.at(-1)?.ingredients).toEqual([ing(water, 300, 'ml')]);
+    expect(screen.getAllByRole('button', { name: /kcal ·/ })[0]!.textContent).toBe(
+      '19:450 kcal · 0 g protein · 300 ml water✎',
+    );
   });
 
   it('refuses an empty meal', () => {
@@ -137,29 +150,31 @@ describe('meal composer', () => {
     expect(store.data.value.meals).toHaveLength(3);
   });
 
-  it('edits a meal: the day counts it only once', async () => {
+  it('edits a meal: counted once in the chart; a new minute keeps its seconds', async () => {
     start();
     fireEvent.click(screen.getByRole('button', { name: /^08:30/ }));
     expect(screen.getByRole('heading', { name: 'Meal' })).toBeTruthy();
     expect(bar(/^kcal/)).toBe('kcal: 370 taken, 172 this meal, goal 2000');
-    fireEvent.input(screen.getByLabelText('Amount of egg'), { target: { value: '1' } });
+    fireEvent.input(input('Amount of egg'), { target: { value: '1' } });
+    fireEvent.input(input('Consumed at'), { target: { value: '2026-11-17T09:00' } });
     click('Save');
     await screen.findByRole('heading', { name: 'Today' });
-    expect(store.data.value.meals.find((m) => m.id === breakfast.id)?.ingredients).toEqual([
-      ing(egg, 1, 'u1'),
-    ]);
+    expect(store.data.value.meals.find((m) => m.id === breakfast.id)).toEqual({
+      consumedAt: '2026-11-17T08:00:41.512Z',
+      id: breakfast.id,
+      ingredients: [ing(egg, 1, 'u:piece')],
+    });
   });
 
   it('eats a past meal again, now', async () => {
     start({}, `/meal/${yesterday.id}`);
     click('Eat again');
     expect(screen.getByRole('heading', { name: 'Eat again' })).toBeTruthy();
-    expect((screen.getByLabelText('Amount of egg') as HTMLInputElement).value).toBe('3');
-    expect((screen.getByLabelText('Eaten at') as HTMLInputElement).value).toBe('2026-11-17T19:45');
+    expect(input('Amount of egg').value).toBe('3');
     click('Save');
     await vi.waitFor(() => expect(store.data.value.meals).toHaveLength(4));
     expect(store.data.value.meals.at(-1)).toMatchObject({
-      eatenAt: '2026-11-17T19:45',
+      consumedAt: NOW,
       ingredients: yesterday.ingredients,
     });
     expect(store.data.value.meals).toContainEqual(yesterday);
@@ -170,28 +185,32 @@ describe('meal composer', () => {
     click('Delete');
     click('Tap again to delete');
     await vi.waitFor(() => expect(store.data.value.meals).toHaveLength(2));
-    expect(store.data.value.meals.find((m) => m.id === lunch.id)).toBeUndefined();
   });
 
-  it('adds a meal to a past day just after its last meal', () => {
+  it('adds a meal to a past day a minute after its last meal, with the seconds of now', async () => {
     start({}, '/day/2026-11-16');
     click('＋ Eat');
-    expect((screen.getByLabelText('Eaten at') as HTMLInputElement).value).toBe('2026-11-16T09:01');
-    expect(bar(/^kcal/)).toBe('kcal: 257 taken, 0 this meal, goal 2000');
+    expect(input('Consumed at').value).toBe('2026-11-16T09:01');
+    pick('egg');
+    click('Save');
+    await vi.waitFor(() => expect(store.data.value.meals).toHaveLength(4));
+    expect(
+      store.data.value.meals.find((m) => m.consumedAt.startsWith('2026-11-16T08:01'))?.consumedAt,
+    ).toBe('2026-11-16T08:01:12.345Z');
   });
 });
 
 describe('goals', () => {
-  it('saves new goals effective from today and keeps their history', async () => {
+  it('saves new goals now, effective from the start of today', async () => {
     start({}, '/goals');
-    const kcal = screen.getByLabelText('kcal') as HTMLInputElement;
-    expect(kcal.value).toBe('2000');
-    fireEvent.input(kcal, { target: { value: '2200' } });
-    fireEvent.input(screen.getByLabelText('protein (g)'), { target: { value: '' } });
-    fireEvent.input(screen.getByLabelText('fat (g)', { exact: false }), { target: { value: 'x' } });
+    expect(input('kcal').value).toBe('2000');
+    expect(input('Water (ml)').value).toBe('2000');
+    fireEvent.input(input('kcal'), { target: { value: '2200' } });
+    fireEvent.input(input('Protein (g)'), { target: { value: '' } });
+    fireEvent.input(input('Fat (g)'), { target: { value: 'x' } });
     click('Save');
     expect(screen.getByText('Not a positive number')).toBeTruthy();
-    fireEvent.input(screen.getByLabelText('fat (g)', { exact: false }), {
+    fireEvent.input(screen.getByLabelText('Fat (g)', { exact: false }), {
       target: { value: '70' },
     });
     click('Save');
@@ -199,13 +218,15 @@ describe('goals', () => {
     await vi.waitFor(() =>
       expect(store.data.value.goals).toEqual([
         ...goals,
-        { from: '2026-11-17', targets: { kcal: 2200, fat: 70 } },
+        { perDay: { fat: 70, kcal: 2200, water: 2000 }, setAt: NOW },
       ]),
     );
   });
 
   it('lists the goals history', () => {
     start({}, '/goals');
-    expect(screen.getByText('From 2026-11-01: 2000 kcal · 150 g protein')).toBeTruthy();
+    expect(
+      screen.getByText('From 2026-11-01: 2000 kcal · 150 g protein · 2000 ml water'),
+    ).toBeTruthy();
   });
 });

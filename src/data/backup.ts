@@ -1,15 +1,20 @@
+import { canonical, canonicalJson } from '../core/canonical';
+import { isValidUtc } from '../core/time';
 import type { AppData } from '../core/types';
 import { validateAppData } from '../core/validate';
 
 /**
- * Version of the stored data's schema, independent of app releases. While 0.x, a minor bump
- * may break (needs a migration) and a patch only adds optional fields.
+ * The stored data as a document: a backup file, or what the app saves in the browser (the same
+ * without `exportedAt`). Format: docs/backup-format.md.
+ *
+ * The version of the format, independent of app releases. While 0.x, a minor bump may break
+ * (needs a migration) and a patch only adds optional fields.
  */
 export const SCHEMA_VERSION = '0.1.0';
-/** `version` of every Kcal file: marks it as Kcal data and versions it. */
+/** `version` of every Kcal document: marks it as Kcal data and versions it. */
 export const VERSION_TAG = `kcal ${SCHEMA_VERSION}`;
 
-const DOCUMENT_FIELDS = ['version', 'exportedAt', 'goals', 'products', 'recipes', 'meals'];
+const DOCUMENT_FIELDS = ['exportedAt', 'goals', 'meals', 'products', 'recipes', 'version'];
 
 /** A problem with the version, or null when this app can read it as it is. */
 export function versionProblem(version: unknown): string | null {
@@ -34,8 +39,8 @@ export function versionProblem(version: unknown): string | null {
 }
 
 /**
- * Checks a whole document (a backup, or the saved data): its version, its fields and all its
- * data. Returns every problem; empty means it can be used as it is.
+ * Checks a whole document: its version, its fields and all its data. Returns every problem;
+ * empty means it can be used as it is.
  */
 export function validateDocument(doc: unknown): string[] {
   if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) {
@@ -51,16 +56,19 @@ export function validateDocument(doc: unknown): string[] {
   }
   if (
     'exportedAt' in record &&
-    (typeof record.exportedAt !== 'string' || Number.isNaN(Date.parse(record.exportedAt)))
+    !(typeof record.exportedAt === 'string' && isValidUtc(record.exportedAt))
   ) {
-    problems.push('exportedAt must be a timestamp');
+    problems.push('exportedAt must be a UTC timestamp like 2026-11-17T07:30:41.512Z');
   }
   return [...problems, ...validateAppData(record)];
 }
 
 export type ParseResult = { ok: true; data: AppData } | { ok: false; problems: string[] };
 
-/** Reads a backup file or the saved data. All-or-nothing: any problem refuses the whole file. */
+/**
+ * Reads a backup file or the saved data. All-or-nothing: any problem refuses the whole file.
+ * Order is not data: the data comes back in canonical order.
+ */
 export function parseDocument(text: string): ParseResult {
   let doc: unknown;
   try {
@@ -70,26 +78,16 @@ export function parseDocument(text: string): ParseResult {
   }
   const problems = validateDocument(doc);
   if (problems.length > 0) return { ok: false, problems };
-  const { goals, products, recipes, meals } = doc as AppData;
-  return { ok: true, data: { goals, products, recipes, meals } };
+  const { goals, meals, products, recipes } = doc as AppData;
+  return { ok: true, data: canonical({ goals, meals, products, recipes }) };
 }
 
-/** The document as saved by the app: the data with its version. */
-export function toDocument(data: AppData): object {
-  const { goals, products, recipes, meals } = data;
-  return { version: VERSION_TAG, goals, products, recipes, meals };
+/** The document as the app saves it: the data with its version, canonical. */
+export function documentJson(data: AppData): string {
+  return canonicalJson({ ...canonical(data), version: VERSION_TAG });
 }
 
-/** A backup file's contents: the document plus when it was written, readable by people. */
+/** A backup file's contents: the saved document plus when it was written. */
 export function serializeBackup(data: AppData, now: Date): string {
-  const { goals, products, recipes, meals } = data;
-  const backup = {
-    version: VERSION_TAG,
-    exportedAt: now.toISOString(),
-    goals,
-    products,
-    recipes,
-    meals,
-  };
-  return `${JSON.stringify(backup, null, 2)}\n`;
+  return canonicalJson({ ...canonical(data), exportedAt: now.toISOString(), version: VERSION_TAG });
 }
