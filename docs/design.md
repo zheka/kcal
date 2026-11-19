@@ -145,13 +145,14 @@ Agreed:
 
 ```json
 "goals": [
-  { "from": "2026-11-01", "targets": { "kcal": 2000, "protein": 150, "water": 2500 } },
-  { "from": "2027-01-15", "targets": { "kcal": 2200, "protein": 160, "water": 2500 } }
+  { "perDay": { "kcal": 2000, "protein": 150, "water": 2000 }, "setAt": "2026-11-01T18:20:05.114Z" },
+  { "perDay": { "kcal": 2200, "protein": 160, "water": 2000 }, "setAt": "2027-01-15T07:02:44.590Z" }
 ]
 ```
 
-(`from` is when the goals form was saved; it is never entered by hand. Whether it is stored as
-a date or a UTC timestamp is open: see [backup-format.md](backup-format.md).)
+(`setAt` is when the goals form was saved, a UTC timestamp; it is never entered by hand. A set
+applies from the start of the local day containing `setAt`, so goals saved at 15:00 apply to the
+whole of that day. See [backup-format.md](backup-format.md).)
 
 ### Weight
 
@@ -192,7 +193,8 @@ Agreed:
   last amount used. Drinks are meals in storage. _(Later: the button may become configurable.)_
 - Built-in foods have no custom units; recent amounts appear as chips. "My cup of water" is a
   recipe (330 ml of water, makes 1 cup) or a product with a water value.
-- _(To decide when building)_ how a drink-only meal looks in the day list (e.g. `💧 330 ml`).
+- Drinks are rows in the day list like any meal; every row shows the nutrients that have
+  goals, so a glass of water shows its `330 ml water`.
 
 ### Editing foods: everything is live
 
@@ -232,8 +234,10 @@ layouts are checked with screenshots at that size.
   daily goal for each nutrient that has one.
 - The **day's meals**, **newest first** (the meal just logged sits right under the chart).
   A meal row is **compact** and shows **no
-  ingredients**: its time and its totals, either as numbers (`690 kcal · 48 g protein`) or as
-  a small inline chart of its share of each goal _(to decide when designing the screen)_.
+  ingredients**: its time and **the nutrients that have goals** that day (agreed), e.g.
+  `690 kcal · 48 g protein · 300 ml water`, so every meal, a glass of water included, shows
+  how it moves each goal. Drinks are rows like any other meal. _(Before the first goals:
+  kcal, proposal.)_
 - A small **edit icon** on the right of a meal row opens it in the meal composer (edit mode),
   which also offers **Eat again** and **Delete** (two-tap). _(What tapping the row itself does,
   if anything, is open.)_
@@ -476,7 +480,8 @@ UX details still to decide:
    may the new one also be called `milk` (names repeating among archived foods)?
 3. **Meal rows** on the day screen: totals as numbers or as a small inline chart; what tapping
    the row itself does.
-4. **Water** in the day list: how a drink-only meal looks (see Water).
+4. ~~Water in the day list~~: decided, drinks are rows like any meal, showing the nutrients
+   that have goals.
 5. The _(proposal)_ items above, to confirm or change while building.
 
 Technical questions (see Technical design):
