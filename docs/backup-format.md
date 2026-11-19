@@ -4,7 +4,7 @@ The format of Kcal's backup file and of the data the app saves in the browser: `
 
 Status (2026-11-19): **agreed, apart from the open questions at the end. Not implemented
 yet:** the app still writes the earlier draft of `0.1.0` (per-100 g values, `kg`, `servings`
-and `cookedGrams`, local `eatenAt`, `archived`). Since no real data exists yet, `0.1.0` is
+and `cookedGrams`, local `consumedAt`, `archived`). Since no real data exists yet, `0.1.0` is
 changed in place, with no migration.
 
 ## Purpose and principles
@@ -65,7 +65,7 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
   | List                   | Order                                        |
   | ---------------------- | -------------------------------------------- |
   | `goals`                | by `from`                                    |
-  | `meals`                | by `eatenAt` (then `id`, if ever equal)      |
+  | `meals`                | by `consumedAt` (then `id`, if ever equal)   |
   | `products`, `recipes`  | by `id`                                      |
   | `units`, `ingredients` | as the user ordered them (the order is data) |
 
@@ -125,12 +125,12 @@ Only the format version is recorded, not the version of the app that wrote the f
 }
 ```
 
-| Field   | Required | Meaning                                                               |
-| ------- | -------- | --------------------------------------------------------------------- |
-| `id`    | yes      | UUID                                                                  |
-| `name`  | yes      | unique among products and recipes, ignoring case                      |
-| `per1g` | yes      | nutrients in 1 g; `kcal` required, an omitted nutrient is **unknown** |
-| `units` | yes      | the product's own units, in the user's order; `[]` when none          |
+| Field   | Required | Meaning                                                      |
+| ------- | -------- | ------------------------------------------------------------ |
+| `id`    | yes      | UUID                                                         |
+| `name`  | yes      | unique among products and recipes, ignoring case             |
+| `per1g` | yes      | nutrients in 1 g; an omitted nutrient counts as **0**        |
+| `units` | yes      | the product's own units, in the user's order; `[]` when none |
 
 - **Everything goes through grams.** A unit that is not really a weight (a millilitre of a
   drink, an egg of size M) gets a reasonable figure in grams, corrected later if needed: the
@@ -138,7 +138,28 @@ Only the format version is recorded, not the version of the app that wrote the f
 - **Grams are built in**: every product can be measured in grams, which is not stored as a
   unit. There is no `kg`.
 - **Product unit:** `grams` (positive), `id` (UUID), `name` (unique within the product,
-  ignoring case; `g` is reserved, ignoring case).
+  ignoring case; `g` and `ml` are reserved, ignoring case).
+- **Nutrients** are `carbs`, `fat`, `kcal`, `protein` and `water` (in ml; 1 g of water = 1 ml).
+  Nothing is required: every omitted nutrient counts as 0. Drinks carry a `water` value by
+  their water content (water 1 per g, coffee and tea about 0.99, milk about 0.88); foods omit
+  it.
+
+## Built-in foods
+
+Four foods are defined in the code, not stored, and referred to by fixed ids:
+
+| Id        | Per 1 g             | Units             |
+| --------- | ------------------- | ----------------- |
+| `water`   | 1 ml water          | `g`, `ml` (= 1 g) |
+| `protein` | 1 g protein, 4 kcal | `g`               |
+| `fat`     | 1 g fat, 9 kcal     | `g`               |
+| `carbs`   | 1 g carbs, 4 kcal   | `g`               |
+
+- They can be used in any meal or recipe like a product (`"food": "water", "unit": "ml"`), but
+  are read-only and have no custom units. A cup of your own is a recipe (330 ml of water,
+  makes 1 cup) or a product with a water value.
+- Their names are reserved, ignoring case: no product or recipe can be called `water`,
+  `protein`, `fat` or `carbs`.
 
 ## Recipes
 
@@ -177,7 +198,7 @@ Only the format version is recorded, not the version of the app that wrote the f
 
 ```json
 {
-  "eatenAt": "2026-11-17T07:30:41.512Z",
+  "consumedAt": "2026-11-17T07:30:41.512Z",
   "id": "0a7f…",
   "ingredients": [
     { "amount": 2, "food": "<egg id>", "unit": "<piece id>" },
@@ -188,12 +209,12 @@ Only the format version is recorded, not the version of the app that wrote the f
 
 | Field         | Required | Meaning                                       |
 | ------------- | -------- | --------------------------------------------- |
-| `eatenAt`     | yes      | when the meal is (to be) eaten, UTC timestamp |
+| `consumedAt`  | yes      | when the meal is (to be) eaten, UTC timestamp |
 | `id`          | yes      | UUID                                          |
 | `ingredients` | yes      | at least one (see Ingredients)                |
 
 - A meal has nothing else: no name, no time zone.
-- **Editing changes only the minute** of `eatenAt`; its seconds and milliseconds stay. A meal
+- **Editing changes only the minute** of `consumedAt`; its seconds and milliseconds stay. A meal
   logged now gets the exact moment; a new meal with a chosen time gets that minute plus the
   current seconds and milliseconds; Eat again counts as new. So meals in the same minute are
   ordered as they were logged, without any second timestamp.
@@ -203,11 +224,11 @@ Only the format version is recorded, not the version of the app that wrote the f
 
 The shared structure of a meal's and a recipe's ingredient list.
 
-| Field    | Required | Meaning                                                     |
-| -------- | -------- | ----------------------------------------------------------- |
-| `amount` | yes      | positive (0 can't be saved)                                 |
-| `food`   | yes      | id of a product or a recipe                                 |
-| `unit`   | yes      | `"g"` (products only) or the id of one of that food's units |
+| Field    | Required | Meaning                                                                                    |
+| -------- | -------- | ------------------------------------------------------------------------------------------ |
+| `amount` | yes      | positive (0 can't be saved)                                                                |
+| `food`   | yes      | id of a product, a recipe or a built-in food                                               |
+| `unit`   | yes      | `"g"` (products and built-in foods), `"ml"` (water), or the id of one of that food's units |
 
 - The same food may appear in several ingredients.
 
@@ -225,7 +246,7 @@ The shared structure of a meal's and a recipe's ingredient list.
 - Without `targets`, a set means no goals from then on.
 - Goal sets have no ids.
 - **At most one goal set per day**: saving again on the same day replaces that day's set.
-- Targets cover the nutrients. A water goal comes with water tracking.
+- Targets cover the nutrients, water included (in ml).
 
 ## Numbers
 
@@ -243,14 +264,14 @@ The shared structure of a meal's and a recipe's ingredient list.
 Checked on every load and every import, with every problem reported and located:
 
 - every record has its required fields and no others; values have the right types;
-- ids are unique; names are clean; food names are unique (ignoring case); unit names are unique
-  within their food (ignoring case); `g` is not a product unit name;
-- every `food` refers to an existing product or recipe; every `unit` is `g` for a product or
-  one of that food's units;
+- ids are unique and don't use a built-in food's id; names are clean; food names are unique and
+  not a built-in food's name (ignoring case); unit names are unique within their food (ignoring
+  case); `g` and `ml` are not product unit names;
+- every `food` refers to an existing product, recipe or built-in food; every `unit` is `g` for a
+  product or built-in food, `ml` for water, or one of that food's units;
 - recipes have at least one ingredient and one unit, and don't contain each other; meals have
   at least one ingredient;
-- `per1g` has `kcal`; numbers are non-negative, and positive where stated (amounts, grams,
-  `makes`, targets);
+- numbers are non-negative, and positive where stated (amounts, grams, `makes`, targets);
 - timestamps are valid UTC timestamps in the form above; goal sets have strictly increasing
   `from`, at most one per day.
 

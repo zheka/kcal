@@ -32,7 +32,7 @@ suggestions not discussed yet; Open questions lists what is still undecided.
 | **Recipe**   | products (and recipes) with amounts; usable everywhere a product is           |
 | **Unit**     | a way to measure a food: `piece`, `ml`, `cup` (in grams), `serving` (a share) |
 | **Meal**     | a logged entry: foods taken together, at a date and time                      |
-| **Water**    | plain water I drink, logged separately from meals, in ml                      |
+| **Water**    | a nutrient (ml): the water in drinks, counted towards a daily goal            |
 | **Goals**    | daily targets per nutrient                                                    |
 | **Weight**   | my body weight, at most one value per day                                     |
 
@@ -43,7 +43,8 @@ suggestions not discussed yet; Open questions lists what is still undecided.
 - `kcal`, `protein`, `fat`, `carbs` (g). The list is **built into the code**
   (`src/config.ts`), so adding `fiber` or `sugar` later is a config change plus an optional
   field.
-- Water is **not a nutrient**: it is tracked on its own (see Water).
+- **`water`** (ml) is a nutrient too (see Water).
+- **An omitted nutrient counts as 0** (agreed); nothing is required, kcal included.
 - `kcal` comes **from the label**, not from the macros (labels round and use other factors).
 
 ### Products
@@ -67,10 +68,9 @@ suggestions not discussed yet; Open questions lists what is still undecided.
   "per [100 g ▾]", where the selector also offers the product's units (`per bar` = 45 g,
   `per ml`…). So a label's per-serving or per-100-ml column is copied as printed, and the app
   converts it to per gram, rounded once when stored.
-- **Unknown values are allowed** (agreed in principle; details to discuss): a nutrient left
-  empty is **unknown**, not 0. Totals and the chart show when they include unknowns (e.g. a
-  marker on the bar: "1 food without fat"), so the numbers never silently understate.
-  _(proposal: kcal is required; protein, fat, carbs may be unknown.)_
+- **A nutrient left empty counts as 0** (agreed). This replaces the earlier "unknown values":
+  no markers, no `≥`. The four macros are on every EU label; a nutrient added later (fiber)
+  simply counts 0 for products without it.
 - _(proposal)_ A soft warning when kcal and `4·P + 4·C + 9·F` differ by more than ~15%
   (catches typos like 25 for 2.5); it never blocks saving.
 - Amounts are decimals (`0.5 cup`); no fractions.
@@ -176,14 +176,23 @@ Agreed:
 
 Agreed:
 
-- **Drinks are products.** Coffee, tea, milk, juice are products like any other, logged in
-  meals, counting towards kcal and macros.
-- **Water is tracked separately**: plain water I drink, in ml, with its own daily goal and its
-  own bar in the day chart. It does not come from products: neither foods nor other drinks
-  add to it. _(Assumption to confirm: coffee and tea do not count as water.)_
-- Logged on its own, with a **＋ Water** button on the day screen, next to **＋ Eat**.
-- **Not in the first prototype.** Details (one-tap amounts such as a glass, how water entries
-  show in the day list) are decided when it is built.
+- **Water is counted by the water content of drinks**, as hydration and kidney-health guidance
+  count it: total fluid matters, coffee and tea included (their diuretic effect is small),
+  while sugary sodas are a matter of sugar, not fluid. Food is left out (its water, about 20%
+  of total intake, is covered by the margin in fluid targets).
+- **Water is a nutrient** (ml; 1 g of water = 1 ml). Drink products carry a water value by
+  their content: water 1 per g, coffee and tea about 0.99, milk about 0.88. Foods omit it,
+  which counts as 0.
+- **The water goal** is a target like the others (e.g. 2000 ml), and water has its own bar in
+  the day chart, on its own scale (ml).
+- **Built-in foods**, defined in the code and read-only: `water` (units g and ml), `protein`,
+  `fat`, `carbs` (pure, with 4/9/4 kcal per gram). Their names are reserved. Besides water,
+  they let a meal be estimated as macros ("40 g protein + 20 g fat + 60 g carbs").
+- **＋ Water** on the day screen, next to ＋ Eat, opens the composer with built-in water at the
+  last amount used. Drinks are meals in storage. _(Later: the button may become configurable.)_
+- Built-in foods have no custom units; recent amounts appear as chips. "My cup of water" is a
+  recipe (330 ml of water, makes 1 cup) or a product with a water value.
+- _(To decide when building)_ how a drink-only meal looks in the day list (e.g. `💧 330 ml`).
 
 ### Editing foods: everything is live
 
@@ -229,7 +238,7 @@ layouts are checked with screenshots at that size.
   which also offers **Eat again** and **Delete** (two-tap). _(What tapping the row itself does,
   if anything, is open.)_
 - **＋ Eat** opens the composer for the day on screen (see the meal time defaults); **＋ Water**
-  logs water (see Water).
+  opens it with built-in water (see Water).
 - A small **weight button** near the date, showing the last weight; tapping it logs the
   day's weight (see Weight).
 - **Other days**: small ‹ › arrows next to the date, in the header bar. No swiping: going
@@ -259,7 +268,7 @@ Where the planning happens.
   an ingredient or changing an amount shows at once how the meal moves the day. No per-meal
   target and no suggestions: I judge the meal's size myself.
 - **Built so:** vertical bars side by side, each in its nutrient's colour, labelled with its
-  numbers (`1200 + 690` over `/ 2000`). A total with unknown values shows `≥`.
+  numbers (`1200 + 690` over `/ 2000`).
 - **Bars of the same unit share one scale** (agreed), so equal amounts are equally high: 10 g
   of protein is as high as 10 g of fat. The full height of the gram bars is the largest goal
   or total among protein, fat and carbs; kcal has its own scale, set apart by a thin divider.
@@ -376,9 +385,6 @@ day     → nutrients         Σ meals of that date
   well under a millisecond, so there is no smart invalidation.
 - **Meals, days, stats** are plain sums over the food table. A day is ~30 lookups; a year of
   stats ~10 000, still under a millisecond. Nothing else is cached.
-- **Unknowns** travel with every value: a nutrient is `{ value, missing }`: the known part,
-  and how many products (all the way down through recipes) lacked it. With `missing > 0` the
-  amount is shown as `≥ value`. An ingredient with amount 0 counts nothing, unknowns included.
 - **"Used in N meals and M recipes"** is a scan over meals and recipes on demand
   (milliseconds), not a stored index.
 - **The weight basis of a recipe** is the sum of its ingredients in grams; one of its units
@@ -465,13 +471,12 @@ fonts and icons are bundled too.
 
 UX details still to decide:
 
-1. **Unknown nutrient values**: which nutrients may be unknown (kcal too?), and how the chart
-   and totals show them. Agreed in principle (see Products).
+1. ~~Unknown nutrient values~~: decided, an omitted nutrient counts as 0.
 2. **New food replacing an old one**: when `milk` is copied as new and the old one archived,
    may the new one also be called `milk` (names repeating among archived foods)?
 3. **Meal rows** on the day screen: totals as numbers or as a small inline chart; what tapping
    the row itself does.
-4. **Water** details, when it is built (see Water).
+4. **Water** in the day list: how a drink-only meal looks (see Water).
 5. The _(proposal)_ items above, to confirm or change while building.
 
 Technical questions (see Technical design):
@@ -484,10 +489,10 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
 
 | In                                                                                    | Later                                                     |
 | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Products with units, nutrients entered per any unit; created from library or composer | Water                                                     |
+| Products with units, nutrients entered per any unit; created from library or composer | Water: next, see Water                                    |
 | Recipes (composer + yield), recipes inside recipes                                    | Weight, Stats screen, analysis export                     |
 | Meal composer: chips, inline amounts, unit selector, date/time, the live chart        | Copy as new, archiving (editing with "used in N" warning) |
-| Day screen: chart, meal rows, ‹ › days, ＋ Eat, Eat again, delete                     | Markers for unknown values in the chart                   |
+| Day screen: chart, meal rows, ‹ › days, ＋ Eat, Eat again, delete                     |                                                           |
 | Goals form (effective from today, history kept)                                       |                                                           |
 | Backup export/import, installable PWA, deploy to GitHub Pages                         |                                                           |
 
