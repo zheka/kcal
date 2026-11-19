@@ -4,6 +4,9 @@ import { registerServiceWorker, requestPersistentStorage } from './pwa';
 import { createStore } from './state/store';
 import { App } from './ui/App';
 import { ProblemScreen } from './ui/ProblemScreen';
+// Roboto, the Pixel's own font, shipped with the app so it looks the same on every device,
+// in development and in the layout tests.
+import '@fontsource-variable/roboto/wght.css';
 import './style.css';
 
 const root = document.getElementById('app');

@@ -6,7 +6,9 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: 'e2e',
-  fullyParallel: true,
+  // One test at a time: parallel browsers make timing-sensitive tests flaky on small machines.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? 'github' : 'list',
   use: {

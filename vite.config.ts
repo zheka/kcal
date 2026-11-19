@@ -43,7 +43,12 @@ export default defineConfig({
         background_color: '#ffffff',
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // Of the font's character sets only Latin is cached for offline use; others (Cyrillic,
+        // Greek…) still load on demand when online.
+        globPatterns: [
+          '**/*.{js,css,html,svg,png,ico,webmanifest}',
+          '**/roboto-latin-wght-normal-*.woff2',
+        ],
       },
     }),
   ],
