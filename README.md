@@ -14,7 +14,7 @@ Requires Node 26 (see `.nvmrc`).
 
 ```bash
 npm install
-npm run dev        # dev server at http://localhost:5280/kcal/
+npm run dev        # dev server at http://localhost:5280/kcal/, in a Pixel 8a frame (?full: full width)
 npm test           # unit and UI tests (Vitest, jsdom)
 npm run e2e        # layout tests in Chromium at Pixel 8a size (Playwright; builds and serves the app)
 npm run lint       # ESLint
@@ -53,6 +53,12 @@ src/
   pwa.ts          service worker registration
   **/*.test.ts(x) tests next to the code they test (run in Europe/Berlin time)
 ```
+
+On a desktop browser, `npm run dev` shows the app inside a frame the size of the target phone,
+a Pixel 8a (412 × 915 CSS px): an iframe, so media queries, `dvh` and sticky bars behave as on
+the phone. The frame scales down to fit short windows without changing the app's layout, and
+the address bar follows the screen shown in it. Add `?full` to the address for full width.
+The frame is development-only (`src/dev/phoneFrame.ts`) and not part of the production build.
 
 ## Stack
 
