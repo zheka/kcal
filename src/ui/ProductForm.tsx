@@ -190,9 +190,6 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
         <button type="submit" class="button primary">
           Save
         </button>
-        <button type="button" class="button" onClick={() => goBack('/library')}>
-          Cancel
-        </button>
         {existing && !inUse && (
           <ConfirmButton
             class="push-right"

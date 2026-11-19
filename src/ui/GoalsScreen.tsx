@@ -71,9 +71,6 @@ export function GoalsScreen({ store }: { store: Store }) {
         <button type="submit" class="button primary">
           Save
         </button>
-        <button type="button" class="button" onClick={() => goBack('/')}>
-          Cancel
-        </button>
       </div>
       {goals.length > 0 && (
         <section class="section">

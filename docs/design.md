@@ -228,10 +228,11 @@ layouts are checked with screenshots at that size.
 
 - **Closing a screen: × in the top-right corner** (agreed), the usual pattern for sub-screens
   and sheets, as a 48 × 48 px tap target; the title is on the left. It returns to the screen it
-  was opened from. The day screen has ‹ date › and ☰ instead, since its arrows move between
+  was opened from, and on a form it discards what wasn't saved, so **forms have no Cancel
+  button**. A form left to create a product for it (from the food picker) stays as it was. The day screen has ‹ date › and ☰ instead, since its arrows move between
   days. Icons are drawn as SVG.
 - **The main actions stay at the bottom**, within thumb reach: ＋ Eat on the day screen,
-  Save/Cancel/… in the composer and the forms (a bar that stays in view while the screen
+  Save, Delete… in the composer and the forms (a bar that stays in view while the screen
   scrolls).
 
 - The **same chart as in the meal composer**, without a meal being edited: taken vs the
@@ -286,7 +287,7 @@ Where the planning happens.
   from 4/9/4 kcal per gram).
 - The chart stays at the top of the composer while the ingredients scroll, with a line of
   the meal's own totals (`This meal: 690 kcal · 48 g protein · …`).
-- **Save** logs the meal. Cancel discards it.
+- **Save** logs the meal; **×** closes the composer and discards it.
 - **Eat again** (agreed): open any past meal and press **Eat again**; the composer opens with a
   copy of its ingredients and amounts as a new meal for **now**, to adjust and save. This is how
   repeated meals are logged; there are no meal templates or recent-meal chips (a meal has no
@@ -304,6 +305,8 @@ Where the planning happens.
   servings", "4 pieces", "1600 g" if the pot is weighed), at least one.
 - No "save meal as recipe": a meal and a dish are different things.
 - Products and recipes can be edited. A food in use cannot be deleted.
+- **Built-in foods are listed too** (agreed), by name among your own, marked "built-in" and not
+  editable. They are defined in the code and never part of the backup.
 - _(Later)_ Archiving: archived foods are hidden from the chips but kept, since meals and
   recipes refer to them.
 

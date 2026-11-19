@@ -156,9 +156,6 @@ export function MealComposer({ store, id, date, copyOf, startWith, draftKey }: P
         <button type="submit" class="button primary">
           Save
         </button>
-        <button type="button" class="button" onClick={leave}>
-          Cancel
-        </button>
         {existing && (
           <>
             <button

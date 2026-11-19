@@ -243,3 +243,39 @@ describe('problem screen', () => {
     expect(onStartFresh).toHaveBeenCalledOnce();
   });
 });
+
+describe('library and closing screens', () => {
+  it('lists the built-in foods by name among your own, marked and not editable', () => {
+    start(appData({ products: [egg, oatFlakes] }), '/library');
+    const names = [...document.querySelectorAll('.food-name')].map(
+      (n) => n.firstChild?.textContent,
+    );
+    expect(names).toEqual(['carbs', 'egg', 'fat', 'oat flakes', 'protein', 'water']);
+    const water = screen.getByLabelText('water, built in, not editable');
+    expect(water.tagName).not.toBe('BUTTON');
+    expect(within(water).getByText('built-in')).toBeTruthy();
+    expect(within(water).getByText('0 kcal · 0 g protein · 100 ml water / 100 g')).toBeTruthy();
+  });
+
+  it('has no Cancel buttons: × closes a screen and discards its unsaved form', async () => {
+    start(appData({ products: [oatFlakes] }), '/library');
+    click('＋ Recipe');
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    type(nameField(), 'Half-made recipe');
+    click('Close');
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeTruthy();
+    click('＋ Recipe');
+    expect((nameField() as HTMLInputElement).value).toBe('');
+  });
+
+  it('keeps a recipe when the product form opened from it is closed', async () => {
+    start(appData({ products: [oatFlakes] }), '/recipe/new');
+    type(nameField(), 'Oats with skyr');
+    type(field('Find food'), 'Skyr');
+    click('＋ create “Skyr”');
+    expect(await screen.findByRole('heading', { name: 'New product' })).toBeTruthy();
+    click('Close');
+    expect(await screen.findByRole('heading', { name: 'New recipe' })).toBeTruthy();
+    expect((nameField() as HTMLInputElement).value).toBe('Oats with skyr');
+  });
+});

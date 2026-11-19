@@ -9,9 +9,8 @@ import { navigate } from './router';
 /** All products and recipes, by name; tap one to edit it. */
 export function LibraryScreen({ store }: { store: Store }) {
   const [text, setText] = useState('');
-  const all = [...store.foods.value.values()]
-    .filter((f) => f.kind !== 'builtin')
-    .sort((a, b) => a.name.localeCompare(b.name));
+  // Built-in foods are listed too, marked: they can be used but not edited.
+  const all = [...store.foods.value.values()].sort((a, b) => a.name.localeCompare(b.name));
   const shown = matchFoods(all, text);
 
   return (
@@ -24,35 +23,47 @@ export function LibraryScreen({ store }: { store: Store }) {
           ＋ Recipe
         </button>
       </div>
-      {all.length > 0 && (
-        <input
-          class="input"
-          type="search"
-          aria-label="Search foods"
-          placeholder="Search…"
-          value={text}
-          onInput={(e) => setText(e.currentTarget.value)}
-        />
-      )}
-      {all.length === 0 && (
-        <p class="empty">No foods yet. Add products from their labels, then recipes from them.</p>
+      <input
+        class="input"
+        type="search"
+        aria-label="Search foods"
+        placeholder="Search…"
+        value={text}
+        onInput={(e) => setText(e.currentTarget.value)}
+      />
+      {all.every((f) => f.kind === 'builtin') && (
+        <p class="empty">
+          No foods of your own yet. Add products from their labels, then recipes from them.
+        </p>
       )}
       <ul class="food-list">
-        {shown.map((food) => (
-          <li key={food.id}>
-            <button
-              type="button"
-              class="food-row"
-              onClick={() => navigate(`/${food.kind}/${food.id}`)}
-            >
-              <span class="food-name">
-                {food.name}
-                {food.kind === 'recipe' && <span class="tag">recipe</span>}
-              </span>
-              <span class="food-per100">{summary(food)}</span>
-            </button>
-          </li>
-        ))}
+        {shown.map((food) =>
+          food.kind === 'builtin' ? (
+            <li key={food.id}>
+              <div class="food-row builtin" aria-label={`${food.name}, built in, not editable`}>
+                <span class="food-name">
+                  {food.name}
+                  <span class="tag builtin">built-in</span>
+                </span>
+                <span class="food-per100">{summary(food)}</span>
+              </div>
+            </li>
+          ) : (
+            <li key={food.id}>
+              <button
+                type="button"
+                class="food-row"
+                onClick={() => navigate(`/${food.kind}/${food.id}`)}
+              >
+                <span class="food-name">
+                  {food.name}
+                  {food.kind === 'recipe' && <span class="tag">recipe</span>}
+                </span>
+                <span class="food-per100">{summary(food)}</span>
+              </button>
+            </li>
+          ),
+        )}
       </ul>
     </div>
   );

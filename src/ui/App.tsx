@@ -8,6 +8,7 @@ import { isValidDate } from '../core/time';
 import { DayNav, DayScreen } from './DayScreen';
 import { GoalsScreen } from './GoalsScreen';
 import { MealComposer } from './MealComposer';
+import { dropDraft } from './drafts';
 import { CloseIcon, MenuIcon } from './icons';
 import { goBack, navigate, route, today } from './router';
 
@@ -74,11 +75,17 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
     return { title: 'Product', body: <ProductForm store={store} id={product[1]!} /> };
   }
   if (path === '/recipe/new') {
-    return { title: 'New recipe', body: <RecipeForm store={store} id={null} draftKey={path} /> };
+    return {
+      title: 'New recipe',
+      body: <RecipeForm store={store} id={null} draftKey={draftKey} />,
+    };
   }
   const recipe = /^\/recipe\/(.+)$/.exec(path);
   if (recipe) {
-    return { title: 'Recipe', body: <RecipeForm store={store} id={recipe[1]!} draftKey={path} /> };
+    return {
+      title: 'Recipe',
+      body: <RecipeForm store={store} id={recipe[1]!} draftKey={draftKey} />,
+    };
   }
   return { title: 'Not found', body: <p class="empty">Nothing here.</p> };
 }
@@ -108,7 +115,11 @@ export function App({ store }: { store: Store }) {
               type="button"
               class="icon-button push-right"
               aria-label="Close"
-              onClick={() => goBack('/')}
+              onClick={() => {
+                // Closing discards the screen's unsaved form, as Cancel did.
+                dropDraft(`${path}?${params.toString()}`);
+                goBack('/');
+              }}
             >
               <CloseIcon />
             </button>

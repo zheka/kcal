@@ -496,6 +496,16 @@ legend select.input {
   font-weight: 500;
 }
 
+/* Built-in foods: listed, but not editable */
+.tag.builtin {
+  border-color: var(--muted);
+  color: var(--muted);
+}
+
+.food-row.builtin {
+  cursor: default;
+}
+
 /* Menu */
 
 .menu-item {
