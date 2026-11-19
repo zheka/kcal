@@ -16,6 +16,7 @@ Requires Node 26 (see `.nvmrc`).
 npm install
 npm run dev        # dev server at http://localhost:5280/kcal/
 npm test           # unit and UI tests (Vitest, jsdom)
+npm run e2e        # layout tests in Chromium at Pixel 8a size (Playwright; builds and serves the app)
 npm run lint       # ESLint
 npm run format     # Prettier
 npm run typecheck  # TypeScript
@@ -59,7 +60,11 @@ src/
 - **Vite** builds a static site; **vite-plugin-pwa** (Workbox) generates the service worker,
   which precaches the whole app, so it works offline. App icons are generated from
   `public/icon.svg` at build time.
-- **Vitest** with jsdom and Testing Library for tests.
+- **Vitest** with jsdom and Testing Library for unit and UI tests.
+- **Playwright** (Chromium) for end-to-end tests of the built app at Pixel 8a size, light and
+  dark: layout checks jsdom can't do (nothing wider than the screen, headers, buttons and
+  form fields on screen), plus a few flows. No screenshot comparisons. The first run needs a
+  browser: `npx playwright install chromium`.
 
 Runtime libraries are bundled into the app and cached with it; nothing is loaded from a CDN.
 
@@ -71,5 +76,6 @@ once Workbox depends on a fixed version itself.
 
 ## Deployment
 
-GitHub Actions (`.github/workflows/deploy.yml`) checks formatting, lints, tests and builds
-every PR, and deploys `dist/` to GitHub Pages on every push to `main`.
+GitHub Actions (`.github/workflows/deploy.yml`) checks formatting, lints, tests, builds and
+runs the end-to-end tests on every PR, and deploys `dist/` to GitHub Pages on every push to
+`main` once both pass.
