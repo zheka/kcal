@@ -1,7 +1,7 @@
 /// <reference types="vitest/config" />
 import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
-import { APP_NAME } from './src/config';
+import { APP_NAME } from './src/config.ts';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
