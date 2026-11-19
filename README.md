@@ -58,8 +58,11 @@ src/
 
 - **Preact** + **@preact/signals** for the UI, JSX compiled by Vite (no Babel).
 - **Vite** builds a static site; **vite-plugin-pwa** (Workbox) generates the service worker,
-  which precaches the whole app, so it works offline. App icons are generated from
-  `public/icon.svg` at build time.
+  which precaches the whole app, so it works offline. App icons (favicon, 64/192/512 px,
+  maskable 512 px, Apple touch 180 px) are generated from `public/icon.svg` at build time.
+  The icon itself, a hedgehog hugged by a croissant, is drawn by `scripts/make-icon.py`
+  (`python3 scripts/make-icon.py public/icon.svg`); its content stays inside the maskable safe
+  zone.
 - **Vitest** with jsdom and Testing Library for unit and UI tests.
 - **Playwright** (Chromium) for end-to-end tests of the built app at Pixel 8a size, light and
   dark: layout checks jsdom can't do (nothing wider than the screen, headers, buttons and
