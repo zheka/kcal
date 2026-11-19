@@ -7,6 +7,7 @@ import { addDays, localDateOf, localMinuteOf } from '../core/time';
 import type { NutrientValues } from '../core/types';
 import type { Store } from '../state/store';
 import { DayChart } from './DayChart';
+import { ChevronLeftIcon, ChevronRightIcon } from './icons';
 import { navigate, replaceRoute, today } from './router';
 
 export function dayPath(date: string): string {
@@ -34,7 +35,7 @@ export function DayNav({ date }: { date: string }) {
         aria-label="Previous day"
         onClick={() => replaceRoute(dayPath(addDays(date, -1)))}
       >
-        ‹
+        <ChevronLeftIcon />
       </button>
       <h1>{dayTitle(date)}</h1>
       <button
@@ -43,7 +44,7 @@ export function DayNav({ date }: { date: string }) {
         aria-label="Next day"
         onClick={() => replaceRoute(dayPath(addDays(date, 1)))}
       >
-        ›
+        <ChevronRightIcon />
       </button>
     </div>
   );

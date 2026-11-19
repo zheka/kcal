@@ -226,6 +226,10 @@ Agreed:
 included) and water, without scrolling. The target phone is a **Pixel 8a** (412 × 915 CSS px);
 layouts are checked with screenshots at that size.
 
+- **Closing a screen: × in the top-right corner** (agreed), the usual pattern for sub-screens
+  and sheets, as a 48 × 48 px tap target; the title is on the left. It returns to the screen it
+  was opened from. The day screen has ‹ date › and ☰ instead, since its arrows move between
+  days. Icons are drawn as SVG.
 - **The main actions stay at the bottom**, within thumb reach: ＋ Eat on the day screen,
   Save/Cancel/… in the composer and the forms (a bar that stays in view while the screen
   scrolls).

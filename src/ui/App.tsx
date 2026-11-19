@@ -8,6 +8,7 @@ import { isValidDate } from '../core/time';
 import { DayNav, DayScreen } from './DayScreen';
 import { GoalsScreen } from './GoalsScreen';
 import { MealComposer } from './MealComposer';
+import { CloseIcon, MenuIcon } from './icons';
 import { goBack, navigate, route, today } from './router';
 
 interface Screen {
@@ -88,23 +89,30 @@ export function App({ store }: { store: Store }) {
   return (
     <div class="app">
       <header class="topbar">
-        {header ?? (
+        {header ? (
           <>
-            <button type="button" class="icon-button" aria-label="Back" onClick={() => goBack('/')}>
-              ‹
+            {header}
+            <button
+              type="button"
+              class="icon-button push-right"
+              aria-label="Menu"
+              onClick={() => navigate('/menu')}
+            >
+              <MenuIcon />
             </button>
-            <h1>{title}</h1>
           </>
-        )}
-        {path !== '/menu' && (
-          <button
-            type="button"
-            class="icon-button push-right"
-            aria-label="Menu"
-            onClick={() => navigate('/menu')}
-          >
-            ☰
-          </button>
+        ) : (
+          <>
+            <h1>{title}</h1>
+            <button
+              type="button"
+              class="icon-button push-right"
+              aria-label="Close"
+              onClick={() => goBack('/')}
+            >
+              <CloseIcon />
+            </button>
+          </>
         )}
       </header>
       {/* A new route is a new screen: forms start from their own state. */}

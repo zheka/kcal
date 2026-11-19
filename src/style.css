@@ -102,6 +102,11 @@ p {
   border-bottom: 1px solid var(--line);
 }
 
+/* The header's right-hand icon sits on the page's edge; its tap target reaches past it. */
+.topbar > .icon-button.push-right {
+  margin-right: -12px;
+}
+
 .push-right {
   margin-left: auto;
 }
@@ -145,6 +150,9 @@ p {
 }
 
 .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: var(--tap);
   min-height: var(--tap);
   border: none;

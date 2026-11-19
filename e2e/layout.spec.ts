@@ -5,7 +5,10 @@ test.describe('day screen', () => {
     await page.goto('#/');
     await expectNoHorizontalScroll(page);
     for (const name of ['Previous day', 'Next day', 'Menu']) {
-      await expectOnScreen(page.getByRole('button', { name }));
+      const button = page.getByRole('button', { name });
+      await expectOnScreen(button);
+      const box = (await button.boundingBox())!;
+      expect(box.width, `${name} is too small to tap`).toBeGreaterThanOrEqual(48);
     }
     await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
     await expect(page.getByRole('img')).toHaveCount(5);
@@ -122,7 +125,25 @@ test.describe('forms', () => {
     test(`${name} fits the screen`, async ({ seeded: page }) => {
       await page.goto(route);
       await expectNoHorizontalScroll(page);
-      await expectOnScreen(page.getByRole('button', { name: 'Back', exact: true }));
+      const close = page.getByRole('button', { name: 'Close', exact: true });
+      await expectOnScreen(close);
+      // the traditional place and a full tap target: the top-right corner, at least 48 × 48
+      const box = (await close.boundingBox())!;
+      expect(412 - (box.x + box.width)).toBeLessThan(16);
+      expect(box.y).toBeLessThan(16);
+      expect(box.width).toBeGreaterThanOrEqual(48);
+      expect(box.height).toBeGreaterThanOrEqual(48);
     });
   }
+});
+
+test('the close button returns to the screen it was opened from', async ({ seeded: page }) => {
+  await page.goto('#/');
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('button', { name: 'Library' }).click();
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Menu' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
 });
