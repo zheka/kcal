@@ -13,7 +13,7 @@ import { navigate } from './router';
 const CODE = '4006040002093';
 vi.mock('../barcode', () => ({
   canScan: vi.fn(() => true),
-  startScan: vi.fn(async (_video: HTMLVideoElement, onCode: (code: string) => void) => {
+  startScan: vi.fn((_video: HTMLVideoElement, onCode: (code: string) => void) => {
     queueMicrotask(() => onCode(CODE));
     return { stop: vi.fn() };
   }),

@@ -74,7 +74,8 @@ The frame is development-only (`src/dev/phoneFrame.ts`) and not part of the prod
 - **Playwright** (Chromium) for end-to-end tests of the built app at Pixel 8a size, light and
   dark, one test at a time: layout checks jsdom can't do (nothing wider than the screen, headers, buttons and
   form fields on screen), plus a few flows. No screenshot comparisons. The first run needs a
-  browser: `npx playwright install chromium`.
+  browser: `npx playwright install chromium`. CI runs them in Playwright's Docker image, whose
+  tag must match the exactly pinned `@playwright/test` version.
 
 Runtime libraries are bundled into the app and cached with it; nothing is loaded from a CDN.
 The app's font is Roboto (`@fontsource-variable/roboto`, SIL Open Font License), the Pixel's

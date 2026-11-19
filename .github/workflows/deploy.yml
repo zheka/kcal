@@ -35,9 +35,14 @@ jobs:
         with:
           path: dist
 
-  # Layout checks in Chromium at Pixel 8a size (see e2e/).
+  # Layout checks in Chromium at Pixel 8a size (see e2e/). Playwright's image has the browser and
+  # its system libraries installed, so nothing is downloaded per run. Its tag must match the
+  # @playwright/test version in package.json (pinned exactly): bump both together.
   e2e:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -45,7 +50,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run e2e
       - if: failure()
         uses: actions/upload-artifact@v7

@@ -95,3 +95,37 @@ test('the scanner closes with ×, turning the camera off', async ({ seeded: page
   );
   expect(states).toEqual(['ended']);
 });
+
+test('closing while the camera is still starting turns it off too', async ({ seeded: page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { BarcodeDetector: unknown }).BarcodeDetector = class {
+      detect() {
+        return Promise.resolve([]);
+      }
+    };
+    // a slow camera: the stream arrives half a second after it is asked for
+    const getUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const stream = await getUserMedia(constraints);
+      (window as unknown as { cameraStream: MediaStream }).cameraStream = stream;
+      return stream;
+    };
+  });
+  await page.goto('#/product/new');
+  await page.getByRole('button', { name: 'Scan barcode' }).click();
+  await page
+    .getByRole('dialog', { name: 'Scan barcode' })
+    .getByRole('button', { name: 'Close' })
+    .click();
+  // the stream arrives after closing, and is turned off as soon as it does
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as unknown as { cameraStream?: MediaStream }).cameraStream
+          ?.getTracks()
+          .map((t) => t.readyState),
+      ),
+    )
+    .toEqual(['ended']);
+});

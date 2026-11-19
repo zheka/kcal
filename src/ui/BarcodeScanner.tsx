@@ -20,16 +20,9 @@ export function BarcodeScanner({
   const [error, setError] = useState<ScanError | null>(null);
 
   useEffect(() => {
-    let scan: { stop(): void } | undefined;
-    let closed = false;
-    void startScan(video.current!, onCode, setError).then((s) => {
-      if (closed) s.stop();
-      else scan = s;
-    });
-    return () => {
-      closed = true;
-      scan?.stop();
-    };
+    // Closing turns the camera off at once, also while it is still starting.
+    const scan = startScan(video.current!, onCode, setError);
+    return () => scan.stop();
   }, [onCode]);
 
   return (

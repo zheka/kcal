@@ -12,7 +12,7 @@ export function canScan(): boolean {
 
 export type ScanError = 'denied' | 'failed';
 
-/** A running scan; `stop` turns the camera off. */
+/** A running scan; `stop` turns the camera off, at any moment, also while it is starting. */
 export interface Scan {
   stop(): void;
 }
@@ -20,46 +20,61 @@ export interface Scan {
 /**
  * Shows the back camera in `video` and reports the first barcode it reads, then stops.
  * Errors: `denied` when camera access is refused, `failed` when the camera can't start.
+ * Returns at once: the camera starts in the background.
  */
-export async function startScan(
+export function startScan(
   video: HTMLVideoElement,
   onCode: (code: string) => void,
   onError: (error: ScanError) => void,
-): Promise<Scan> {
-  const running: { stream?: MediaStream; timer?: ReturnType<typeof setInterval> } = {};
+): Scan {
+  const running: {
+    stopped: boolean;
+    stream?: MediaStream;
+    timer?: ReturnType<typeof setInterval>;
+  } = { stopped: false };
   const stop = () => {
+    running.stopped = true;
     if (running.timer) clearInterval(running.timer);
     running.stream?.getTracks().forEach((t) => t.stop());
     video.srcObject = null;
   };
-  try {
-    running.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: 'environment' } },
-    });
-    video.srcObject = running.stream;
-    await video.play();
-  } catch (err) {
-    stop();
-    onError((err as Error).name === 'NotAllowedError' ? 'denied' : 'failed');
-    return { stop };
-  }
-  const detector = new window.BarcodeDetector!({ formats: FORMATS });
-  let busy = false;
-  running.timer = setInterval(() => {
-    if (busy || video.readyState < 2) return;
-    busy = true;
-    detector
-      .detect(video)
-      .then((codes) => {
-        const code = codes.map((c) => c.rawValue).find((v) => /^\d{8,14}$/.test(v));
-        if (code) {
-          stop();
-          onCode(code);
-        }
-      })
-      .catch(() => {})
-      .finally(() => (busy = false));
-  }, 250);
+
+  void (async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' } },
+      });
+      running.stream = stream;
+      // Stopped while the camera was starting: turn it off as soon as it is there.
+      if (running.stopped) return stop();
+      video.srcObject = stream;
+      await video.play();
+    } catch (err) {
+      if (running.stopped) return;
+      stop();
+      onError((err as Error).name === 'NotAllowedError' ? 'denied' : 'failed');
+      return;
+    }
+    if (running.stopped) return stop();
+    const detector = new window.BarcodeDetector!({ formats: FORMATS });
+    let busy = false;
+    running.timer = setInterval(() => {
+      if (busy || video.readyState < 2) return;
+      busy = true;
+      detector
+        .detect(video)
+        .then((codes) => {
+          const code = codes.map((c) => c.rawValue).find((v) => /^\d{8,14}$/.test(v));
+          if (code && !running.stopped) {
+            stop();
+            onCode(code);
+          }
+        })
+        .catch(() => {})
+        .finally(() => (busy = false));
+    }, 250);
+  })();
+
   return { stop };
 }
