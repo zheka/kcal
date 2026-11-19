@@ -5,6 +5,8 @@
  * `?full` shows the app at full width instead.
  */
 
+import { APP_NAME } from '../config';
+
 export const PHONE = { name: 'Pixel 8a', width: 412, height: 915 };
 
 /** Whether this page should show the phone frame instead of the app. */
@@ -16,7 +18,7 @@ export function wantsPhoneFrame(): boolean {
 
 /** Replaces the page with the phone frame showing the app at the current address. */
 export function showPhoneFrame(): void {
-  document.title = `Kcal · ${PHONE.name}`;
+  document.title = `${APP_NAME} · ${PHONE.name}`;
   const style = document.createElement('style');
   style.textContent = `
     html, body { margin: 0; height: 100%; background: #d9dfdb; font-family: system-ui, sans-serif; }
@@ -43,7 +45,7 @@ export function showPhoneFrame(): void {
   const stage = document.createElement('div');
   stage.className = 'dev-stage';
   stage.innerHTML = `
-    <div class="dev-scaler"><div class="dev-phone"><iframe title="Kcal on a ${PHONE.name}"></iframe></div></div>
+    <div class="dev-scaler"><div class="dev-phone"><iframe title="${APP_NAME} on a ${PHONE.name}"></iframe></div></div>
     <div class="dev-caption">
       <span class="dev-size">${PHONE.name} · ${PHONE.width} × ${PHONE.height}</span>
       <a href="${full.href}">Full width</a>

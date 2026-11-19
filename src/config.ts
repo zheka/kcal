@@ -3,6 +3,12 @@
  * fails the check on load.
  */
 
+/**
+ * The app's name, written exactly so everywhere: lowercase, like the unit, even at the start of
+ * a sentence.
+ */
+export const APP_NAME = 'kcal';
+
 /** Nutrients, in display order. Each is a number per gram of a food; omitted counts as 0. */
 export const NUTRIENTS = ['kcal', 'protein', 'fat', 'carbs', 'water'] as const;
 export type Nutrient = (typeof NUTRIENTS)[number];

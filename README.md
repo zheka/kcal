@@ -1,4 +1,4 @@
-# Kcal
+# kcal
 
 A personal nutrition tracker: compose each meal from products and recipes while a chart shows
 how it moves the day towards its goals (kcal, protein, …), then save it. Offline-first PWA;

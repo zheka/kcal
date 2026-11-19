@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { readFileSync } from 'node:fs';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { APP_NAME } from './src/config';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
@@ -20,6 +21,7 @@ export default defineConfig({
     jsx: { runtime: 'automatic', importSource: 'preact' },
   },
   plugins: [
+    appName(),
     VitePWA({
       // A new version waits and takes over on the next launch; the app never reloads itself.
       registerType: 'prompt',
@@ -27,8 +29,8 @@ export default defineConfig({
       // Icons are generated from public/icon.svg at build time (see pwa-assets.config.ts).
       pwaAssets: { config: true, overrideManifestIcons: true },
       manifest: {
-        name: 'Kcal',
-        short_name: 'Kcal',
+        name: APP_NAME,
+        short_name: APP_NAME,
         description: 'Compose meals against daily nutrition goals',
         lang: 'en',
         display: 'standalone',
@@ -48,3 +50,11 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
   },
 });
+
+/** Fills in the app's name (from src/config.ts) where index.html says %APP_NAME%. */
+function appName(): Plugin {
+  return {
+    name: 'kcal-app-name',
+    transformIndexHtml: (html) => html.replaceAll('%APP_NAME%', APP_NAME),
+  };
+}

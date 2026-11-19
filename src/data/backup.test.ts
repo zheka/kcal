@@ -24,11 +24,11 @@ describe('versions', () => {
     expect(versionProblem('kcal 0.1.0')).toBeNull();
   });
 
-  it('refuses newer versions, older minors and non-Kcal files', () => {
+  it('refuses newer versions, older minors and non-kcal files', () => {
     expect(versionProblem('kcal 0.1.1')).toMatch(/newer than this app .*update the app/);
     expect(versionProblem('kcal 0.0.9')).toMatch(/older than this app .*needs an upgrade/);
-    expect(versionProblem(undefined)).toBe('no version: this is not a Kcal file');
-    expect(versionProblem('other 0.1.0')).toMatch(/not a Kcal file/);
+    expect(versionProblem(undefined)).toBe('no version: this is not a kcal file');
+    expect(versionProblem('other 0.1.0')).toMatch(/not a kcal file/);
   });
 });
 

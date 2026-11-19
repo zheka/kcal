@@ -1,3 +1,4 @@
+import { APP_NAME } from '../config';
 import { useState } from 'preact/hooks';
 import type { AppData } from '../core/types';
 import { localDate } from '../core/time';
@@ -104,7 +105,9 @@ export function MenuScreen({ store }: { store: Store }) {
           Saved data: {(size / 1_000_000).toFixed(2)} MB of about 5 MB
           {size > SIZE_WARNING_CHARS && ' (getting full: time to move the data to IndexedDB)'}
         </p>
-        <p>Kcal {__APP_VERSION__}</p>
+        <p>
+          {APP_NAME} {__APP_VERSION__}
+        </p>
       </section>
     </div>
   );

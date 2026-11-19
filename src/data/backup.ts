@@ -1,3 +1,4 @@
+import { APP_NAME } from '../config';
 import { canonical, canonicalJson } from '../core/canonical';
 import { isValidUtc } from '../core/time';
 import type { AppData } from '../core/types';
@@ -11,16 +12,16 @@ import { validateAppData } from '../core/validate';
  * (needs a migration) and a patch only adds optional fields.
  */
 export const SCHEMA_VERSION = '0.1.0';
-/** `version` of every Kcal document: marks it as Kcal data and versions it. */
-export const VERSION_TAG = `kcal ${SCHEMA_VERSION}`;
+/** `version` of every kcal document: marks it as kcal data and versions it. */
+export const VERSION_TAG = `${APP_NAME} ${SCHEMA_VERSION}`;
 
 const DOCUMENT_FIELDS = ['exportedAt', 'goals', 'meals', 'products', 'recipes', 'version'];
 
 /** A problem with the version, or null when this app can read it as it is. */
 export function versionProblem(version: unknown): string | null {
-  if (version === undefined) return 'no version: this is not a Kcal file';
+  if (version === undefined) return `no version: this is not a ${APP_NAME} file`;
   const match = typeof version === 'string' ? /^kcal (\d+)\.(\d+)\.(\d+)$/.exec(version) : null;
-  if (!match) return `version ${JSON.stringify(version)}: this is not a Kcal file`;
+  if (!match) return `version ${JSON.stringify(version)}: this is not a ${APP_NAME} file`;
   const [major, minor, patch] = match.slice(1).map(Number) as [number, number, number];
   const [ownMajor, ownMinor, ownPatch] = SCHEMA_VERSION.split('.').map(Number) as [
     number,

@@ -1,12 +1,18 @@
-# Kcal design
+# kcal design
 
-High-level design of Kcal, a personal nutrition tracker.
+High-level design of kcal, a personal nutrition tracker.
 
 Status (2026-11-19): **UX agreed at a high level; backup format agreed** (see
 [backup-format.md](backup-format.md), not implemented yet). Items marked _(proposal)_ are
 suggestions not discussed yet; Open questions lists what is still undecided.
 
 ## Goals and principles
+
+- **The name is "kcal"**, all lowercase, like the unit, even at the start of a sentence or a
+  title. It is defined once, `APP_NAME` in `src/config.ts`, and every use takes it from there
+  (page title, installed app name, menu, messages).
+- **Every text is written exactly as shown**: no automatic capitalization (no CSS
+  `text-transform`, no upper-casing in code), so what is in the code is what the user sees.
 
 - **Purpose.** Hit daily nutrition goals (kcal, protein, other macros) by composing each meal
   against them: while putting a meal together I see how balanced it is and how it moves the
@@ -426,7 +432,7 @@ has a single cause.
   for both.
 - **Every change is checked before it is saved**: the store runs the integrity check on the new
   data and saves it before showing it; an invalid change or a failed save changes nothing.
-- **Versioning.** The document carries `"version": "kcal <semver>"`, which marks it as a Kcal
+- **Versioning.** The document carries `"version": "kcal <semver>"`, which marks it as a kcal
   file and versions its schema (independent of app releases). While `0.x`, a minor bump may
   break (needs a migration) and a patch only adds optional fields. The app accepts the same
   `0.minor` with a patch up to its own; saved data of an older version is migrated silently on
@@ -453,7 +459,7 @@ Two different files for two different readers:
 
 Agreed: **Preact** from the start.
 
-- Kcal's UI is highly interactive: the meal composer (an inline editable list
+- kcal's UI is highly interactive: the meal composer (an inline editable list
   with a live chart), product and recipe forms with unit selectors, the goals form, stats.
   Writing each screen as a function of the data avoids hand-written DOM syncing, which is
   where bugs would come from, and typing in an amount never loses focus.

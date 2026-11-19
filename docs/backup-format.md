@@ -1,6 +1,6 @@
-# Kcal backup format
+# kcal backup format
 
-The format of Kcal's backup file and of the data the app saves in the browser: `kcal 0.1.0`.
+The format of kcal's backup file and of the data the app saves in the browser: `kcal 0.1.0`.
 
 Status (2026-11-19): **agreed and implemented.** It replaced an earlier draft of `0.1.0` in
 place, with no migration, since no real data existed yet.
@@ -109,7 +109,7 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
 | `meals`      | yes      | meals, drinks included                                               |
 | `products`   | yes      | products                                                             |
 | `recipes`    | yes      | recipes                                                              |
-| `version`    | yes      | `kcal <semver>`: marks the file as Kcal data and versions its format |
+| `version`    | yes      | `kcal <semver>`: marks the file as kcal data and versions its format |
 
 Only the format version is recorded, not the version of the app that wrote the file.
 
