@@ -310,9 +310,10 @@ The shared structure of a meal's and a recipe's ingredient list.
 - **A goal set applies from the start of the local day containing `setAt`** (in the device's
   current time zone): goals saved at 15:00 apply to the whole of that day. Each day uses the
   latest set that applies to it; days before the first set have no goals.
-- **At most one goal set per local day**: saving again on the same day replaces that day's set.
-  This is a rule of saving, not of the integrity check: which day a timestamp falls on depends
-  on the device's time zone, so a check of it would not be deterministic.
+- **Goal sets are only ever added**, never changed or removed. Saving again on the same day adds
+  another set; the latest set of a day is the one that applies, so earlier ones of that day
+  simply never apply. Because sets are ordered by real time, the newest decision wins even after
+  moving to another time zone.
 - Without `perDay`, a set means no goals from that day on.
 - Goal sets have no ids.
 

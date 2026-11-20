@@ -2,8 +2,7 @@ import { useState } from 'preact/hooks';
 import { NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
 import { roundStored } from '../core/decimal';
 import { formatNumber, parseNumber } from '../core/format';
-import { goalsOn } from '../core/goals';
-import { localDateOf } from '../core/time';
+import { goalHistory, goalsOn } from '../core/goals';
 import type { NutrientValues } from '../core/types';
 import type { Store } from '../state/store';
 import { describeTargets } from './DayScreen';
@@ -76,9 +75,9 @@ export function GoalsScreen({ store }: { store: Store }) {
         <section class="section">
           <h2 class="label">History</h2>
           <ul class="goal-history">
-            {[...goals].reverse().map((g) => (
-              <li key={g.setAt}>
-                From {localDateOf(g.setAt)}: {describeTargets(g.perDay) || 'no goals'}
+            {goalHistory(goals).map(({ from, set }) => (
+              <li key={set.setAt}>
+                From {from}: {describeTargets(set.perDay) || 'no goals'}
               </li>
             ))}
           </ul>

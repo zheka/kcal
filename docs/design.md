@@ -175,6 +175,12 @@ Agreed:
 applies from the start of the local day containing `setAt`, so goals saved at 15:00 apply to the
 whole of that day. See [backup-format.md](backup-format.md).)
 
+- **Goal sets are only ever added** (agreed). Each set is complete: a nutrient left out has no
+  goal from that day on. Saving twice on one day adds two sets, and the later one applies; the
+  goals history shows only the set that applies from each day. Nothing in the goals history is
+  replaced or deleted, so goals need no identity and no tombstones, and the newest decision
+  wins even across time zones (sets are in real-time order).
+
 ### Weight
 
 Agreed:
@@ -315,6 +321,12 @@ Where the planning happens.
 - The chart stays at the top of the composer while the ingredients scroll, with a line of
   the meal's own totals (`This meal: 690 kcal · 48 g protein · …`).
 - **Save** logs the meal; **×** closes the composer and discards it.
+- **New foods wait for the meal** (agreed). A product created from the composer, or a unit
+  added to a food there, is **pending**: it exists only in this meal until the meal is saved,
+  and is saved together with it; **×** discards it with the meal, without asking. Rows with a
+  pending food show a **new** chip (tapping it opens the food to edit), pending units are
+  marked new in the unit selector, and Save says what it saves ("Save meal + 2 new foods").
+  The recipe form works the same way.
 - **Eat again** (agreed): open any past meal and press **Eat again**; the composer opens with a
   copy of its ingredients and amounts as a new meal for **now**, to adjust and save. This is how
   repeated meals are logged; there are no meal templates or recent-meal chips (a meal has no
@@ -442,6 +454,31 @@ day     → nutrients         Σ meals of that date
   units (integer thousandths) and the nutrients per g and per ml, so an amount becomes exact
   g or ml first and nutrients last: 100 g and 4 × 25 g give exactly the same result.
 
+### Changes
+
+Agreed: **every edit is a change, shaped like the data.** A change has the same lists and
+fields as the stored data, every part optional, with whole records (no field-level patches);
+the whole data is just the largest change.
+
+- **Applying** (`applyChange(data, change)`, pure): a record replaces the one with its id, or
+  is added; records the change doesn't mention stay. Goal sets in a change are added (goals
+  are append-only); `settings`, when present, replaces the settings. Then the result is checked
+  as a whole (see Integrity) and saved, or nothing changes.
+- **Deleting** is a tombstone in the same list: `"meals": [{ "id": "m:abc", "deleted": true }]`.
+  For now tombstones exist only in changes, never in stored data.
+- **Forms produce changes.** A meal's or recipe's draft holds a change with its pending foods;
+  its food table is the data with that change applied, and saving adds the meal or recipe to
+  the change and applies it at once.
+- **Pending edits of existing foods are rebased.** A draft that adds a unit to an existing food
+  remembers the version of the food it started from; if the food was saved meanwhile (e.g.
+  renamed in the library), saving the meal rebuilds it from the stored version plus the new
+  unit, so the draft never undoes another edit.
+- **Restoring a backup is not a change**: it replaces everything.
+- **Sync later** (agreed shape): pushing sends the records changed since the last sync as a
+  change; the server keeps the newer version of each record (by `updatedAt`), and a deletion
+  stays deleted (ids are never reused); pulling is a restore from the server. `updatedAt` on
+  every record and tombstones in stored data are added to the format when sync arrives.
+
 ### Integrity
 
 Checked on every load and every import: see [backup-format.md](backup-format.md). Every
@@ -475,7 +512,7 @@ has a single cause.
   app shows a **problem screen** with the problems and two actions: download the saved data
   unchanged (to fix it at the desk), or start fresh (two-tap confirmation).
 - Persistent storage is requested, so the browser does not evict the data.
-- Later sync fits this model: records with ids, plus `updatedAt` and tombstones.
+- Later sync fits this model: records with ids, plus `updatedAt` and tombstones (see Changes).
 
 ### Backup vs analysis export
 

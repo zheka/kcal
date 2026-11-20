@@ -22,17 +22,22 @@ export function goalsOn(goals: readonly GoalSet[], date: string): NutrientValues
 }
 
 /**
- * Saves new daily targets now, effective from the start of today. A set saved earlier today is
- * replaced (at most one per local day); unchanged targets change nothing.
+ * Saves new daily targets now, effective from the start of today. Goals are only ever added: a
+ * set saved earlier today stays, and simply no longer applies (the latest of a day wins), so
+ * the newest decision wins even across time zones. Unchanged targets change nothing.
  */
 export function saveGoals(goals: readonly GoalSet[], perDay: NutrientValues, now: Date): GoalSet[] {
-  const today = localDate(now);
-  if (sameTargets(goalsOn(goals, today) ?? {}, perDay)) return [...goals];
-  const last = goals.at(-1);
-  const kept = last && localDateOf(last.setAt) === today ? goals.slice(0, -1) : goals;
+  if (sameTargets(goalsOn(goals, localDate(now)) ?? {}, perDay)) return [...goals];
   const set: GoalSet = { setAt: now.toISOString() };
   if (Object.keys(perDay).length > 0) set.perDay = { ...perDay };
-  return [...kept, set];
+  return [...goals, set];
+}
+
+/** The goal sets that apply to some day, newest first: the last set of each local day. */
+export function goalHistory(goals: readonly GoalSet[]): { from: string; set: GoalSet }[] {
+  const byDay = new Map<string, GoalSet>();
+  for (const set of goals) byDay.set(localDateOf(set.setAt), set);
+  return [...byDay].map(([from, set]) => ({ from, set })).reverse();
 }
 
 function sameTargets(a: NutrientValues, b: NutrientValues): boolean {

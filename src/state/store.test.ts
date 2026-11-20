@@ -63,12 +63,12 @@ describe('store', () => {
     expect(() => store.saveMeal(meal('2026-11-17T09:00:00.000Z', []))).toThrow(/non-empty list/);
   });
 
-  it('saves goals now, at most one set per day', () => {
+  it('saves goals now, only ever adding sets', () => {
     const { store } = setup();
     store.saveGoals({ kcal: 2000 }, new Date('2026-11-17T07:00:00.000Z'));
     store.saveGoals({ kcal: 2100 }, new Date('2026-11-17T15:00:00.000Z'));
     store.saveGoals({ kcal: 2200 }, new Date('2026-11-18T07:00:00.000Z'));
-    expect(store.data.value.goals.map((g) => g.perDay?.kcal)).toEqual([2100, 2200]);
+    expect(store.data.value.goals.map((g) => g.perDay?.kcal)).toEqual([2000, 2100, 2200]);
   });
 
   it('rebuilds the food table only when foods change', () => {
