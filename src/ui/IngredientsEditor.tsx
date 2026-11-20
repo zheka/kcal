@@ -1,14 +1,13 @@
 import { useState } from 'preact/hooks';
 import { foodsByRecency, newId, pickIngredient } from '../core/foods';
 import { formatNumber, formatNutrientValue, parseNumber } from '../core/format';
-import { ingredientPortion, type FoodEntry } from '../core/nutrition';
+import { ingredientPortion, type FoodEntry, type FoodTable } from '../core/nutrition';
 import { cleanText, nameKey } from '../core/text';
-import type { Ingredient } from '../core/types';
+import type { AppData, Ingredient, ProductUnit, RecipeUnit } from '../core/types';
 import { roundStored } from '../core/decimal';
 import { isReservedProductUnitName } from '../core/units';
 import { GRAMS, type Base } from '../config';
 import { BaseSelect } from './UnitsEditor';
-import type { Store } from '../state/store';
 import { FoodPicker } from './FoodPicker';
 
 /** An ingredient as edited: the amount stays text while typing ("2," is fine). */
@@ -45,13 +44,21 @@ export function readIngredients(rows: readonly IngredientRow[]): {
 }
 
 interface Props {
-  store: Store;
+  /** The data and foods as the draft sees them: stored, with its pending foods. */
+  data: AppData;
+  foods: FoodTable;
+  /** Foods and units the draft created, not saved yet: marked new. */
+  news: { foods: ReadonlySet<string>; units: ReadonlySet<string> };
   rows: IngredientRow[];
   onChange: (rows: IngredientRow[]) => void;
   /** Foods that may not be added (recipes that contain the recipe being edited). */
   exclude?: ReadonlySet<string>;
   /** Starts creating a product with this name, to be added here once saved. */
   onCreateFood: (name: string) => void;
+  /** Opens a new (pending) product to edit it. */
+  onOpenNew: (id: string) => void;
+  /** Adds a unit to a food: pending, saved with the meal or recipe. */
+  onAddUnit: (foodId: string, unit: ProductUnit | RecipeUnit) => void;
   showErrors: boolean;
 }
 
@@ -59,15 +66,17 @@ const NEW_UNIT = '__new__';
 
 /** The ingredient list of a meal or a recipe: rows edited inline, and a picker to add more. */
 export function IngredientsEditor({
-  store,
+  data,
+  foods,
+  news,
   rows,
   onChange,
   exclude,
   onCreateFood,
+  onOpenNew,
+  onAddUnit,
   showErrors,
 }: Props) {
-  const foods = store.foods.value;
-  const data = store.data.value;
   const [newUnitFor, setNewUnitFor] = useState<string | null>(null);
 
   const change = (key: string, patch: Partial<IngredientRow>) =>
@@ -90,7 +99,19 @@ export function IngredientsEditor({
           <div class="ingredient" key={row.key}>
             <div class="ingredient-main">
               <div class="ingredient-text">
-                <span class="ingredient-name">{food.name}</span>
+                <span class="ingredient-title">
+                  <span class="ingredient-name">{food.name}</span>
+                  {news.foods.has(food.id) && (
+                    <button
+                      type="button"
+                      class="new-badge"
+                      aria-label={`Edit new product ${food.name}`}
+                      onClick={() => onOpenNew(food.id)}
+                    >
+                      new
+                    </button>
+                  )}
+                </span>
                 <span class="ingredient-kcal">{kcal} kcal</span>
               </div>
               <input
@@ -118,7 +139,7 @@ export function IngredientsEditor({
               >
                 {food.units.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name}
+                    {news.units.has(u.id) ? `${u.name} (new)` : u.name}
                   </option>
                 ))}
                 <option value={NEW_UNIT}>＋ new unit…</option>
@@ -135,12 +156,13 @@ export function IngredientsEditor({
             {showErrors && amount === null && <p class="error">Add an amount</p>}
             {newUnitFor === row.key && (
               <NewUnitForm
-                store={store}
                 food={food}
-                onDone={(unitId) => {
+                onAdd={(unit) => {
                   setNewUnitFor(null);
-                  if (unitId) change(row.key, { unit: unitId, amountText: '1' });
+                  onAddUnit(food.id, unit);
+                  change(row.key, { unit: unit.id, amountText: '1' });
                 }}
+                onCancel={() => setNewUnitFor(null)}
               />
             )}
           </div>
@@ -157,18 +179,18 @@ export function IngredientsEditor({
 }
 
 /**
- * Adds a unit to a food right from an ingredient row, and selects it: for a product, how many
- * g or ml one is (in a base the product has); for a recipe, how many of it the whole recipe
- * makes.
+ * A new unit for a food, right from an ingredient row: for a product, how many g or ml one is
+ * (in a base the product has); for a recipe, how many of it the whole recipe makes. It is
+ * pending: saved with the meal or recipe.
  */
 function NewUnitForm({
-  store,
   food,
-  onDone,
+  onAdd,
+  onCancel,
 }: {
-  store: Store;
   food: FoodEntry;
-  onDone: (unitId: string | null) => void;
+  onAdd: (unit: ProductUnit | RecipeUnit) => void;
+  onCancel: () => void;
 }) {
   const [name, setName] = useState('');
   const [valueText, setValueText] = useState('');
@@ -190,29 +212,14 @@ function NewUnitForm({
     if (value === null || value <= 0) {
       return setError(isProduct ? `Add how many ${base} it is` : 'Add how many the recipe makes');
     }
-    const data = store.data.value;
     const id = newId();
-    try {
-      if (isProduct) {
-        const product = data.products.find((p) => p.id === food.id)!;
-        store.saveProduct({
-          ...product,
-          units: [
-            ...product.units,
-            base === GRAMS ? { g: value, id, name: unitName } : { id, ml: value, name: unitName },
-          ],
-        });
-      } else {
-        const recipe = data.recipes.find((r) => r.id === food.id)!;
-        store.saveRecipe({
-          ...recipe,
-          units: [...recipe.units, { id, makes: value, name: unitName }],
-        });
-      }
-      onDone(id);
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    onAdd(
+      isProduct
+        ? base === GRAMS
+          ? { g: value, id, name: unitName }
+          : { id, ml: value, name: unitName }
+        : { id, makes: value, name: unitName },
+    );
   }
 
   const nameInput = (
@@ -260,7 +267,7 @@ function NewUnitForm({
         <button type="button" class="button primary" onClick={add}>
           Add unit
         </button>
-        <button type="button" class="button" onClick={() => onDone(null)}>
+        <button type="button" class="button" onClick={onCancel}>
           Cancel
         </button>
       </div>

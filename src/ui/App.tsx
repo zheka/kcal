@@ -9,7 +9,7 @@ import { isValidDate } from '../core/time';
 import { DayNav, DayScreen } from './DayScreen';
 import { GoalsScreen } from './GoalsScreen';
 import { MealComposer } from './MealComposer';
-import { dropDraft } from './drafts';
+import { dropDraft, productRequest } from './drafts';
 import { CloseIcon, MenuIcon } from './icons';
 import { goBack, navigate, route, today } from './router';
 
@@ -74,7 +74,7 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
           store={store}
           id={null}
           initialName={params.get('name') ?? ''}
-          addToPicker={params.has('add')}
+          forDraft={params.has('add') ? (productRequest() ?? undefined) : undefined}
         />
       ),
     };

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { addUnit, noPending, pendingFor, saveWith, whatsNew } from '../core/pending';
 import { NUTRIENTS } from '../config';
 import { newId, pickIngredient } from '../core/foods';
 import { formatNutrient } from '../core/format';
@@ -12,13 +13,9 @@ import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
 import { DayChart } from './DayChart';
 import { dayPath } from './DayScreen';
-import { dropDraft, keepDraft, loadDraft, takeCreatedFood } from './drafts';
-import {
-  ingredientRow,
-  IngredientsEditor,
-  readIngredients,
-  type IngredientRow,
-} from './IngredientsEditor';
+import { dropDraft, keepDraft, loadDraft, requestProduct } from './drafts';
+import { ingredientRow, IngredientsEditor, readIngredients } from './IngredientsEditor';
+import { reopen, saveLabel, usePendingView, type PendingDraft } from './pendingDraft';
 import { goBack, navigate, replaceRoute, today } from './router';
 
 interface Props {
@@ -34,10 +31,9 @@ interface Props {
   draftKey: string;
 }
 
-interface Draft {
+interface Draft extends PendingDraft {
   /** The local minute, as in the datetime-local input. */
   minute: string;
-  rows: IngredientRow[];
 }
 
 /**
@@ -46,19 +42,17 @@ interface Draft {
  */
 export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props) {
   const data = store.data.value;
-  const foods = store.foods.value;
   const existing = id === null ? undefined : data.meals.find((m) => m.id === id);
 
-  const [draft, setDraft] = useState<Draft>(() => {
-    const loaded =
-      loadDraft<Draft>(draftKey) ?? initialDraft(data, foods, existing, { date, copyOf, start });
-    const kept = { ...loaded, rows: loaded.rows.filter((r) => foods.has(r.food)) };
-    const created = takeCreatedFood();
-    const food = created ? foods.get(created) : undefined;
-    return food
-      ? { ...kept, rows: [...kept.rows, ingredientRow(pickIngredient(data, food))] }
-      : kept;
-  });
+  const [draft, setDraft] = useState<Draft>(() =>
+    reopen(
+      loadDraft<Draft>(draftKey) ??
+        initialDraft(data, store.foods.value, existing, { date, copyOf, start }),
+      data,
+    ),
+  );
+  // The foods as this meal sees them: with the ones it created or changed, not saved yet.
+  const { data: view, foods } = usePendingView(store, draft.pending);
   useEffect(() => keepDraft(draftKey, draft), [draftKey, draft]);
   const [submitted, setSubmitted] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -66,6 +60,7 @@ export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props
   if (id !== null && !existing) return <p class="empty">This meal does not exist.</p>;
 
   const { ingredients, invalid } = readIngredients(draft.rows);
+  const pendingChange = pendingFor(draft.pending, data, draft.rows);
   const timeValid = isValidLocalMinute(draft.minute);
   const day = timeValid
     ? draft.minute.slice(0, 10)
@@ -94,7 +89,8 @@ export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props
       ingredients,
     };
     try {
-      store.saveMeal(saved);
+      // The meal and the foods it created or changed, all or nothing.
+      store.apply(saveWith(draft.pending, data, ingredients, { meals: [saved] }));
     } catch (err) {
       setSaveError((err as Error).message);
       return;
@@ -126,11 +122,22 @@ export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props
 
       <section class="section">
         <IngredientsEditor
-          store={store}
+          data={view}
+          foods={foods}
+          news={whatsNew(pendingChange, data)}
           rows={draft.rows}
-          onChange={(rows) => setDraft({ ...draft, rows })}
-          onCreateFood={(name) =>
-            navigate(`/product/new?${new URLSearchParams({ name, add: '1' }).toString()}`)
+          onChange={(rows) => setDraft((d) => ({ ...d, rows }))}
+          onCreateFood={(name) => {
+            requestProduct({ data: view });
+            navigate(`/product/new?${new URLSearchParams({ name, add: '1' }).toString()}`);
+          }}
+          onOpenNew={(foodId) => {
+            const product = view.products.find((p) => p.id === foodId);
+            requestProduct({ data: view, ...(product && { product }) });
+            navigate('/product/new?add=1&edit=1');
+          }}
+          onAddUnit={(foodId, unit) =>
+            setDraft((d) => ({ ...d, pending: addUnit(d.pending, data, foodId, unit) }))
           }
           showErrors={submitted}
         />
@@ -153,7 +160,7 @@ export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props
 
       <div class="actions action-bar">
         <button type="submit" class="button primary">
-          Save
+          {saveLabel(pendingChange, data)}
         </button>
         {existing && (
           <>
@@ -196,6 +203,7 @@ function initialDraft(
   if (existing) {
     return {
       minute: localMinuteOf(existing.consumedAt),
+      pending: noPending,
       rows: existing.ingredients.map(ingredientRow),
     };
   }
@@ -213,6 +221,7 @@ function initialDraft(
   const rows = source ? source.ingredients.map(ingredientRow) : first ? [ingredientRow(first)] : [];
   return {
     minute: defaultMealMinute(data.meals, source ? today.value : (date ?? today.value), now),
+    pending: noPending,
     rows,
   };
 }

@@ -386,6 +386,34 @@ select.input.base {
   white-space: nowrap;
 }
 
+.ingredient-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* A food the meal or recipe created, saved with it: tapping opens it. */
+.new-badge {
+  position: relative;
+  flex: none;
+  padding: 1px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* A 48 px tap target around the small badge. */
+.new-badge::after {
+  position: absolute;
+  inset: -12px -4px;
+  content: '';
+}
+
 .ingredient-kcal {
   color: var(--muted);
   font-size: 0.8125rem;

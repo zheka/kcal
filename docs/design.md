@@ -324,9 +324,11 @@ Where the planning happens.
 - **New foods wait for the meal** (agreed). A product created from the composer, or a unit
   added to a food there, is **pending**: it exists only in this meal until the meal is saved,
   and is saved together with it; **×** discards it with the meal, without asking. Rows with a
-  pending food show a **new** chip (tapping it opens the food to edit), pending units are
-  marked new in the unit selector, and Save says what it saves ("Save meal + 2 new foods").
-  The recipe form works the same way.
+  pending food show a **new** badge (tapping it opens the food to edit), pending units are
+  marked new in the unit selector ("cup (new)"), and Save says what it saves ("Save + 1 new
+  food, 1 new unit"). The product form opened from a meal says **Done** instead of Save; a
+  scanned barcode that is already in the library offers **Add it** (to the meal) instead of
+  Open it. The recipe form works the same way.
 - **Eat again** (agreed): open any past meal and press **Eat again**; the composer opens with a
   copy of its ingredients and amounts as a new meal for **now**, to adjust and save. This is how
   repeated meals are logged; there are no meal templates or recent-meal chips (a meal has no

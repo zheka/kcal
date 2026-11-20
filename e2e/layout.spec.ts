@@ -106,6 +106,32 @@ test.describe('meal composer', () => {
     await page.reload();
     await expect(page.locator('.meal-row')).toHaveCount(7);
   });
+
+  test('marks a product created for the meal as new, saved with it', async ({ seeded: page }) => {
+    await page.goto('#/meal/new');
+    await page.getByLabel('Find food').fill('Pumpkin soup at the café');
+    await page.getByRole('button', { name: '＋ create “Pumpkin soup at the café”' }).click();
+    await page.getByLabel('kcal', { exact: true }).fill('45');
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('heading', { name: 'New meal' })).toBeVisible();
+    await page.getByLabel('Find food').fill('egg');
+    await page.getByLabel('Foods').getByText('egg', { exact: true }).click();
+    await page.getByLabel('Unit of egg').selectOption('__new__');
+    await page.getByLabel('New unit name').fill('large egg');
+    await page.getByLabel('New unit size').fill('70');
+    await page.getByRole('button', { name: 'Add unit' }).click();
+
+    await expectNoHorizontalScroll(page);
+    const badge = page.getByRole('button', { name: 'Edit new product Pumpkin soup at the café' });
+    await expectOnScreen(badge);
+    await expect(page.getByLabel('Unit of egg')).toContainText('large egg (new)');
+    const save = page.getByRole('button', { name: 'Save + 1 new food, 1 new unit' });
+    await expectOnScreen(save);
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+    await save.click();
+    await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
+    await expect(page.locator('.meal-row')).toHaveCount(7);
+  });
 });
 
 test.describe('forms', () => {

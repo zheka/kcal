@@ -12,14 +12,16 @@ import {
 } from '../config';
 import { isUsed, newId, productWithBarcode, unitUsages, usages, type Usages } from '../core/foods';
 import { formatNumber, parseNumber } from '../core/format';
+import { applyChange } from '../core/change';
 import { cleanText, nameKey } from '../core/text';
 import type { NutrientValues, Product } from '../core/types';
 import { perOneFrom } from '../core/units';
+import { validateAppData } from '../core/validate';
 import { lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
 import type { Store } from '../state/store';
 import { BarcodeScanner } from './BarcodeScanner';
 import { ConfirmButton } from './ConfirmButton';
-import { handOverCreatedFood } from './drafts';
+import { handOver, type ProductRequest } from './drafts';
 import { goBack, replaceRoute } from './router';
 import { productUnitRows, readProductUnits, UnitsEditor, type UnitRow } from './UnitsEditor';
 
@@ -29,8 +31,11 @@ interface Props {
   id: string | null;
   /** Prefilled name of a new product (typed in a food picker). */
   initialName?: string;
-  /** Add the new product where the picker was, once saved. */
-  addToPicker?: boolean;
+  /**
+   * Opened from a meal or recipe: the product is for that draft. It is checked against the
+   * draft's data and handed back to it, to be saved with it, instead of being saved here.
+   */
+  forDraft?: ProductRequest | undefined;
 }
 
 type ValueTexts = Record<Nutrient, string>;
@@ -71,24 +76,28 @@ function readValues(texts: ValueTexts): { values: NutrientValues; errors: Map<Nu
  * A product's name, values and units. Values are entered per g or per ml, one base at a time;
  * a base is stored exactly when at least one of its values is filled (0 counts).
  */
-export function ProductForm({ store, id, initialName = '', addToPicker = false }: Props) {
-  const data = store.data.value;
+export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
+  const data = forDraft?.data ?? store.data.value;
+  /** The stored product being edited. */
   const existing = id === null ? undefined : data.products.find((p) => p.id === id);
+  /** What the form starts from: the stored product, or a draft's pending one. */
+  const initial = existing ?? forDraft?.product;
+  const selfId = initial?.id;
 
-  const [name, setName] = useState(existing?.name ?? initialName);
-  const [unitRows, setUnitRows] = useState<UnitRow[]>(() => productUnitRows(existing?.units ?? []));
+  const [name, setName] = useState(initial?.name ?? initialName);
+  const [unitRows, setUnitRows] = useState<UnitRow[]>(() => productUnitRows(initial?.units ?? []));
   const [texts, setTexts] = useState<Record<Base, ValueTexts>>(() => ({
-    g: textsOf(existing?.perG),
-    ml: textsOf(existing?.perMl),
+    g: textsOf(initial?.perG),
+    ml: textsOf(initial?.perMl),
   }));
-  const [shown, setShown] = useState<Base>(existing && !existing.perG ? MILLILITRES : GRAMS);
+  const [shown, setShown] = useState<Base>(initial && !initial.perG ? MILLILITRES : GRAMS);
   const [basis, setBasis] = useState<Record<Base, Basis>>({
     g: { amount: '100', unit: GRAMS },
     ml: { amount: '100', unit: MILLILITRES },
   });
   const [submitted, setSubmitted] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [barcode, setBarcode] = useState(existing?.barcode);
+  const [barcode, setBarcode] = useState(initial?.barcode);
   const [scanning, setScanning] = useState(false);
   const [lookup, setLookup] = useState<ScanStatus | null>(null);
 
@@ -96,8 +105,8 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
   const onCode = useCallback(
     (code: string) => {
       setScanning(false);
-      const known = productWithBarcode(store.data.value, code);
-      if (known) {
+      const known = productWithBarcode(data, code);
+      if (known && known.id !== selfId) {
         setLookup({ kind: 'known', code, product: { id: known.id, name: known.name } });
         return;
       }
@@ -119,7 +128,7 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
         setShown(base);
       });
     },
-    [store],
+    [data, selfId],
   );
 
   if (id !== null && !existing) return <p class="empty">This product does not exist.</p>;
@@ -142,8 +151,8 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
   }
 
   const cleanName = cleanText(name);
-  const taken = [...store.foods.value.values()].find(
-    (f) => f.id !== id && nameKey(f.name) === nameKey(cleanName),
+  const taken = [...data.products, ...data.recipes].find(
+    (f) => f.id !== selfId && nameKey(f.name) === nameKey(cleanName),
   );
   const nameError = !cleanName ? 'Add a name' : taken ? `“${taken.name}” already exists` : '';
   const basisErrors = new Map<Base, string>();
@@ -186,20 +195,27 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
     const perG = perOne(GRAMS);
     const perMl = perOne(MILLILITRES);
     const product: Product = {
-      id: existing?.id ?? newId(),
+      id: selfId ?? newId(),
       name: cleanName,
       ...(perG && { perG }),
       ...(perMl && { perMl }),
       units,
       ...(barcode !== undefined && { barcode }),
     };
+    if (forDraft) {
+      // Saved later, with the meal or recipe; checked now against what it will be saved with.
+      const problems = validateAppData(applyChange(data, { products: [product] }));
+      if (problems.length > 0) return setSaveError(problems.join('; '));
+      handOver({ product });
+      goBack('/');
+      return;
+    }
     try {
       store.saveProduct(product);
     } catch (err) {
       setSaveError((err as Error).message);
       return;
     }
-    if (addToPicker && !existing) handOverCreatedFood(product.id);
     goBack('/library');
   }
 
@@ -224,7 +240,17 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
           Scan barcode
         </button>
       )}
-      {lookup && <ScanMessage status={lookup} />}
+      {lookup && (
+        <ScanMessage
+          status={lookup}
+          {...(forDraft && {
+            onAdd: (food: string) => {
+              handOver({ food });
+              goBack('/');
+            },
+          })}
+        />
+      )}
       {barcode !== undefined && (
         <p class="barcode">
           Barcode <span class="barcode-digits">{barcode}</span>
@@ -334,11 +360,12 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
       </fieldset>
 
       {inUse && <p class="notice">{usedNotice(used)}</p>}
+      {forDraft && <p class="hint">Saved together with the meal or recipe it’s for.</p>}
       {saveError && <p class="error">Could not save: {saveError}</p>}
 
       <div class="actions action-bar">
         <button type="submit" class="button primary">
-          Save
+          {forDraft ? 'Done' : 'Save'}
         </button>
         {existing && !inUse && (
           <ConfirmButton
@@ -389,8 +416,16 @@ type ScanStatus =
   | { kind: 'result'; code: string; result: LookupResult };
 
 /** What happened to a scanned barcode. */
-function ScanMessage({ status }: { status: ScanStatus }) {
+function ScanMessage({
+  status,
+  onAdd,
+}: {
+  status: ScanStatus;
+  /** Opened from a meal or recipe: add the known product there instead of opening it. */
+  onAdd?: (food: string) => void;
+}) {
   if (status.kind === 'known') {
+    const { id } = status.product;
     return (
       <div class="notice">
         <p>
@@ -400,9 +435,9 @@ function ScanMessage({ status }: { status: ScanStatus }) {
           <button
             type="button"
             class="button primary"
-            onClick={() => replaceRoute(`/product/${status.product.id}`)}
+            onClick={() => (onAdd ? onAdd(id) : replaceRoute(`/product/${id}`))}
           >
-            Open it
+            {onAdd ? 'Add it' : 'Open it'}
           </button>
         </div>
       </div>

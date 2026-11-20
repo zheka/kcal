@@ -217,8 +217,9 @@ describe('recipes', () => {
     expect(store.data.value.recipes).toEqual([]);
   });
 
-  it('creates a missing product from the picker and adds it, keeping the recipe', async () => {
-    start(appData({ products: [oatFlakes] }), '/recipe/new');
+  it('creates a missing product from the picker; it is saved only with the recipe', async () => {
+    start(appData({ products: [oatFlakes] }), '/library');
+    click('＋ Recipe');
     type(nameField(), 'Oats with skyr');
     chip('oat flakes');
     type(field('Find food'), 'Skyr');
@@ -227,27 +228,50 @@ describe('recipes', () => {
     expect(await screen.findByText('New product')).toBeTruthy();
     expect((nameField() as HTMLInputElement).value).toBe('Skyr');
     type(field('kcal'), '63');
-    click('Save');
+    click('Done');
 
     expect(await screen.findByText('New recipe')).toBeTruthy();
     expect((nameField() as HTMLInputElement).value).toBe('Oats with skyr');
     expect(screen.getByText('oat flakes', { selector: '.ingredient-name' })).toBeTruthy();
     expect(screen.getByText('Skyr', { selector: '.ingredient-name' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit new product Skyr' })).toBeTruthy();
+    expect(store.data.value.products.map((p) => p.name)).toEqual(['oat flakes']);
+
+    type(field('How many units it makes'), '2');
+    type(field('Unit name'), 'bowl');
+    click('Save + 1 new food');
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeTruthy();
+    expect(store.data.value.products.map((p) => p.name).sort()).toEqual(['Skyr', 'oat flakes']);
+    const skyr = store.data.value.products.find((p) => p.name === 'Skyr')!;
+    expect(store.data.value.recipes[0]!.ingredients.map((i) => i.food)).toEqual([
+      oatFlakes.id,
+      skyr.id,
+    ]);
   });
 
-  it('adds a unit to a product right from an ingredient row', async () => {
-    start(appData({ products: [oatFlakes] }), '/recipe/new');
+  it('adds a unit to a product right from an ingredient row, saved with the recipe', async () => {
+    start(appData({ products: [oatFlakes] }), '/library');
+    click('＋ Recipe');
+    type(nameField(), 'Oats');
     chip('oat flakes');
     fireEvent.change(field('Unit of oat flakes'), { target: { value: '__new__' } });
     type(field('New unit name'), 'cup');
     type(field('New unit size'), '80');
     click('Add unit');
 
-    await vi.waitFor(() =>
-      expect(store.data.value.products[0]!.units).toMatchObject([{ g: 80, name: 'cup' }]),
-    );
-    const cup = store.data.value.products[0]!.units[0]!;
-    expect((field('Unit of oat flakes') as HTMLSelectElement).value).toBe(cup.id);
+    const select = field('Unit of oat flakes') as HTMLSelectElement;
+    expect(select.selectedOptions[0]?.textContent).toBe('cup (new)');
+    expect(store.data.value.products[0]!.units).toEqual([]);
+
+    type(field('How many units it makes'), '1');
+    type(field('Unit name'), 'bowl');
+    click('Save + 1 new unit');
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeTruthy();
+    const [cup] = store.data.value.products[0]!.units;
+    expect(cup).toMatchObject({ g: 80, name: 'cup' });
+    expect(store.data.value.recipes[0]!.ingredients).toEqual([
+      { amount: 1, food: oatFlakes.id, unit: cup!.id },
+    ]);
   });
 
   it('offers foods, but not recipes that would contain themselves', () => {
@@ -298,6 +322,67 @@ describe('problem screen', () => {
   });
 });
 
+describe('new foods wait for their meal', () => {
+  it('discards a product created for a meal when the meal is closed', async () => {
+    start(appData({ products: [egg] }), '/meal/new');
+    type(field('Find food'), 'Skyr');
+    click('＋ create “Skyr”');
+    type(await screen.findByLabelText('kcal', { exact: false }), '63');
+    click('Done');
+    expect(await screen.findByRole('heading', { name: 'New meal' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save + 1 new food' })).toBeTruthy();
+    click('Close');
+    expect(await screen.findByRole('heading', { name: 'Today' })).toBeTruthy();
+    expect(store.data.value.products).toEqual([egg]);
+    expect(store.data.value.meals).toEqual([]);
+  });
+
+  it('opens a new product from its chip to edit it, and saves it with the meal', async () => {
+    start(appData(), '/meal/new');
+    type(field('Find food'), 'Skyr');
+    click('＋ create “Skyr”');
+    type(await screen.findByLabelText('kcal', { exact: false }), '63');
+    click('Done');
+    click(
+      await screen
+        .findByRole('button', { name: 'Edit new product Skyr' })
+        .then(() => 'Edit new product Skyr'),
+    );
+    expect(await screen.findByRole('heading', { name: 'New product' })).toBeTruthy();
+    expect((field('kcal') as HTMLInputElement).value).toBe('63');
+    type(field('kcal'), '70');
+    click('Done');
+    expect(await screen.findByRole('heading', { name: 'New meal' })).toBeTruthy();
+    expect(screen.getAllByText('Skyr', { selector: '.ingredient-name' })).toHaveLength(1);
+    click('Save + 1 new food');
+    expect(await screen.findByRole('heading', { name: 'Today' })).toBeTruthy();
+    const [skyr] = store.data.value.products;
+    expect(skyr).toMatchObject({ name: 'Skyr', perG: { kcal: 0.7 } });
+    expect(store.data.value.meals[0]!.ingredients[0]!.food).toBe(skyr!.id);
+  });
+
+  it('keeps an edit made elsewhere when a meal saves a unit it added', async () => {
+    start(appData({ products: [oatFlakes] }), '/meal/new');
+    chip('oat flakes');
+    fireEvent.change(field('Unit of oat flakes'), { target: { value: '__new__' } });
+    type(field('New unit name'), 'cup');
+    type(field('New unit size'), '80');
+    click('Add unit');
+    // renamed meanwhile, e.g. in the library
+    store.saveProduct({ ...oatFlakes, name: 'rolled oats' });
+    click(
+      await screen
+        .findByRole('button', { name: 'Save + 1 new unit' })
+        .then(() => 'Save + 1 new unit'),
+    );
+    expect(await screen.findByRole('heading', { name: 'Today' })).toBeTruthy();
+    expect(store.data.value.products[0]).toMatchObject({
+      name: 'rolled oats',
+      units: [{ g: 80, name: 'cup' }],
+    });
+  });
+});
+
 describe('library and closing screens', () => {
   it('lists the foods by name, each per 100 of its first base', () => {
     const juice = { id: 'p:juice', name: 'juice', perMl: { kcal: 0.45 }, units: [] };
@@ -330,5 +415,6 @@ describe('library and closing screens', () => {
     click('Close');
     expect(await screen.findByRole('heading', { name: 'New recipe' })).toBeTruthy();
     expect((nameField() as HTMLInputElement).value).toBe('Oats with skyr');
+    expect(store.data.value.products).toEqual([oatFlakes]);
   });
 });

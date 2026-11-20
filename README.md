@@ -35,7 +35,9 @@ src/
     canonical.ts    canonical order and JSON: the same data always gives the same file
     validate.ts     integrity checks for saved data and imports
     decimal.ts      rounding stored numbers to 3 decimals, exact thousandths
-    goals.ts        goals that apply to a day, saving goals
+    goals.ts        goals that apply to a day, saving goals (append-only)
+    change.ts       changes shaped like the data: applying and merging them
+    pending.ts      foods a meal or recipe created or changed, saved with it
     meals.ts        meal times (UTC, minute edits), macro split
     foods.ts        picking foods, chip order, usages, ids
     units.ts        product units, converting label values to per g or per ml
@@ -46,7 +48,7 @@ src/
     backup.ts       versioned document, strict import, backup export
     storage.ts      saved data in localStorage, checked on load
   state/
-    store.ts        app state (signals): stored data and derived tables; the only changes
+    store.ts        app state (signals): stored data and derived tables; applies every change
   ui/             Preact components: screens, forms, the ingredient editor
     router.ts       hash routes, back navigation
   pwa.ts          service worker registration

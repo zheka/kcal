@@ -1,26 +1,16 @@
 import { useEffect, useState } from 'preact/hooks';
 import { NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
-import {
-  isUsed,
-  newId,
-  pickIngredient,
-  recipesContaining,
-  unitUsages,
-  usages,
-} from '../core/foods';
+import { isUsed, newId, recipesContaining, unitUsages, usages } from '../core/foods';
 import { formatNutrientValue } from '../core/format';
 import { ingredientsNutrients, type Nutrients } from '../core/nutrition';
 import { cleanText, nameKey } from '../core/text';
 import type { Recipe, RecipeUnit } from '../core/types';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
-import { dropDraft, keepDraft, loadDraft, takeCreatedFood } from './drafts';
-import {
-  ingredientRow,
-  IngredientsEditor,
-  readIngredients,
-  type IngredientRow,
-} from './IngredientsEditor';
+import { addUnit, noPending, pendingFor, saveWith, whatsNew } from '../core/pending';
+import { dropDraft, keepDraft, loadDraft, requestProduct } from './drafts';
+import { ingredientRow, IngredientsEditor, readIngredients } from './IngredientsEditor';
+import { reopen, saveLabel, usePendingView, type PendingDraft } from './pendingDraft';
 import { usedNotice } from './ProductForm';
 import { goBack, navigate } from './router';
 import {
@@ -39,9 +29,8 @@ interface Props {
   draftKey: string;
 }
 
-interface Draft {
+interface Draft extends PendingDraft {
   name: string;
-  rows: IngredientRow[];
   unitRows: UnitRow[];
 }
 
@@ -51,30 +40,25 @@ interface Draft {
  */
 export function RecipeForm({ store, id, draftKey }: Props) {
   const data = store.data.value;
-  const foods = store.foods.value;
   const existing = id === null ? undefined : data.recipes.find((r) => r.id === id);
 
-  const [draft, setDraft] = useState<Draft>(() => {
-    const loaded = loadDraft<Draft>(draftKey) ?? fromRecipe(existing);
-    // Foods deleted meanwhile drop out of an unsaved draft.
-    const kept = { ...loaded, rows: loaded.rows.filter((r) => foods.has(r.food)) };
-    // A product just created from this recipe's picker joins the ingredients.
-    const created = takeCreatedFood();
-    const food = created ? foods.get(created) : undefined;
-    return food
-      ? { ...kept, rows: [...kept.rows, ingredientRow(pickIngredient(data, food))] }
-      : kept;
-  });
+  // Foods deleted meanwhile drop out; a product created from the picker joins the ingredients.
+  const [draft, setDraft] = useState<Draft>(() =>
+    reopen(loadDraft<Draft>(draftKey) ?? fromRecipe(existing), data),
+  );
+  // The foods as this recipe sees them: with the ones it created or changed, not saved yet.
+  const { data: view, foods } = usePendingView(store, draft.pending);
   useEffect(() => keepDraft(draftKey, draft), [draftKey, draft]);
   const [submitted, setSubmitted] = useState(false);
   const [saveError, setSaveError] = useState('');
 
   if (id !== null && !existing) return <p class="empty">This recipe does not exist.</p>;
 
-  const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
+  const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const { ingredients, invalid } = readIngredients(draft.rows);
   const { units, errors: unitErrors } = readRecipeUnits(draft.unitRows);
   const whole = ingredientsNutrients(foods, ingredients);
+  const pendingChange = pendingFor(draft.pending, data, draft.rows);
 
   const cleanName = cleanText(draft.name);
   const taken = [...foods.values()].find(
@@ -101,7 +85,8 @@ export function RecipeForm({ store, id, draftKey }: Props) {
     if (!valid) return;
     const recipe: Recipe = { id: existing?.id ?? newId(), ingredients, name: cleanName, units };
     try {
-      store.saveRecipe(recipe);
+      // The recipe and the foods it created or changed, all or nothing.
+      store.apply(saveWith(draft.pending, data, ingredients, { recipes: [recipe] }));
     } catch (err) {
       setSaveError((err as Error).message);
       return;
@@ -133,12 +118,23 @@ export function RecipeForm({ store, id, draftKey }: Props) {
       <fieldset class="section">
         <legend class="label">Ingredients</legend>
         <IngredientsEditor
-          store={store}
+          data={view}
+          foods={foods}
+          news={whatsNew(pendingChange, data)}
           rows={draft.rows}
           onChange={(rows) => set({ rows })}
           exclude={id ? recipesContaining(data.recipes, id) : new Set()}
-          onCreateFood={(name) =>
-            navigate(`/product/new?${new URLSearchParams({ name, add: '1' }).toString()}`)
+          onCreateFood={(name) => {
+            requestProduct({ data: view });
+            navigate(`/product/new?${new URLSearchParams({ name, add: '1' }).toString()}`);
+          }}
+          onOpenNew={(foodId) => {
+            const product = view.products.find((p) => p.id === foodId);
+            requestProduct({ data: view, ...(product && { product }) });
+            navigate('/product/new?add=1&edit=1');
+          }}
+          onAddUnit={(foodId, unit) =>
+            setDraft((d) => ({ ...d, pending: addUnit(d.pending, data, foodId, unit) }))
           }
           showErrors={submitted}
         />
@@ -168,7 +164,7 @@ export function RecipeForm({ store, id, draftKey }: Props) {
 
       <div class="actions action-bar">
         <button type="submit" class="button primary">
-          Save
+          {saveLabel(pendingChange, data)}
         </button>
         {existing && !inUse && (
           <ConfirmButton
@@ -189,6 +185,7 @@ export function RecipeForm({ store, id, draftKey }: Props) {
 function fromRecipe(recipe: Recipe | undefined): Draft {
   return {
     name: recipe?.name ?? '',
+    pending: noPending,
     rows: (recipe?.ingredients ?? []).map(ingredientRow),
     unitRows: recipe ? recipeUnitRows(recipe.units) : [emptyUnitRow()],
   };

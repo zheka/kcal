@@ -1,3 +1,5 @@
+import type { AppData, Product } from '../core/types';
+
 /**
  * Unsaved forms, kept while the user leaves them for another screen (e.g. to create a
  * product for a recipe) and dropped on save or cancel.
@@ -16,21 +18,44 @@ export function dropDraft(key: string): void {
   drafts.delete(key);
 }
 
-/** A food just created from a picker, to be added where the picker was. */
-let createdFood: string | null = null;
-
-export function handOverCreatedFood(id: string): void {
-  createdFood = id;
+/**
+ * A product form opened from a meal or recipe: it works on the data as that draft sees it
+ * (with its pending foods), edits `product` if given (a pending one) and hands its result
+ * back instead of saving it.
+ */
+export interface ProductRequest {
+  data: AppData;
+  product?: Product;
 }
 
-export function takeCreatedFood(): string | null {
-  const id = createdFood;
-  createdFood = null;
-  return id;
+/** What a product form opened from a draft hands back: a product, or a food to add. */
+export type HandOver = { product: Product } | { food: string };
+
+let request: ProductRequest | null = null;
+let handedOver: HandOver | null = null;
+
+export function requestProduct(r: ProductRequest): void {
+  request = r;
+}
+
+export function productRequest(): ProductRequest | null {
+  return request;
+}
+
+export function handOver(h: HandOver): void {
+  handedOver = h;
+  request = null;
+}
+
+export function takeHandOver(): HandOver | null {
+  const h = handedOver;
+  handedOver = null;
+  return h;
 }
 
 /** Forgets every draft (tests). */
 export function clearDrafts(): void {
   drafts.clear();
-  createdFood = null;
+  request = null;
+  handedOver = null;
 }

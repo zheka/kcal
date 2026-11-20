@@ -99,6 +99,19 @@ describe('scanning a barcode in a new product', () => {
     expect((screen.getByLabelText(/^Name/) as HTMLInputElement).value).toBe('egg');
   });
 
+  it('adds a product already in the library to the meal it was created for', async () => {
+    start(appData({ products: [{ ...egg, barcode: CODE }] }), '/meal/new');
+    fireEvent.input(screen.getByLabelText('Find food'), { target: { value: 'Skyr' } });
+    fireEvent.click(screen.getByRole('button', { name: '＋ create “Skyr”' }));
+    expect(await screen.findByRole('heading', { name: 'New product' })).toBeTruthy();
+    scan();
+    expect(await screen.findByText('Already in your library:')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }));
+    expect(await screen.findByRole('heading', { name: 'New meal' })).toBeTruthy();
+    expect(screen.getByText('egg', { selector: '.ingredient-name' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+  });
+
   it('keeps the barcode when Open Food Facts doesn’t know it', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({ kind: 'not-found' });
     start();
