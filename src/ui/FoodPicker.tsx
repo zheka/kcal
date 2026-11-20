@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { matchFoods } from '../core/foods';
 import type { FoodEntry } from '../core/nutrition';
 import { cleanText } from '../core/text';
@@ -22,6 +22,21 @@ export function FoodPicker({ foods, onPick, onCreate, nameTaken }: Props) {
   const chips = matchFoods(foods, text).slice(0, MAX_CHIPS);
   const canCreate = typed !== '' && !nameTaken(typed);
 
+  // Edge fades where there are more chips to swipe to. A new filter scrolls back to the start,
+  // so the best matches are in view.
+  const row = useRef<HTMLDivElement>(null);
+  const [fades, setFades] = useState({ left: false, right: false });
+  const chipsKey = chips.map((c) => c.id).join(' ') + (canCreate ? ' +' : '');
+  useLayoutEffect(() => {
+    const el = row.current!;
+    scrollToStart(el);
+    setFades(scrollFades(el));
+    // The phone turned, or the window was resized: the row's width changed.
+    const update = () => setFades(scrollFades(el));
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [chipsKey]);
+
   return (
     <div class="picker">
       <input
@@ -34,7 +49,12 @@ export function FoodPicker({ foods, onPick, onCreate, nameTaken }: Props) {
         onInput={(e) => setText(e.currentTarget.value)}
         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), e.currentTarget.blur())}
       />
-      <div class="chips" aria-label="Foods">
+      <div
+        ref={row}
+        class={`chips${fades.left ? ' fade-left' : ''}${fades.right ? ' fade-right' : ''}`}
+        aria-label="Foods"
+        onScroll={(e) => setFades(scrollFades(e.currentTarget))}
+      >
         {chips.map((food) => (
           <button
             type="button"
@@ -59,4 +79,16 @@ export function FoodPicker({ foods, onPick, onCreate, nameTaken }: Props) {
       </div>
     </div>
   );
+}
+
+function scrollToStart(el: HTMLElement): void {
+  el.scrollLeft = 0;
+}
+
+/** Whether a row scrolled sideways has more to see on its left and on its right. */
+function scrollFades(el: HTMLElement): { left: boolean; right: boolean } {
+  return {
+    left: el.scrollLeft > 1,
+    right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+  };
 }

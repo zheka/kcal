@@ -440,6 +440,25 @@ select.input.base {
   scrollbar-width: none;
 }
 
+/* A fade on the side(s) of the chip row with more chips to swipe to. */
+.chips.fade-right {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+
+.chips.fade-left {
+  mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+}
+
+.chips.fade-left.fade-right {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 32px,
+    #000 calc(100% - 32px),
+    transparent
+  );
+}
+
 .chip {
   flex: none;
   min-width: 64px;

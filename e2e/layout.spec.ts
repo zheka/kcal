@@ -107,6 +107,22 @@ test.describe('meal composer', () => {
     await expect(page.locator('.meal-row')).toHaveCount(7);
   });
 
+  test('fades the chip row’s edges where there are more chips to swipe to', async ({
+    seeded: page,
+  }) => {
+    await page.goto('#/meal/new');
+    const chips = page.getByLabel('Foods');
+    await expect(chips).toHaveClass(/fade-right/);
+    await expect(chips).not.toHaveClass(/fade-left/);
+    if (process.env.SHOT) await page.locator('.picker').screenshot({ path: process.env.SHOT });
+    await chips.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+    await expect(chips).toHaveClass(/fade-left/);
+    await expect(chips).not.toHaveClass(/fade-right/);
+    // a filter with one match: nothing to swipe to
+    await page.getByLabel('Find food').fill('banana');
+    await expect(chips).not.toHaveClass(/fade-/);
+  });
+
   test('marks a product created for the meal as new, saved with it', async ({ seeded: page }) => {
     await page.goto('#/meal/new');
     await page.getByLabel('Find food').fill('Pumpkin soup at the café');
