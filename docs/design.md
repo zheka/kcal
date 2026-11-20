@@ -31,16 +31,16 @@ suggestions not discussed yet; Open questions lists what is still undecided.
 
 ## Concepts
 
-| Concept      | Meaning                                                                       |
-| ------------ | ----------------------------------------------------------------------------- |
-| **Nutrient** | a quantity in food: `kcal`, `protein`, `fat`, `carbs`                         |
-| **Product**  | something with nutrients per gram, from its label                             |
-| **Recipe**   | products (and recipes) with amounts; usable everywhere a product is           |
-| **Unit**     | a way to measure a food: `piece`, `ml`, `cup` (in grams), `serving` (a share) |
-| **Meal**     | a logged entry: foods taken together, at a date and time                      |
-| **Water**    | a nutrient (ml): the water in drinks, counted towards a daily goal            |
-| **Goals**    | daily targets per nutrient                                                    |
-| **Weight**   | my body weight, at most one value per day                                     |
+| Concept      | Meaning                                                                     |
+| ------------ | --------------------------------------------------------------------------- |
+| **Nutrient** | a quantity in food: `kcal`, `protein`, `fat`, `carbs`                       |
+| **Product**  | something with nutrients per g and/or per ml, from its label                |
+| **Recipe**   | products (and recipes) with amounts; usable everywhere a product is         |
+| **Unit**     | a way to measure a food: `piece` (in g), `cup` (in ml), `serving` (a share) |
+| **Meal**     | a logged entry: foods taken together, at a date and time                    |
+| **Water**    | a nutrient (ml): the water in drinks, counted towards a daily goal          |
+| **Goals**    | daily targets per nutrient                                                  |
+| **Weight**   | my body weight, at most one value per day                                   |
 
 "Food" below means a product or a recipe: wherever one can be used, so can the other.
 
@@ -50,39 +50,54 @@ suggestions not discussed yet; Open questions lists what is still undecided.
   (`src/config.ts`), so adding `fiber` or `sugar` later is a config change plus an optional
   field.
 - **`water`** (ml) is a nutrient too (see Water).
-- **An omitted nutrient counts as 0** (agreed); nothing is required, kcal included.
+- **Zero is stored as 0; an empty nutrient is "not given"** (agreed): whatever is entered is
+  stored, and only what is empty is omitted. No single nutrient is required, kcal included,
+  but a product needs at least one value. For now a value not given counts as 0 in totals;
+  the data keeps the difference, so totals can later show that they are incomplete.
 - `kcal` comes **from the label**, not from the macros (labels round and use other factors).
 
 ### Products
 
-- **Everything goes through grams** (agreed). Every product stores its nutrients **per 1 g**,
-  and every amount is converted to grams for calculation. A unit that is not really a weight
-  (ml of a drink, an egg of size M) gets a reasonable figure in grams, corrected later if
-  needed: that error is far below the tolerances of labels.
-- **All other units are defined by hand, per product**, as grams: `piece = 60 g`,
-  `ml = 1.03 g` (milk), `cup = 250 g` (my mug of milk), `scoop = 30 g`. No standard volume
-  units are built in: "cup" means whatever my cup holds of that product.
+- **A product is measured in grams, in millilitres, or both** (agreed). It stores its
+  nutrients **per 1 g** (`perG`), **per 1 ml** (`perMl`), or both, as its label gives them:
+  food per 100 g, drinks per 100 ml. Each set says the product can be measured in that base.
+- **The two sets are independent** (agreed): an amount in g uses the per-g values, an amount
+  in ml the per-ml values, and nothing converts between them, so no density is ever guessed.
+  A strict conversion may come later as a separate field.
+- **All other units are defined by hand, per product**, each in exactly one base the product
+  has (agreed): `piece = 60 g`, `scoop = 30 g`, `cup = 250 ml` (my mug of milk). No standard
+  volume units are built in: "cup" means whatever my cup holds.
 - **Units belong to their food** (agreed): they are stored inside the product and mean
   nothing outside it ("cup" of oats ≠ "cup" of milk). Nothing about units is shared between
   foods except, as a typing aid, their names.
-- **Grams are built in** (agreed): every product can be measured in `g`, which is never stored
-  and is reserved as a unit name. There is no `kg`.
+- **`g` and `ml` are built in** (agreed): a product with per-g values can be measured in `g`,
+  one with per-ml values in `ml`; neither is stored as a unit, and both are reserved unit
+  names. There is no `kg` or `l`.
 - How products are stored: see [backup-format.md](backup-format.md).
 - The **last unit and amount used** for a food are preselected the next time.
 - **Nutrients can be entered and shown per any unit** of the product (agreed in principle):
   the product form has its units section right away, and the nutrient values are entered
-  "per [100 g ▾]", where the selector also offers the product's units (`per bar` = 45 g,
-  `per ml`…). So a label's per-serving or per-100-ml column is copied as printed, and the app
-  converts it to per gram, rounded once when stored.
-- **A nutrient left empty counts as 0** (agreed). This replaces the earlier "unknown values":
-  no markers, no `≥`. The four macros are on every EU label; a nutrient added later (fiber)
-  simply counts 0 for products without it.
+  "per [100 g ▾]", where the selector also offers the product's units of that base
+  (`per bar` = 45 g). So a label's per-serving column is copied as printed, and the app
+  converts it to per g or per ml, rounded once when stored.
+- **The form shows one base at a time**, with a `per g | per ml` switch (agreed); the switch
+  marks the bases that have values. **A base is stored exactly when at least one of its
+  values is filled** (0 counts): looking at the other side stores nothing, and clearing all of
+  a base's values removes it on save.
+- **A unit can only be in a base that has values** (agreed): a unit's g/ml selector offers
+  `ml` only once the ml side has a value. Clearing the last ml value while an ml unit exists
+  marks the unit ("cup is in ml: enter at least one value per ml"), and saving waits until
+  one of them is fixed. Saving is also refused while meals or recipes use the product in a
+  base that would disappear.
+- **A product needs at least one value** (agreed), per g or per ml; 0 counts (salt: 0 kcal).
+- **A nutrient left empty is not given; 0 is typed as 0** (agreed). For now, not given counts
+  as 0 in totals (no markers, no `≥` yet); the stored data keeps the difference.
 - _(proposal)_ A soft warning when kcal and `4·P + 4·C + 9·F` differ by more than ~15%
   (catches typos like 25 for 2.5); it never blocks saving.
 - Amounts are decimals (`0.5 cup`); no fractions.
 - **Units are defined in two places** (agreed): in the product form (a units section:
-  name + grams), and **on the fly in the composer**: the unit selector lists `g`, the food's
-  units and **＋ new unit…**, which asks for a name and its grams, saves the unit on the food
+  name + g or ml), and **on the fly in the composer**: the unit selector lists `g` and/or `ml`,
+  the food's units and **＋ new unit…**, which asks for a name and its g or ml, saves the unit on the food
   and selects it. _(proposal: the new-unit form offers names already used on other foods as
   chips, to keep names consistent.)_
 - Grams are measured with a kitchen scale, so `g` is the everyday unit; other units are a
@@ -97,9 +112,9 @@ suggestions not discussed yet; Open questions lists what is still undecided.
   built-in unit for recipes, not even grams.
 - **"Makes 1600 g"** is one more unit: the weighed pot. Then "350 g of soup" from the scale is
   right even when cooking changed the weight.
-- Its nutrients are **computed** from the ingredients, never typed. Internally a recipe is
-  measured by the sum of its ingredients in grams; one of a unit is that sum divided by what
-  it makes.
+- Its nutrients are **computed** from the ingredients, never typed: the whole recipe is the
+  sum of its ingredients, and one of a unit is that sum divided by what it makes. A recipe has
+  no weight or volume of its own, so ingredients in g and ml mix freely.
 - **Recipes are for things prepared as one dish**, not for repeating meals.
 - **Recipes can contain recipes**: `oats` (oats + water, cooked), `oats with honey` (oats +
   honey), `oats with banana` (oats + banana). Cycles are refused.
@@ -187,20 +202,22 @@ Agreed:
   count it: total fluid matters, coffee and tea included (their diuretic effect is small),
   while sugary sodas are a matter of sugar, not fluid. Food is left out (its water, about 20%
   of total intake, is covered by the margin in fluid targets).
-- **Water is a nutrient** (ml; 1 g of water = 1 ml). Drink products carry a water value by
-  their content: water 1 per g, coffee and tea about 0.99, milk about 0.88. Foods omit it,
-  which counts as 0.
+- **Water is a nutrient** (ml). Drink products carry a water value by their content: water
+  1 ml per ml, coffee and tea about 0.99, milk about 0.88.
 - **The water goal** is a target like the others (e.g. 2000 ml), and water has its own bar in
   the day chart, on its own scale (ml).
-- **Built-in foods**, defined in the code and read-only: `water` (units g and ml), `protein`,
-  `fat`, `carbs` (pure, with 4/9/4 kcal per gram). Their names are reserved. Besides water,
-  they let a meal be estimated as macros ("40 g protein + 20 g fat + 60 g carbs").
-- **＋ Water** on the day screen, next to ＋ Eat, opens the composer with built-in water at the
-  last amount used. Drinks are meals in storage. _(Later: the button may become configurable.)_
-- Built-in foods have no custom units; recent amounts appear as chips. "My cup of water" is a
-  recipe (330 ml of water, makes 1 cup) or a product with a water value.
+- **No built-in foods** (agreed). Water is an ordinary product that a fresh start creates
+  (per g and per ml, 1 ml of water each), editable, renamable and deletable when unused like
+  any other. Pure protein, fat or carbs, to estimate a meal as macros, are products you make
+  yourself if you want them.
+- **Quick buttons** (agreed) on the day screen start a meal: each is a label (an emoji or a
+  short text) and, optionally, a food with an amount. One with a food opens the composer with
+  that food and amount in it (💧 → water 250 ml); one without opens an empty meal (🍽️). A
+  fresh start has 💧 and 🍽️. They are settings, stored in the backup; for now they are
+  changed by editing the backup JSON (a settings screen may come later). See
+  [backup-format.md](backup-format.md).
 - Drinks are rows in the day list like any meal; every row shows the nutrients that have
-  goals, so a glass of water shows its `330 ml water`.
+  goals, so a glass of water shows its `250 ml water`.
 
 ### Editing foods: everything is live
 
@@ -249,13 +266,15 @@ layouts are checked with screenshots at that size.
   `690 kcal · 48 g protein · 300 ml water`, so every meal, a glass of water included, shows
   how it moves each goal. Drinks are rows like any other meal. _(Before the first goals:
   kcal, proposal.)_
-- A small **edit icon** on the right of a meal row opens it in the meal composer (edit mode),
-  which also offers **Eat again** and **Delete** (two-tap). _(What tapping the row itself does,
-  if anything, is open.)_
-- **＋ Eat** opens the composer for the day on screen (see the meal time defaults); **＋ Water**
-  opens it with built-in water (see Water).
-- A small **weight button** near the date, showing the last weight; tapping it logs the
-  day's weight (see Weight).
+- **Tapping a meal row opens it** in the meal composer (agreed; no edit icon), which also
+  offers **Eat again** and **Delete** (two-tap).
+- **Quick buttons** (see Water) open the composer for the day on screen (see the meal time
+  defaults), empty or with their food. They are **round buttons stacked in the bottom-right
+  corner** (agreed), Android style, from top to bottom: weight (once it exists), then the
+  quick buttons in their order. The list leaves room at its end so the last meal can scroll
+  clear of them.
+- A **weight button**, showing the last weight; tapping it logs the day's weight (see
+  Weight). Its icon is drawn by the app (a classic iron scale weight), since no emoji fits.
 - **Other days**: small ‹ › arrows next to the date, in the header bar. No swiping: going
   back is rare. Moving between days replaces the screen, so the back button leaves the day
   rather than stepping through days. Today is `#/`, other days `#/day/YYYY-MM-DD`. A date
@@ -310,8 +329,8 @@ Where the planning happens.
   (Chrome on Android; where a browser has none, the button isn't shown, and there is no typing
   of numbers). A barcode already in the library opens that product instead of making a
   duplicate. Otherwise it is looked up on Open Food Facts, which fills the name (with brand) and
-  kcal, protein, fat and carbs per 100 g, or for drinks per 100 ml with an `ml` unit counted as
-  1 g (correctable under Units). Water isn't in Open Food Facts. Nothing is saved until Save,
+  kcal, protein, fat and carbs per 100 g, or for drinks per 100 ml (values it doesn't give stay
+  empty). Water isn't in Open Food Facts. Nothing is saved until Save,
   and the barcode is kept with the product, also when Open Food Facts doesn't know it. Only
   the barcode is sent.
 - **Recipe form = the meal composer** (agreed): ingredients with amounts and units, inline,
@@ -319,8 +338,6 @@ Where the planning happens.
   servings", "4 pieces", "1600 g" if the pot is weighed), at least one.
 - No "save meal as recipe": a meal and a dish are different things.
 - Products and recipes can be edited. A food in use cannot be deleted.
-- **Built-in foods are listed too** (agreed), by name among your own, marked "built-in" and not
-  editable. They are defined in the code and never part of the backup.
 - _(Later)_ Archiving: archived foods are hidden from the chips but kept, since meals and
   recipes refer to them.
 
@@ -377,7 +394,7 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
 | -------------------- | ------------------- | --------------------------------------------------------------------------------------- |
 | **Forms**            | easy to enter       | text as typed, values per a label's column ("per bar"), "makes 6 servings", local times |
 | **Stored data**      | consistent to store | the canonical data in exactly the format of this file; the single source of truth       |
-| **In-memory tables** | easy to use         | foods by id, units with exact grams, nutrients per gram, meals by day; all derived      |
+| **In-memory tables** | easy to use         | foods by id, units with exact amounts, nutrients per g or ml, meals by day; all derived |
 
 - **The stored data is primary**: the one source of truth, and every other form is converted
   to it (forms, on save) or derived from it (tables, and forms opened for editing). It is:
@@ -403,13 +420,13 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
 that uses it is recomputed on the next render.
 
 ```
-product → per gram          (stored per gram)
-recipe  → per gram          Σ(ingredient grams × ingredient per gram) / total grams
-meal    → nutrients         Σ(ingredient grams × food per gram)
+product → per g, per ml     (stored)
+recipe  → whole recipe      Σ(ingredient nutrients); one unit = whole / makes
+meal    → nutrients         Σ(ingredient nutrients)
 day     → nutrients         Σ meals of that date
 ```
 
-- **Food table.** One derived map `foodId → { perGram, missing, units }` for all foods,
+- **Food table.** One derived map `foodId → { nutrients per unit, units }` for all foods,
   built by recursion with memoisation (recipes resolve their ingredients first) and a cycle
   guard. It is **rebuilt from scratch whenever any food changes**: a few hundred foods take
   well under a millisecond, so there is no smart invalidation.
@@ -417,11 +434,11 @@ day     → nutrients         Σ meals of that date
   stats ~10 000, still under a millisecond. Nothing else is cached.
 - **"Used in N meals and M recipes"** is a scan over meals and recipes on demand
   (milliseconds), not a stored index.
-- **The weight basis of a recipe** is the sum of its ingredients in grams; one of its units
-  is that sum divided by what the unit makes, divided last.
-- **The in-memory food table** holds, for every product and recipe, the exact grams of each
-  of its units (integer thousandths) and the nutrients per gram, so an amount becomes exact
-  grams first and nutrients last: 100 g and 4 × 25 g give exactly the same result.
+- **A recipe** is the sum of its ingredients; one of its units is that sum divided by what
+  the unit makes, divided last.
+- **The in-memory food table** holds, for every product, the exact g or ml of each of its
+  units (integer thousandths) and the nutrients per g and per ml, so an amount becomes exact
+  g or ml first and nutrients last: 100 g and 4 × 25 g give exactly the same result.
 
 ### Integrity
 
@@ -554,4 +571,8 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
    primary form (per-gram products, recipes eaten in their own units, UTC times, canonical
    JSON, at most 3 decimals, exact quantities); water as a nutrient with built-in foods (water,
    protein, fat, carbs) and ＋ Water; meal rows showing the nutrients that have goals.
-7. Weight logging; then the Stats screen (reports, weight charts) and the analysis export.
+7. **Next:** format `kcal 0.2.0`: products per g and/or per ml, units in g or ml, zeros
+   stored, empty lists omitted, no built-in foods (water is an ordinary product), quick
+   buttons in `settings` (the day screen's ＋ Eat and ＋ Water become the two default
+   buttons; their layout is discussed separately).
+8. Weight logging; then the Stats screen (reports, weight charts) and the analysis export.
