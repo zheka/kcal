@@ -649,11 +649,12 @@ select.input.base {
   display: flex;
   flex: 1;
   align-items: center;
-  justify-content: center;
-  /* Balances the menu button on the right, so the date is centred. */
-  padding-left: var(--tap);
+  /* On the left, like the other screens' titles; the chevron's icon lines up with the edge,
+     as the menu's does on the right. */
+  margin-left: -12px;
 }
 
+/* A fixed width, so the arrows stay put while paging through days. */
 .day-nav h1 {
   min-width: 7.5em;
   text-align: center;
