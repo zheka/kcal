@@ -342,17 +342,18 @@ Where the planning happens.
   is added to the meal).
 - **Product form**: name, units, and nutrients entered per any unit (see Products).
 - **Scanning a barcode** (agreed): a small barcode button inside the right edge of the field,
-  in the food search of the meal composer and recipe form, and in a new product's name field
-  (not in the Library, for now). The browser's built-in barcode reader is used (Chrome on
-  Android; where a browser has none, the button isn't shown, and there is no typing of
-  numbers). In a food search, a barcode of one of my products adds it, like its chip; an
-  unknown one opens the new-product form for the meal, looked up as below (Done adds it as a
-  new food). In the product form, a barcode already in the library opens that product (or,
-  for a meal, offers to add it) instead of making a duplicate. Otherwise it is looked up on Open Food Facts, which fills the name (with brand) and
-  kcal, protein, fat and carbs per 100 g, or for drinks per 100 ml (values it doesn't give stay
-  empty). Water isn't in Open Food Facts. Nothing is saved until Save,
-  and the barcode is kept with the product, also when Open Food Facts doesn't know it. Only
-  the barcode is sent.
+  in the food search of the meal composer and recipe form, in the Library's search, and in a
+  new product's name field. The browser's built-in barcode reader is used (Chrome on Android;
+  where a browser has none, the button isn't shown, and there is no typing of numbers). In a
+  food search, a barcode of one of my products adds it, like its chip; an unknown one opens
+  the new-product form for the meal, looked up as below (Done adds it as a new food). In the
+  Library's search, a barcode of one of my products opens it; an unknown one goes straight to
+  a new product, looked up and saved to the Library. In the product form, a barcode already in
+  the library opens that product (or, for a meal, offers to add it) instead of making a
+  duplicate. Otherwise it is looked up on Open Food Facts, which fills the name (with brand)
+  and kcal, protein, fat and carbs per 100 g, or for drinks per 100 ml (values it doesn't give
+  stay empty). Water isn't in Open Food Facts. Nothing is saved until Save, and the barcode is
+  kept with the product, also when Open Food Facts doesn't know it. Only the barcode is sent.
 - **Recipe form = the meal composer** (agreed): ingredients with amounts and units, inline,
   with live totals. After composing, the recipe gets its **units**: what it makes ("6
   servings", "4 pieces", "1600 g" if the pot is weighed), at least one.

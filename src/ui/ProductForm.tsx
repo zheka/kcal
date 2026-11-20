@@ -31,6 +31,8 @@ interface Props {
   id: string | null;
   /** Prefilled name of a new product (typed in a food picker). */
   initialName?: string;
+  /** A barcode scanned elsewhere (the Library's search) for a new product: look it up. */
+  initialBarcode?: string | undefined;
   /**
    * Opened from a meal or recipe: the product is for that draft. It is checked against the
    * draft's data and handed back to it, to be saved with it, instead of being saved here.
@@ -76,7 +78,7 @@ function readValues(texts: ValueTexts): { values: NutrientValues; errors: Map<Nu
  * A product's name, values and units. Values are entered per g or per ml, one base at a time;
  * a base is stored exactly when at least one of its values is filled (0 counts).
  */
-export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
+export function ProductForm({ store, id, initialName = '', initialBarcode, forDraft }: Props) {
   const data = forDraft?.data ?? store.data.value;
   /** The stored product being edited. */
   const existing = id === null ? undefined : data.products.find((p) => p.id === id);
@@ -129,8 +131,8 @@ export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
     [data, selfId],
   );
 
-  // A barcode scanned in a meal's or recipe's food picker: look it up as if scanned here.
-  const handedBarcodeRef = useRef(initial ? undefined : forDraft?.barcode);
+  // A barcode scanned in a food picker or the Library's search: look it up as if scanned here.
+  const handedBarcodeRef = useRef(initial ? undefined : (forDraft?.barcode ?? initialBarcode));
   useEffect(() => {
     const code = handedBarcodeRef.current;
     handedBarcodeRef.current = undefined;

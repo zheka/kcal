@@ -74,6 +74,7 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
           store={store}
           id={null}
           initialName={params.get('name') ?? ''}
+          initialBarcode={params.get('barcode') ?? undefined}
           forDraft={params.has('add') ? (productRequest() ?? undefined) : undefined}
         />
       ),

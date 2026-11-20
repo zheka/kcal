@@ -1,9 +1,10 @@
 import { useState } from 'preact/hooks';
-import { matchFoods } from '../core/foods';
+import { matchFoods, productWithBarcode } from '../core/foods';
 import { formatNutrient } from '../core/format';
 import type { FoodEntry } from '../core/nutrition';
 import type { Store } from '../state/store';
 import { navigate } from './router';
+import { ScanButton } from './ScanButton';
 
 /** All products and recipes, by name; tap one to edit it. */
 export function LibraryScreen({ store }: { store: Store }) {
@@ -21,14 +22,27 @@ export function LibraryScreen({ store }: { store: Store }) {
           ＋ Recipe
         </button>
       </div>
-      <input
-        class="input"
-        type="search"
-        aria-label="Search foods"
-        placeholder="Search…"
-        value={text}
-        onInput={(e) => setText(e.currentTarget.value)}
-      />
+      <div class="input-with-action">
+        <input
+          class="input"
+          type="search"
+          aria-label="Search foods"
+          placeholder="Search…"
+          value={text}
+          onInput={(e) => setText(e.currentTarget.value)}
+        />
+        {/* A product of mine opens; an unknown barcode starts a new product, looked up. */}
+        <ScanButton
+          onCode={(code) => {
+            const known = productWithBarcode(store.data.value, code);
+            navigate(
+              known
+                ? `/product/${known.id}`
+                : `/product/new?${new URLSearchParams({ barcode: code }).toString()}`,
+            );
+          }}
+        />
+      </div>
       {all.length === 0 && (
         <p class="empty">No foods yet. Add products from their labels, then recipes from them.</p>
       )}

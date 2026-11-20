@@ -143,6 +143,32 @@ describe('scanning a barcode in a new product', () => {
     );
   });
 
+  it('opens a scanned product of mine from the Library’s search', async () => {
+    start(appData({ products: [{ ...egg, barcode: CODE }] }), '/library');
+    scan();
+    expect(await screen.findByRole('heading', { name: 'Product' })).toBeTruthy();
+    expect((screen.getByLabelText(/^Name/) as HTMLInputElement).value).toBe('egg');
+  });
+
+  it('starts a new product, looked up, for an unknown barcode scanned in the Library', async () => {
+    vi.mocked(lookUpBarcode).mockResolvedValue({
+      kind: 'found',
+      name: 'Skyr Natur (Arla)',
+      per100: { kcal: 63, protein: 11 },
+      liquid: false,
+    });
+    start(appData(), '/library');
+    scan();
+    expect(await screen.findByRole('heading', { name: 'New product' })).toBeTruthy();
+    expect(await screen.findByText(/Filled from Open Food Facts/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await vi.waitFor(() => expect(store.data.value.products).toHaveLength(1));
+    expect(store.data.value.products[0]).toMatchObject({
+      barcode: CODE,
+      name: 'Skyr Natur (Arla)',
+    });
+  });
+
   it('keeps the barcode when Open Food Facts doesn’t know it', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({ kind: 'not-found' });
     start();
