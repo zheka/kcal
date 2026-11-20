@@ -1,5 +1,6 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
 import { canonical } from '../core/canonical';
+import { applyChange, tombstone, type Change } from '../core/change';
 import { isUsed, usages } from '../core/foods';
 import { saveGoals } from '../core/goals';
 import { buildFoodTable, type FoodTable } from '../core/nutrition';
@@ -8,13 +9,16 @@ import { validateAppData } from '../core/validate';
 
 /**
  * The app state: the stored data (primary, canonical, always valid) and the in-memory tables
- * derived from it. Every change goes through here: it is checked like an import, put in
- * canonical order and saved before it takes effect, so invalid data is never stored or shown.
+ * derived from it. Every change goes through here (`apply`): the result is checked like an
+ * import, put in canonical order and saved before it takes effect, so invalid data is never
+ * stored or shown. The other methods are shorthands for common changes.
  */
 export interface Store {
   readonly data: ReadonlySignal<AppData>;
   /** Every food (product, recipe) with its units and portions; rebuilt only when foods change. */
   readonly foods: ReadonlySignal<FoodTable>;
+  /** Applies a change; throws `InvalidChangeError`, changing nothing, if the result is invalid. */
+  apply(change: Change): void;
   /** Adds a product or replaces the one with its id. */
   saveProduct(product: Product): void;
   /** Adds a recipe or replaces the one with its id. */
@@ -48,37 +52,35 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
     data.value = next;
   }
 
-  function upsert<T extends { id: string }>(list: readonly T[], item: T): T[] {
-    return list.some((x) => x.id === item.id)
-      ? list.map((x) => (x.id === item.id ? item : x))
-      : [...list, item];
+  function apply(change: Change): void {
+    commit(applyChange(data.value, change));
   }
 
   return {
     data,
     foods,
+    apply,
     saveProduct(product) {
-      commit({ ...data.value, products: upsert(data.value.products, product) });
+      apply({ products: [product] });
     },
     saveRecipe(recipe) {
-      commit({ ...data.value, recipes: upsert(data.value.recipes, recipe) });
+      apply({ recipes: [recipe] });
     },
     deleteFood(id) {
+      // The friendly check; validation would refuse it too, in less friendly words.
       if (isUsed(usages(data.value, id))) throw new InvalidChangeError('the food is in use');
-      commit({
-        ...data.value,
-        products: data.value.products.filter((p) => p.id !== id),
-        recipes: data.value.recipes.filter((r) => r.id !== id),
-      });
+      apply({ products: [tombstone(id)], recipes: [tombstone(id)] });
     },
     saveMeal(meal) {
-      commit({ ...data.value, meals: upsert(data.value.meals, meal) });
+      apply({ meals: [meal] });
     },
     deleteMeal(id) {
-      commit({ ...data.value, meals: data.value.meals.filter((m) => m.id !== id) });
+      apply({ meals: [tombstone(id)] });
     },
     saveGoals(perDay, now) {
-      commit({ ...data.value, goals: saveGoals(data.value.goals, perDay, now) });
+      const goals = data.value.goals;
+      const added = saveGoals(goals, perDay, now).slice(goals.length);
+      if (added.length > 0) apply({ goals: added });
     },
     replaceAll(next) {
       commit(next);

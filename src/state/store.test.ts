@@ -29,6 +29,20 @@ describe('store', () => {
     expect(store.data.value.products).toEqual([egg]);
   });
 
+  it('applies a change all or nothing', () => {
+    const { store, persist } = setup(appData({ products: [egg] }));
+    const breakfast = meal('2026-11-17T07:30:41.512Z', [ing(oatFlakes, 60)]);
+    // the meal needs oat flakes: alone it is refused, together with them it is saved
+    expect(() => store.apply({ meals: [breakfast] })).toThrow(/does not exist/);
+    expect(() =>
+      store.apply({ products: [{ ...oatFlakes, name: 'Egg' }], meals: [breakfast] }),
+    ).toThrow(InvalidChangeError);
+    expect(persist).not.toHaveBeenCalled();
+    store.apply({ products: [oatFlakes], meals: [breakfast] });
+    expect(store.data.value.meals).toEqual([breakfast]);
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('changes nothing when saving fails', () => {
     const store = createStore(appData(), () => {
       throw new Error('quota exceeded');
