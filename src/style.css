@@ -8,7 +8,6 @@
   --accent: #1f7a4d;
   --accent-fg: #ffffff;
   --accent-soft: #e3f2ea;
-  --fab: #c4e3d2;
   --recipe: #b26a00;
   --danger: #c0392b;
   --kcal: #1f7a4d;
@@ -33,7 +32,6 @@
     --accent: #4cc38a;
     --accent-fg: #0b1a12;
     --accent-soft: #1d3328;
-    --fab: #24402f;
     --recipe: #f2a43a;
     --danger: #ff6b5b;
     --kcal: #4cc38a;
@@ -870,8 +868,8 @@ select.input.base {
   height: 56px;
   border: none;
   border-radius: 28px;
-  background: var(--fab);
-  color: var(--fg);
+  background: var(--accent);
+  color: var(--accent-fg);
   font-size: 1.5rem;
   line-height: 1;
   box-shadow:
