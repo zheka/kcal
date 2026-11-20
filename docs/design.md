@@ -575,6 +575,10 @@ UX details still to decide:
 4. ~~Water in the day list~~: decided, drinks are rows like any meal, showing the nutrients
    that have goals.
 5. The _(proposal)_ items above, to confirm or change while building.
+6. **A unit in use can't be removed, but doesn't say so on a phone**: its × is disabled, and the
+   reason ("Used in 3 ingredients") is only a hover tooltip. Options: A, a hint under every
+   used unit's row; B (preferred so far), a tappable × that shows the reason under the row
+   instead of removing the unit. Skipped for now.
 
 Technical questions (see Technical design):
 
