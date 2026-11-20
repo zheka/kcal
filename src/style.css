@@ -957,6 +957,11 @@ select.input.base {
   font-size: 0.875rem;
 }
 
+/* Its × lines up with the other ×s, at the edge. */
+.barcode > .icon-button {
+  margin-right: -12px;
+}
+
 .barcode-digits {
   color: var(--fg);
   font-variant-numeric: tabular-nums;

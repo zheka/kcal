@@ -5,6 +5,7 @@ import { formatNumber, parseNumber } from '../core/format';
 import { cleanText, nameKey } from '../core/text';
 import { unitSize, type ProductUnit, type RecipeUnit } from '../core/types';
 import { isReservedProductUnitName } from '../core/units';
+import { CloseIcon } from './icons';
 
 /**
  * A unit as typed in a form. For a product, `valueText` is how many g or ml (`base`) one of
@@ -201,7 +202,7 @@ export function UnitsEditor({ kind, bases = [GRAMS], rows, onChange, usesOf, err
                 title={uses > 0 ? `Used in ${uses} ingredients` : undefined}
                 onClick={() => onChange(rows.filter((r) => r.id !== row.id))}
               >
-                ×
+                <CloseIcon />
               </button>
             </div>
             {errors.has(row.id) && <p class="error">{errors.get(row.id)}</p>}

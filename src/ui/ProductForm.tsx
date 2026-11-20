@@ -18,6 +18,7 @@ import { perOneFrom } from '../core/units';
 import { validateAppData } from '../core/validate';
 import { lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
 import type { Store } from '../state/store';
+import { CloseIcon } from './icons';
 import { ScanButton } from './ScanButton';
 import { ConfirmButton } from './ConfirmButton';
 import { handOver, type ProductRequest } from './drafts';
@@ -271,13 +272,14 @@ export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
           Barcode <span class="barcode-digits">{barcode}</span>
           <button
             type="button"
-            class="button link"
+            class="icon-button push-right"
+            aria-label="Remove barcode"
             onClick={() => {
               setBarcode(undefined);
               setLookup(null);
             }}
           >
-            Remove
+            <CloseIcon />
           </button>
         </p>
       )}

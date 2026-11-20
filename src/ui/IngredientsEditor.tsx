@@ -154,7 +154,7 @@ export function IngredientsEditor({
                 aria-label={`Remove ${food.name}`}
                 onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
               >
-                ×
+                <CloseIcon />
               </button>
             </div>
             {showErrors && amount === null && <p class="error">Add an amount</p>}
