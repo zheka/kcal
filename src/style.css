@@ -732,10 +732,28 @@ select.input.base {
   flex: 1;
 }
 
+/* Rows like the Library's: when, then the targets. */
 .goal-history {
   margin: 0;
-  padding-left: 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.goal-history li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.goal-history-from {
+  font-weight: 600;
+}
+
+.goal-history-targets {
   color: var(--muted);
+  font-size: 0.875rem;
 }
 
 /* Day chart: taken (faded), this meal (bright), remaining (empty) up to the goal line */

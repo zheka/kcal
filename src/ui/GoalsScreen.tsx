@@ -77,7 +77,10 @@ export function GoalsScreen({ store }: { store: Store }) {
           <ul class="goal-history">
             {goalHistory(goals).map(({ from, set }) => (
               <li key={set.setAt}>
-                From {goalDate(from)}: {describeTargets(set.perDay) || 'no goals'}
+                <span class="goal-history-from">From {goalDate(from)}</span>
+                <span class="goal-history-targets">
+                  {describeTargets(set.perDay) || 'no goals'}
+                </span>
               </li>
             ))}
           </ul>

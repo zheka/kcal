@@ -255,8 +255,7 @@ describe('goals', () => {
 
   it('lists the goals history', () => {
     start({}, '/goals');
-    expect(
-      screen.getByText('From Nov 1, 2026: 2000 kcal · 150 g protein · 2000 ml water'),
-    ).toBeTruthy();
+    expect(screen.getByText('From Nov 1, 2026')).toBeTruthy();
+    expect(screen.getByText('2000 kcal · 150 g protein · 2000 ml water')).toBeTruthy();
   });
 });
