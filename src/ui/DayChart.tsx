@@ -25,7 +25,8 @@ export function DayChart({ goals, taken, meal }: Props) {
   const scales = chartScales(goals, total);
 
   return (
-    <section class="chart" aria-label="Day chart">
+    // Taken is faded only next to a meal being composed; on its own, the day is shown bright.
+    <section class={meal ? 'chart composing' : 'chart'} aria-label="Day chart">
       <div class="bars">
         {NUTRIENTS.map((n, i) => (
           <Bar

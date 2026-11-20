@@ -70,8 +70,8 @@ The frame is development-only (`src/dev/phoneFrame.ts`) and not part of the prod
   (`python3 scripts/make-icon.py public/icon.svg`); its content stays inside the maskable safe
   zone.
 - **Vitest** with jsdom and Testing Library for unit and UI tests.
-- **Playwright** (Chromium) for end-to-end tests of the built app at Pixel 8a size, light and
-  dark, one test at a time: layout checks jsdom can't do (nothing wider than the screen, headers, buttons and
+- **Playwright** (Chromium) for end-to-end tests of the built app at Pixel 8a size, in the
+  dark theme, one test at a time: layout checks jsdom can't do (nothing wider than the screen, headers, buttons and
   form fields on screen), plus a few flows. No screenshot comparisons. The first run needs a
   browser: `npx playwright install chromium`. CI runs them in Playwright's Docker image, whose
   tag must match the exactly pinned `@playwright/test` version.

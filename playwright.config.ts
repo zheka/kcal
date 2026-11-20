@@ -23,10 +23,8 @@ export default defineConfig({
     // The service worker would cache the app between tests.
     serviceWorkers: 'block',
   },
-  projects: [
-    { name: 'pixel-8a-light', use: { colorScheme: 'light' } },
-    { name: 'pixel-8a-dark', use: { colorScheme: 'dark' } },
-  ],
+  // One theme (dark), so one project.
+  projects: [{ name: 'pixel-8a', use: { colorScheme: 'dark' } }],
   webServer: {
     command: 'npm run build && npm run preview',
     url: 'http://localhost:4280/kcal/',

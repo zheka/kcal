@@ -21,8 +21,8 @@ export function showPhoneFrame(): void {
   document.title = `${APP_NAME} · ${PHONE.name}`;
   const style = document.createElement('style');
   style.textContent = `
-    html, body { margin: 0; height: 100%; background: #d9dfdb; font-family: system-ui, sans-serif; }
-    @media (prefers-color-scheme: dark) { html, body { background: #0b0e0c; color: #cfd8d3; } }
+    html, body { margin: 0; height: 100%; background: #0b0e0c; color: #cfd8d3;
+                 font-family: system-ui, sans-serif; }
     .dev-stage { min-height: 100%; display: grid; place-content: center; gap: 12px;
                  padding: 24px; box-sizing: border-box; justify-items: center; }
     .dev-phone { box-sizing: content-box; width: ${PHONE.width}px; height: ${PHONE.height}px;

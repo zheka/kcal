@@ -254,6 +254,8 @@ layouts are checked with screenshots at that size.
   was opened from, and on a form it discards what wasn't saved, so **forms have no Cancel
   button**. A form left to create a product for it (from the food picker) stays as it was. The day screen has ‹ date › and ☰ instead, since its arrows move between
   days. Icons are drawn as SVG.
+- **One theme: dark** (agreed), whatever the phone's setting. Colours are tokens, so more
+  themes can be added later as other sets of them.
 - **The main actions stay at the bottom**, within thumb reach: ＋ Eat on the day screen,
   Save, Delete… in the composer and the forms (a bar that stays in view while the screen
   scrolls).

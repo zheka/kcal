@@ -1,45 +1,26 @@
 :root {
-  color-scheme: light dark;
-  --bg: #ffffff;
-  --surface: #f3f6f4;
-  --fg: #1b1f1d;
-  --muted: #5d6762;
-  --line: #d9e0dc;
-  --accent: #1f7a4d;
-  --accent-fg: #ffffff;
-  --accent-soft: #e3f2ea;
-  --recipe: #b26a00;
-  --danger: #c0392b;
-  --kcal: #1f7a4d;
-  --protein: #2f6fd1;
-  --fat: #c98a00;
-  --carbs: #8a4fc9;
-  --water: #1f8fc9;
+  /* One theme for now: dark. More themes can come later as other sets of these tokens. */
+  color-scheme: dark;
+  --bg: #121514;
+  --surface: #1d2220;
+  --fg: #e7ece9;
+  --muted: #9aa5a0;
+  --line: #333b37;
+  --accent: #4cc38a;
+  --accent-fg: #0b1a12;
+  --accent-soft: #1d3328;
+  --recipe: #f2a43a;
+  --danger: #ff6b5b;
+  --kcal: #4cc38a;
+  --protein: #6aa1ff;
+  --fat: #f2bf4a;
+  --carbs: #b98cf0;
+  --water: #5cc0f2;
   --tap: 48px;
   --radius: 10px;
   font-family: 'Roboto Variable', Roboto, system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.4;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121514;
-    --surface: #1d2220;
-    --fg: #e7ece9;
-    --muted: #9aa5a0;
-    --line: #333b37;
-    --accent: #4cc38a;
-    --accent-fg: #0b1a12;
-    --accent-soft: #1d3328;
-    --recipe: #f2a43a;
-    --danger: #ff6b5b;
-    --kcal: #4cc38a;
-    --protein: #6aa1ff;
-    --fat: #f2bf4a;
-    --carbs: #b98cf0;
-    --water: #5cc0f2;
-  }
 }
 
 *,
@@ -767,7 +748,7 @@ select.input.base {
   background: var(--color);
 }
 
-.bar-taken {
+.chart.composing .bar-taken {
   opacity: 0.35;
 }
 
@@ -873,8 +854,8 @@ select.input.base {
   font-size: 1.5rem;
   line-height: 1;
   box-shadow:
-    0 3px 6px rgb(0 0 0 / 0.2),
-    0 1px 2px rgb(0 0 0 / 0.15);
+    0 3px 8px rgb(0 0 0 / 0.5),
+    0 1px 3px rgb(0 0 0 / 0.4);
   cursor: pointer;
 }
 
@@ -885,7 +866,7 @@ select.input.base {
 }
 
 .quick-button:active {
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
 }
 
 /* Barcode scanning in the product form */

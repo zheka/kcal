@@ -39,8 +39,8 @@ export default defineConfig({
         lang: 'en',
         display: 'standalone',
         orientation: 'portrait',
-        theme_color: '#1f7a4d',
-        background_color: '#ffffff',
+        theme_color: '#121514',
+        background_color: '#121514',
       },
       workbox: {
         // Of the font's character sets only Latin is cached for offline use; others (Cyrillic,
