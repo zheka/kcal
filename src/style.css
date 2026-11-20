@@ -9,6 +9,8 @@
   --accent: #4cc38a;
   --accent-fg: #0b1a12;
   --accent-soft: #1d3328;
+  /* Quick buttons: deep green, so emoji stand out, ringed in the accent against the black. */
+  --quick: #1f7a4d;
   --recipe: #f2a43a;
   --danger: #ff6b5b;
   --kcal: #4cc38a;
@@ -849,13 +851,13 @@ select.input.base {
   height: 56px;
   border: none;
   border-radius: 28px;
-  background: var(--accent);
-  color: var(--accent-fg);
+  background: var(--quick);
+  color: var(--fg);
   font-size: 1.5rem;
   line-height: 1;
   box-shadow:
-    0 3px 8px rgb(0 0 0 / 0.5),
-    0 1px 3px rgb(0 0 0 / 0.4);
+    0 0 0 2px var(--accent),
+    0 4px 10px rgb(0 0 0 / 0.6);
   cursor: pointer;
 }
 
@@ -866,7 +868,9 @@ select.input.base {
 }
 
 .quick-button:active {
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 1px 2px rgb(0 0 0 / 0.6);
 }
 
 /* Barcode scanning in the product form */
