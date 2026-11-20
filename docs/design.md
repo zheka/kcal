@@ -579,6 +579,18 @@ UX details still to decide:
    reason ("Used in 3 ingredients") is only a hover tooltip. Options: A, a hint under every
    used unit's row; B (preferred so far), a tappable × that shows the reason under the row
    instead of removing the unit. Skipped for now.
+7. **Adding a barcode to an existing product**: scanning is offered only in a new product, so a
+   product entered by hand can't get its barcode (and scanning it later offers a duplicate).
+   Proposed: the scan button on existing products too; a barcode another product has says so,
+   a new one is attached. Open: A (preferred so far), attach only, no lookup (the values are
+   the user's own); or B, also look it up and offer "Use these" next to Open Food Facts'
+   values, never filling them in by itself. Skipped for now.
+8. **One product, several packs**: the same jam in a 250 g and a 500 g jar has two barcodes,
+   and a barcode belongs to one product, so scanning both makes two products for the same food,
+   and 100 g eaten from either is a different food. A product will likely need several barcodes
+   (all its packs), and a scanned barcode that isn't known should be attachable to an existing
+   product ("the same as: jam") as well as start a new one. Changes the format (`barcode` →
+   a list): needs a compatible step or a migration (see Storage, Versioning). Skipped for now.
 
 Technical questions (see Technical design):
 
