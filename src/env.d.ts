@@ -1,8 +1,5 @@
-/** The app's version from package.json, set at build time. */
+/** The app's version, set at build time: the commit it was built from and the build date. */
 declare const __APP_VERSION__: string;
-
-/** The commit the app was built from (short hash), set at build time. */
-declare const __APP_BUILD__: string;
 
 /** The browser's built-in barcode reader (Chrome on Android); not in TypeScript's DOM types. */
 interface BarcodeDetector {

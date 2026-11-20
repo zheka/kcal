@@ -1,6 +1,5 @@
 /// <reference types="vitest/config" />
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import { APP_NAME } from './src/config.ts';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -13,10 +12,7 @@ export default defineConfig({
   server: { port: 5280, strictPort: true },
   preview: { port: 4280, strictPort: true },
   define: {
-    __APP_VERSION__: JSON.stringify(
-      (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version,
-    ),
-    __APP_BUILD__: JSON.stringify(buildId()),
+    __APP_VERSION__: JSON.stringify(appVersion()),
   },
   // Preact's JSX, compiled by Vite itself (no Babel).
   oxc: {
@@ -68,8 +64,15 @@ function appName(): Plugin {
   };
 }
 
-/** Which build this is: the commit it was built from (CI sets GITHUB_SHA), or `dev`. */
-function buildId(): string {
+/**
+ * The app's version, shown in the menu: the commit it was built from (CI sets GITHUB_SHA) and
+ * the build date. The data format has a version of its own (SCHEMA_VERSION in backup.ts).
+ */
+function appVersion(): string {
+  return `${commit()} · ${new Date().toISOString().slice(0, 10)}`;
+}
+
+function commit(): string {
   if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
   try {
     return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })

@@ -1,9 +1,8 @@
-import { APP_NAME } from '../config';
 import { checkForUpdate, installUpdate, updateState, type UpdateState } from '../pwa';
 import { useState } from 'preact/hooks';
 import type { AppData } from '../core/types';
 import { localDate } from '../core/time';
-import { parseDocument, serializeBackup } from '../data/backup';
+import { parseDocument, serializeBackup, VERSION_TAG } from '../data/backup';
 import { savedSize, SIZE_WARNING_CHARS } from '../data/storage';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
@@ -108,6 +107,7 @@ export function MenuScreen({ store }: { store: Store }) {
           Saved data: {(size / 1_000_000).toFixed(2)} MB of about 5 MB
           {size > SIZE_WARNING_CHARS && ' (getting full: time to move the data to IndexedDB)'}
         </p>
+        <p>Data format: {VERSION_TAG}</p>
       </section>
     </div>
   );
@@ -146,9 +146,7 @@ function AppVersion() {
       onClick={() => void (state === 'available' ? installUpdate() : checkForUpdate())}
     >
       <span class="menu-item-title">App version</span>
-      <span class="menu-item-detail">
-        {APP_NAME} {__APP_VERSION__} · {__APP_BUILD__}
-      </span>
+      <span class="menu-item-detail">{__APP_VERSION__}</span>
       <span class="menu-item-status" aria-live="polite">
         {STATUS[state]}
       </span>

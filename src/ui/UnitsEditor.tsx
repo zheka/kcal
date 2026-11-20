@@ -55,7 +55,7 @@ function readRows(
     const value = parsed === null ? null : roundStored(parsed);
     if (!name) errors.set(row.id, 'Add a name');
     else if (kind === 'product' && isReservedProductUnitName(name)) {
-      errors.set(row.id, `“${name}” is built in`);
+      errors.set(row.id, `“${name}” is reserved: g and ml are the product’s bases`);
     } else if (names.has(nameKey(name))) errors.set(row.id, `“${name}” is defined twice`);
     else if (value === null || value <= 0) {
       errors.set(

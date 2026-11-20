@@ -1,7 +1,6 @@
 {
   "name": "kcal",
   "private": true,
-  "version": "0.1.0",
   "description": "Personal nutrition tracker: compose meals against daily goals",
   "type": "module",
   "engines": {

@@ -9,6 +9,7 @@ import { isReservedProductUnitName } from '../core/units';
 import { GRAMS, type Base } from '../config';
 import { BaseSelect } from './UnitsEditor';
 import { FoodPicker } from './FoodPicker';
+import { CloseIcon } from './icons';
 
 /** An ingredient as edited: the amount stays text while typing ("2," is fine). */
 export interface IngredientRow {
@@ -204,7 +205,7 @@ function NewUnitForm({
     const value = parsed === null ? null : roundStored(parsed);
     if (!unitName) return setError('Add a name');
     if (isProduct && isReservedProductUnitName(unitName)) {
-      return setError(`“${unitName}” is built in`);
+      return setError(`“${unitName}” is reserved: g and ml are the product’s bases`);
     }
     if (food.units.some((u) => nameKey(u.name) === nameKey(unitName))) {
       return setError(`“${unitName}” already exists`);
@@ -244,7 +245,17 @@ function NewUnitForm({
 
   return (
     <div class="new-unit">
-      <span class="label">New unit of {food.name}</span>
+      <div class="new-unit-head">
+        <span class="label">New unit of {food.name}</span>
+        <button
+          type="button"
+          class="icon-button"
+          aria-label={`Close new unit of ${food.name}`}
+          onClick={onCancel}
+        >
+          <CloseIcon />
+        </button>
+      </div>
       <div class={`unit-fields ${isProduct ? 'product' : 'recipe'} new`}>
         {isProduct ? (
           <>
@@ -266,9 +277,6 @@ function NewUnitForm({
       <div class="actions">
         <button type="button" class="button primary" onClick={add}>
           Add unit
-        </button>
-        <button type="button" class="button" onClick={onCancel}>
-          Cancel
         </button>
       </div>
     </div>

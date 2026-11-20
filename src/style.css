@@ -386,6 +386,14 @@ select.input.base {
   white-space: nowrap;
 }
 
+.new-unit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* The × sits in the panel's corner, without making the header taller. */
+  margin: -12px -12px -8px 0;
+}
+
 .ingredient-title {
   display: flex;
   align-items: center;

@@ -274,6 +274,19 @@ describe('recipes', () => {
     ]);
   });
 
+  it('refuses g and ml as a new unit’s name, and closes the new unit with ×', () => {
+    start(appData({ products: [oatFlakes] }), '/recipe/new');
+    chip('oat flakes');
+    fireEvent.change(field('Unit of oat flakes'), { target: { value: '__new__' } });
+    type(field('New unit name'), 'ML');
+    type(field('New unit size'), '80');
+    click('Add unit');
+    expect(screen.getByText('“ML” is reserved: g and ml are the product’s bases')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    click('Close new unit of oat flakes');
+    expect(screen.queryByLabelText('New unit name')).toBeNull();
+  });
+
   it('offers foods, but not recipes that would contain themselves', () => {
     const oats = recipe('oats', [ing(oatFlakes, 60)], [makes(1, 'bowl')]);
     start(appData({ products: [oatFlakes], recipes: [oats] }), `/recipe/${oats.id}`);
