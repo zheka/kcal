@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { matchFoods } from '../core/foods';
 import type { FoodEntry } from '../core/nutrition';
 import { cleanText } from '../core/text';
+import { ScanButton } from './ScanButton';
 
 interface Props {
   /** Foods that can be picked, in chip order. */
@@ -11,12 +12,14 @@ interface Props {
   onCreate: (name: string) => void;
   /** Whether a food (any, also one not offered here) already has this name. */
   nameTaken: (name: string) => boolean;
+  /** A barcode was scanned: find its food, or start a new one. */
+  onScan: (code: string) => void;
 }
 
 const MAX_CHIPS = 12;
 
 /** A text field with a row of food chips; typing filters them. */
-export function FoodPicker({ foods, onPick, onCreate, nameTaken }: Props) {
+export function FoodPicker({ foods, onPick, onCreate, nameTaken, onScan }: Props) {
   const [text, setText] = useState('');
   const typed = cleanText(text);
   const chips = matchFoods(foods, text).slice(0, MAX_CHIPS);
@@ -39,16 +42,19 @@ export function FoodPicker({ foods, onPick, onCreate, nameTaken }: Props) {
 
   return (
     <div class="picker">
-      <input
-        class="input"
-        type="search"
-        aria-label="Find food"
-        placeholder="Add food…"
-        enterKeyHint="done"
-        value={text}
-        onInput={(e) => setText(e.currentTarget.value)}
-        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), e.currentTarget.blur())}
-      />
+      <div class="input-with-action">
+        <input
+          class="input"
+          type="search"
+          aria-label="Find food"
+          placeholder="Add food…"
+          enterKeyHint="done"
+          value={text}
+          onInput={(e) => setText(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), e.currentTarget.blur())}
+        />
+        <ScanButton onCode={onScan} />
+      </div>
       <div
         ref={row}
         class={`chips${fades.left ? ' fade-left' : ''}${fades.right ? ' fade-right' : ''}`}

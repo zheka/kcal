@@ -112,6 +112,37 @@ describe('scanning a barcode in a new product', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
   });
 
+  it('adds a scanned product of mine to a meal right from the food picker', async () => {
+    start(appData({ products: [{ ...egg, barcode: CODE }] }), '/meal/new');
+    scan();
+    expect(await screen.findByText('egg', { selector: '.ingredient-name' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'New meal' })).toBeTruthy();
+    expect(lookUpBarcode).not.toHaveBeenCalledWith(CODE);
+  });
+
+  it('starts a new product, looked up, for a barcode scanned in a meal that I don’t have', async () => {
+    vi.mocked(lookUpBarcode).mockResolvedValue({
+      kind: 'found',
+      name: 'Skyr Natur (Arla)',
+      per100: { kcal: 63, protein: 11 },
+      liquid: false,
+    });
+    start(appData({ products: [egg] }), '/meal/new');
+    scan();
+    expect(await screen.findByRole('heading', { name: 'New product' })).toBeTruthy();
+    expect(await screen.findByText(/Filled from Open Food Facts/)).toBeTruthy();
+    expect((screen.getByLabelText(/^Name/) as HTMLInputElement).value).toBe('Skyr Natur (Arla)');
+    expect(screen.getByText(CODE)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(await screen.findByRole('heading', { name: 'New meal' })).toBeTruthy();
+    expect(screen.getByText('Skyr Natur (Arla)', { selector: '.ingredient-name' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save + 1 new food' }));
+    await vi.waitFor(() => expect(store.data.value.meals).toHaveLength(1));
+    expect(store.data.value.products.find((p) => p.barcode === CODE)?.name).toBe(
+      'Skyr Natur (Arla)',
+    );
+  });
+
   it('keeps the barcode when Open Food Facts doesn’t know it', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({ kind: 'not-found' });
     start();

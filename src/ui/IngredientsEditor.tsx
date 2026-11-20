@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { foodsByRecency, newId, pickIngredient } from '../core/foods';
+import { foodsByRecency, newId, pickIngredient, productWithBarcode } from '../core/foods';
 import { formatNumber, formatNutrientValue, parseNumber } from '../core/format';
 import { ingredientPortion, type FoodEntry, type FoodTable } from '../core/nutrition';
 import { cleanText, nameKey } from '../core/text';
@@ -56,6 +56,8 @@ interface Props {
   exclude?: ReadonlySet<string>;
   /** Starts creating a product with this name, to be added here once saved. */
   onCreateFood: (name: string) => void;
+  /** Starts creating a product for a scanned barcode that no food has, looked up first. */
+  onCreateFromBarcode: (code: string) => void;
   /** Opens a new (pending) product to edit it. */
   onOpenNew: (id: string) => void;
   /** Adds a unit to a food: pending, saved with the meal or recipe. */
@@ -74,6 +76,7 @@ export function IngredientsEditor({
   onChange,
   exclude,
   onCreateFood,
+  onCreateFromBarcode,
   onOpenNew,
   onAddUnit,
   showErrors,
@@ -174,6 +177,13 @@ export function IngredientsEditor({
         onPick={(food) => onChange([...rows, ingredientRow(pickIngredient(data, food))])}
         onCreate={onCreateFood}
         nameTaken={(name) => [...foods.values()].some((f) => nameKey(f.name) === nameKey(name))}
+        onScan={(code) => {
+          // A product of mine (or a new one of this draft) with this barcode: add it.
+          const known = productWithBarcode(data, code);
+          const food = known && foods.get(known.id);
+          if (food) onChange([...rows, ingredientRow(pickIngredient(data, food))]);
+          else onCreateFromBarcode(code);
+        }}
       />
     </div>
   );

@@ -85,8 +85,10 @@ the layout tests; only its Latin file (43 KB) is cached for offline use.
 
 ## Open Food Facts
 
-Scanning a barcode in a new product looks it up on [Open Food Facts](https://world.openfoodfacts.org),
-the free open food database, to fill in the name and the macros. Only the barcode is sent;
+Scanning a barcode (the button in the food search of a meal or recipe, and in a new product's
+name field) finds a product you have by its barcode; otherwise it looks the barcode up on
+[Open Food Facts](https://world.openfoodfacts.org), the free open food database, to fill in a
+new product's name and macros. Only the barcode is sent;
 nothing else leaves the device. Scanning uses the browser's built-in barcode reader (Chrome on
 Android), so the button only appears where the browser has one.
 

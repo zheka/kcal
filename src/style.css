@@ -931,8 +931,22 @@ select.input.base {
 
 /* Barcode scanning in the product form */
 
-.button.scan {
-  align-self: flex-start;
+.input-with-action {
+  position: relative;
+}
+
+.input-with-action > .input {
+  width: 100%;
+  padding-right: var(--tap);
+}
+
+/* An icon button inside the field's right edge, e.g. Scan barcode. */
+.input-with-action > .input-action {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  color: var(--muted);
 }
 
 .barcode {

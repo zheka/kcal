@@ -42,3 +42,13 @@ export function ChevronRightIcon() {
     </svg>
   );
 }
+
+/** A barcode in a scanner's frame. */
+export function BarcodeIcon() {
+  return (
+    <svg {...props} stroke-width={2}>
+      <path d="M3 8 V4 H7 M17 4 H21 V8 M21 16 V20 H17 M7 20 H3 V16" />
+      <path d="M7 8 V16 M10.5 8 V16 M14 8 V16 M17 8 V16" />
+    </svg>
+  );
+}

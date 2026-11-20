@@ -131,6 +131,10 @@ export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props
             requestProduct({ data: view });
             navigate(`/product/new?${new URLSearchParams({ name, add: '1' }).toString()}`);
           }}
+          onCreateFromBarcode={(barcode) => {
+            requestProduct({ data: view, barcode });
+            navigate('/product/new?add=1');
+          }}
           onOpenNew={(foodId) => {
             const product = view.products.find((p) => p.id === foodId);
             requestProduct({ data: view, ...(product && { product }) });

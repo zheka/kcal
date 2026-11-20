@@ -26,6 +26,8 @@ export function dropDraft(key: string): void {
 export interface ProductRequest {
   data: AppData;
   product?: Product;
+  /** A barcode scanned in the draft's food picker that isn't in the library: look it up. */
+  barcode?: string;
 }
 
 /** What a product form opened from a draft hands back: a product, or a food to add. */

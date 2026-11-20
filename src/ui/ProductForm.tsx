@@ -1,5 +1,4 @@
-import { useCallback, useState } from 'preact/hooks';
-import { canScan } from '../barcode';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import {
   BASES,
   GRAMS,
@@ -19,7 +18,7 @@ import { perOneFrom } from '../core/units';
 import { validateAppData } from '../core/validate';
 import { lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
 import type { Store } from '../state/store';
-import { BarcodeScanner } from './BarcodeScanner';
+import { ScanButton } from './ScanButton';
 import { ConfirmButton } from './ConfirmButton';
 import { handOver, type ProductRequest } from './drafts';
 import { goBack, replaceRoute } from './router';
@@ -98,13 +97,11 @@ export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [barcode, setBarcode] = useState(initial?.barcode);
-  const [scanning, setScanning] = useState(false);
   const [lookup, setLookup] = useState<ScanStatus | null>(null);
 
   /** A barcode was read: open the product if it's in the library, else look it up and fill the form. */
   const onCode = useCallback(
     (code: string) => {
-      setScanning(false);
       const known = productWithBarcode(data, code);
       if (known && known.id !== selfId) {
         setLookup({ kind: 'known', code, product: { id: known.id, name: known.name } });
@@ -130,6 +127,14 @@ export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
     },
     [data, selfId],
   );
+
+  // A barcode scanned in a meal's or recipe's food picker: look it up as if scanned here.
+  const handedBarcodeRef = useRef(initial ? undefined : forDraft?.barcode);
+  useEffect(() => {
+    const code = handedBarcodeRef.current;
+    handedBarcodeRef.current = undefined;
+    if (code) onCode(code);
+  }, [onCode]);
 
   if (id !== null && !existing) return <p class="empty">This product does not exist.</p>;
 
@@ -234,12 +239,22 @@ export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
         save();
       }}
     >
-      {scanning && <BarcodeScanner onCode={onCode} onClose={() => setScanning(false)} />}
-      {id === null && canScan() && (
-        <button type="button" class="button scan" onClick={() => setScanning(true)}>
-          Scan barcode
-        </button>
-      )}
+      <div class="field">
+        <label class="label" for="product-name">
+          Name
+        </label>
+        <div class="input-with-action">
+          <input
+            id="product-name"
+            class="input"
+            value={name}
+            placeholder="e.g. Skyr natural"
+            onInput={(e) => setName(e.currentTarget.value)}
+          />
+          {id === null && <ScanButton onCode={onCode} />}
+        </div>
+        {show(nameError)}
+      </div>
       {lookup && (
         <ScanMessage
           status={lookup}
@@ -266,17 +281,6 @@ export function ProductForm({ store, id, initialName = '', forDraft }: Props) {
           </button>
         </p>
       )}
-
-      <label class="field">
-        <span class="label">Name</span>
-        <input
-          class="input"
-          value={name}
-          placeholder="e.g. Skyr natural"
-          onInput={(e) => setName(e.currentTarget.value)}
-        />
-        {show(nameError)}
-      </label>
 
       <fieldset class="section">
         <legend class="label">Nutrients</legend>
