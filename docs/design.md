@@ -151,7 +151,7 @@ Agreed:
   day is judged by the goals valid on that day, so changing goals never re-judges the past.
   The history of goals is kept, so past data can later be analysed to suggest better goals.
 - **Old goals are explicit** when viewing a past day whose goals differ from the current
-  ones: the chart says so _(proposal: a small "goals of 2026-11-01: 2000 kcal…" note under the
+  ones: the chart says so _(proposal: a small "Goals of Nov 1, 2026: 2000 kcal…" note under the
   chart)_.
 - **Days before the first goals** show plain amounts, without goal lines.
 - Goals change a few times a year: the goals form lives in the menu.
@@ -175,6 +175,8 @@ Agreed:
 applies from the start of the local day containing `setAt`, so goals saved at 15:00 apply to the
 whole of that day. See [backup-format.md](backup-format.md).)
 
+- **Dates** (agreed): a day's title has the weekday and no year (`Wed, Nov 18`, or `Today`);
+  goal dates have the year and no weekday (`Nov 1, 2026`), as goals reach back for years.
 - **Goal sets are only ever added** (agreed). Each set is complete: a nutrient left out has no
   goal from that day on. Saving twice on one day adds two sets, and the later one applies; the
   goals history shows only the set that applies from each day. Nothing in the goals history is

@@ -15,7 +15,17 @@ export function dayPath(date: string): string {
   return date === today.value ? '/' : `/day/${date}`;
 }
 
-/** `Today`, or the date: `Tue, 18 Nov`. */
+/** A date in goals (when they apply from): with the year, no weekday, e.g. `Nov 1, 2026`. */
+export function goalDate(date: string): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/** A day's title: `Today`, or the date with its weekday, no year, e.g. `Wed, Nov 18`. */
 export function dayTitle(date: string): string {
   if (date === today.value) return 'Today';
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
@@ -83,7 +93,7 @@ export function DayScreen({ store, date }: { store: Store; date: string }) {
       <DayChart goals={goals} taken={dayNutrients(foods, data.meals, date)} />
       {set && set !== current && (
         <p class="hint">
-          Goals of {localDateOf(set.setAt)}: {describeTargets(set.perDay) || 'none'}
+          Goals of {goalDate(localDateOf(set.setAt))}: {describeTargets(set.perDay) || 'none'}
         </p>
       )}
       {data.goals.length === 0 && (

@@ -5,7 +5,7 @@ import { formatNumber, parseNumber } from '../core/format';
 import { goalHistory, goalsOn } from '../core/goals';
 import type { NutrientValues } from '../core/types';
 import type { Store } from '../state/store';
-import { describeTargets } from './DayScreen';
+import { describeTargets, goalDate } from './DayScreen';
 import { goBack, today } from './router';
 
 /** Daily targets: saving makes them effective from the start of today; earlier days keep theirs. */
@@ -77,7 +77,7 @@ export function GoalsScreen({ store }: { store: Store }) {
           <ul class="goal-history">
             {goalHistory(goals).map(({ from, set }) => (
               <li key={set.setAt}>
-                From {from}: {describeTargets(set.perDay) || 'no goals'}
+                From {goalDate(from)}: {describeTargets(set.perDay) || 'no goals'}
               </li>
             ))}
           </ul>

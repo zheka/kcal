@@ -94,7 +94,7 @@ describe('day screen', () => {
       },
       '/day/2026-11-10',
     );
-    expect(screen.getByText('Goals of 2026-11-01: 1800 kcal')).toBeTruthy();
+    expect(screen.getByText('Goals of Nov 1, 2026: 1800 kcal')).toBeTruthy();
     expect(bar(/^kcal/)).toBe('kcal: 0 taken, goal 1800');
   });
 
@@ -256,7 +256,7 @@ describe('goals', () => {
   it('lists the goals history', () => {
     start({}, '/goals');
     expect(
-      screen.getByText('From 2026-11-01: 2000 kcal · 150 g protein · 2000 ml water'),
+      screen.getByText('From Nov 1, 2026: 2000 kcal · 150 g protein · 2000 ml water'),
     ).toBeTruthy();
   });
 });
