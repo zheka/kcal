@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { appData, egg, ing, makes, meal, oatFlakes, recipe } from '../core/testData';
+import { appData, egg, honey, ing, makes, meal, oatFlakes, recipe } from '../core/testData';
 import type { AppData } from '../core/types';
 import { createStore, InvalidChangeError } from './store';
 
@@ -40,13 +40,15 @@ describe('store', () => {
   it('deletes only foods that nothing uses', () => {
     const { store } = setup(
       appData({
-        products: [egg, oatFlakes],
+        products: [egg, oatFlakes, honey],
         meals: [meal('2026-11-17T07:00:00.000Z', [ing(egg, 1)])],
+        settings: { quickButtons: [{ amount: 1, food: honey.id, label: '🍯', unit: 'u:tsp' }] },
       }),
     );
     expect(() => store.deleteFood(egg.id)).toThrow('in use');
+    expect(() => store.deleteFood(honey.id)).toThrow('in use');
     store.deleteFood(oatFlakes.id);
-    expect(store.data.value.products).toEqual([egg]);
+    expect(store.data.value.products).toEqual([egg, honey]);
   });
 
   it('adds, replaces and deletes meals, kept in time order', () => {

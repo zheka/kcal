@@ -6,7 +6,7 @@ import { goalsOn } from '../core/goals';
 import { consumedAtFor, defaultMealMinute } from '../core/meals';
 import { dayNutrients, ingredientsNutrients } from '../core/nutrition';
 import { isValidLocalMinute, localMinuteOf } from '../core/time';
-import type { AppData, Meal } from '../core/types';
+import type { AppData, Ingredient, Meal } from '../core/types';
 import type { FoodTable } from '../core/nutrition';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
@@ -29,8 +29,8 @@ interface Props {
   date?: string;
   /** New meal: copy the ingredients of this meal (Eat again). */
   copyOf?: string;
-  /** New meal: start with this food (＋ Water). */
-  startWith?: string;
+  /** New meal: start with this ingredient (a quick button's). */
+  start?: Ingredient;
   draftKey: string;
 }
 
@@ -44,15 +44,14 @@ interface Draft {
  * Where a meal is put together: foods and amounts, while the day chart shows what was taken
  * (faded), this meal (bright) and what remains. Saving logs the meal.
  */
-export function MealComposer({ store, id, date, copyOf, startWith, draftKey }: Props) {
+export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props) {
   const data = store.data.value;
   const foods = store.foods.value;
   const existing = id === null ? undefined : data.meals.find((m) => m.id === id);
 
   const [draft, setDraft] = useState<Draft>(() => {
     const loaded =
-      loadDraft<Draft>(draftKey) ??
-      initialDraft(data, foods, existing, { date, copyOf, startWith });
+      loadDraft<Draft>(draftKey) ?? initialDraft(data, foods, existing, { date, copyOf, start });
     const kept = { ...loaded, rows: loaded.rows.filter((r) => foods.has(r.food)) };
     const created = takeCreatedFood();
     const food = created ? foods.get(created) : undefined;
@@ -191,8 +190,8 @@ function initialDraft(
   {
     date,
     copyOf,
-    startWith,
-  }: { date?: string | undefined; copyOf?: string | undefined; startWith?: string | undefined },
+    start,
+  }: { date?: string | undefined; copyOf?: string | undefined; start?: Ingredient | undefined },
 ): Draft {
   if (existing) {
     return {
@@ -203,12 +202,15 @@ function initialDraft(
   const now = new Date();
   // Eat again: the same foods, now.
   const source = copyOf ? data.meals.find((m) => m.id === copyOf) : undefined;
-  const start = startWith ? foods.get(startWith) : undefined;
-  const rows = source
-    ? source.ingredients.map(ingredientRow)
-    : start
-      ? [ingredientRow(pickIngredient(data, start))]
-      : [];
+  // A quick button's food, as it says; if the food lost that unit meanwhile, as when picked.
+  const startFood = start ? foods.get(start.food) : undefined;
+  const first =
+    start && startFood
+      ? startFood.units.some((u) => u.id === start.unit)
+        ? start
+        : pickIngredient(data, startFood)
+      : undefined;
+  const rows = source ? source.ingredients.map(ingredientRow) : first ? [ingredientRow(first)] : [];
   return {
     minute: defaultMealMinute(data.meals, source ? today.value : (date ?? today.value), now),
     rows,

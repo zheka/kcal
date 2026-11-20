@@ -1,4 +1,5 @@
 import type { JSX } from 'preact';
+import type { Ingredient } from '../core/types';
 import type { Store } from '../state/store';
 import { LibraryScreen } from './LibraryScreen';
 import { MenuScreen } from './MenuScreen';
@@ -27,6 +28,14 @@ function dayScreen(store: Store, date: string): Screen {
   };
 }
 
+/** A new meal's first ingredient, from a quick button: `food`, `amount` and `unit`. */
+function startOf(params: URLSearchParams): Ingredient | undefined {
+  const food = params.get('food');
+  const unit = params.get('unit');
+  const amount = Number(params.get('amount'));
+  return food && unit && amount > 0 ? { amount, food, unit } : undefined;
+}
+
 function screenFor(store: Store, path: string, params: URLSearchParams): Screen {
   if (path === '/') return dayScreen(store, today.value);
   const day = /^\/day\/(.+)$/.exec(path);
@@ -34,7 +43,7 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
   const draftKey = `${path}?${params.toString()}`;
   if (path === '/meal/new') {
     return {
-      title: params.has('from') ? 'Eat again' : params.has('start') ? 'Drink' : 'New meal',
+      title: params.has('from') ? 'Eat again' : 'New meal',
       body: (
         <MealComposer
           store={store}
@@ -42,7 +51,7 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
           draftKey={draftKey}
           {...(params.get('date') ? { date: params.get('date')! } : {})}
           {...(params.get('from') ? { copyOf: params.get('from')! } : {})}
-          {...(params.get('start') ? { startWith: params.get('start')! } : {})}
+          {...(startOf(params) ? { start: startOf(params)! } : {})}
         />
       ),
     };

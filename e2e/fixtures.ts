@@ -1,17 +1,24 @@
 import { expect, test as base, type Locator, type Page } from '@playwright/test';
 
 /**
- * A realistic day for layout tests: goals, ten products, a recipe, and six meals and drinks
- * today, in the stored format of docs/backup-format.md.
+ * A realistic day for layout tests: goals, eleven products (food per g, drinks per ml, water
+ * both), a recipe, six meals and drinks today, and the two default quick buttons, in the
+ * stored format of docs/backup-format.md.
  */
 export function sampleDocument(now: Date): object {
   const at = (h: number, m: number) =>
     new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 7, 123).toISOString();
-  const p = (id: string, name: string, perGram: object, units: object[] = []) => ({
+  const p = (id: string, name: string, perG: object, units?: object[]) => ({
     id,
     name,
-    perGram,
-    units,
+    perG,
+    ...(units && { units }),
+  });
+  const drink = (id: string, name: string, perMl: object, units?: object[]) => ({
+    id,
+    name,
+    perMl,
+    ...(units && { units }),
   });
   const ing = (food: string, amount: number, unit = 'g') => ({ amount, food, unit });
   return {
@@ -36,30 +43,27 @@ export function sampleDocument(now: Date): object {
     ],
     products: [
       p('banana', 'banana', { carbs: 0.23, fat: 0.003, kcal: 0.89, protein: 0.011 }, [
-        { grams: 120, id: 'u-banana', name: 'piece' },
+        { g: 120, id: 'u-banana', name: 'piece' },
       ]),
       p('chicken', 'chicken breast', { fat: 0.015, kcal: 1.1, protein: 0.23 }),
-      p('coffee', 'coffee', { kcal: 0.02, protein: 0.001, water: 0.99 }, [
-        { grams: 1, id: 'u-ml', name: 'ml' },
-        { grams: 300, id: 'u-mug', name: 'mug' },
+      drink('coffee', 'coffee', { kcal: 0.02, protein: 0.001, water: 0.99 }, [
+        { id: 'u-mug', ml: 300, name: 'mug' },
       ]),
       p('egg', 'egg', { carbs: 0.007, fat: 0.095, kcal: 1.43, protein: 0.126 }, [
-        { grams: 60, id: 'u-egg', name: 'piece' },
+        { g: 60, id: 'u-egg', name: 'piece' },
       ]),
       p('flakes', 'oat flakes', { carbs: 0.59, fat: 0.07, kcal: 3.7, protein: 0.13 }),
-      p('honey', 'honey', { carbs: 0.82, kcal: 3.04 }, [{ grams: 7, id: 'u-tsp', name: 'tsp' }]),
-      p(
+      p('honey', 'honey', { carbs: 0.82, kcal: 3.04 }, [{ g: 7, id: 'u-tsp', name: 'tsp' }]),
+      drink(
         'milk',
         'milk 1.5%',
         { carbs: 0.049, fat: 0.015, kcal: 0.47, protein: 0.034, water: 0.88 },
-        [
-          { grams: 1.03, id: 'u-milk-ml', name: 'ml' },
-          { grams: 250, id: 'u-cup', name: 'cup' },
-        ],
+        [{ id: 'u-cup', ml: 250, name: 'cup' }],
       ),
-      p('oil', 'olive oil', { fat: 1, kcal: 8.84 }, [{ grams: 13, id: 'u-tbsp', name: 'tbsp' }]),
+      p('oil', 'olive oil', { fat: 1, kcal: 8.84 }, [{ g: 13, id: 'u-tbsp', name: 'tbsp' }]),
       p('rice', 'basmati rice, cooked', { carbs: 0.28, fat: 0.003, kcal: 1.3, protein: 0.027 }),
       p('skyr', 'skyr natural', { carbs: 0.04, fat: 0.002, kcal: 0.63, protein: 0.11 }),
+      { id: 'water', name: 'water', perG: { water: 1 }, perMl: { water: 1 } },
     ],
     recipes: [
       {
@@ -69,7 +73,10 @@ export function sampleDocument(now: Date): object {
         units: [{ id: 'u-bowl', makes: 1, name: 'bowl' }],
       },
     ],
-    version: 'kcal 0.1.1',
+    settings: {
+      quickButtons: [{ amount: 250, food: 'water', label: '💧', unit: 'ml' }, { label: '🍽️' }],
+    },
+    version: 'kcal 0.2.0',
   };
 }
 

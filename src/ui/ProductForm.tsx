@@ -1,25 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { canScan } from '../barcode';
-import { GRAMS, NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
-import { newId, productWithBarcode, unitUsages, usages } from '../core/foods';
+import {
+  BASES,
+  GRAMS,
+  MILLILITRES,
+  NUTRIENT_LABEL,
+  NUTRIENT_UNIT,
+  NUTRIENTS,
+  type Base,
+  type Nutrient,
+} from '../config';
+import { isUsed, newId, productWithBarcode, unitUsages, usages, type Usages } from '../core/foods';
 import { formatNumber, parseNumber } from '../core/format';
 import { cleanText, nameKey } from '../core/text';
-import { isBuiltinName } from '../core/builtins';
 import type { NutrientValues, Product } from '../core/types';
-import { perGramFrom } from '../core/units';
+import { perOneFrom } from '../core/units';
+import { lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
 import type { Store } from '../state/store';
+import { BarcodeScanner } from './BarcodeScanner';
 import { ConfirmButton } from './ConfirmButton';
 import { handOverCreatedFood } from './drafts';
-import { lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
-import { BarcodeScanner } from './BarcodeScanner';
 import { goBack, replaceRoute } from './router';
-import {
-  emptyUnitRow,
-  productUnitRows,
-  readProductUnits,
-  UnitsEditor,
-  type UnitRow,
-} from './UnitsEditor';
+import { productUnitRows, readProductUnits, UnitsEditor, type UnitRow } from './UnitsEditor';
 
 interface Props {
   store: Store;
@@ -31,34 +33,64 @@ interface Props {
   addToPicker?: boolean;
 }
 
+type ValueTexts = Record<Nutrient, string>;
+/** What the values of a base are entered per, as on the label's column: 100 g, 1 bar… */
+interface Basis {
+  amount: string;
+  unit: string;
+}
+
+const emptyTexts = (): ValueTexts =>
+  Object.fromEntries(NUTRIENTS.map((n) => [n, ''])) as ValueTexts;
+
+/** Stored values per 1 g or ml, shown per 100. */
+function textsOf(values: NutrientValues | undefined): ValueTexts {
+  const texts = emptyTexts();
+  for (const n of NUTRIENTS) {
+    const x = values?.[n];
+    if (x !== undefined) texts[n] = formatNumber(x * 100, 3);
+  }
+  return texts;
+}
+
+/** Typed values: the ones given, and an error per field that isn't a number. */
+function readValues(texts: ValueTexts): { values: NutrientValues; errors: Map<Nutrient, string> } {
+  const values: NutrientValues = {};
+  const errors = new Map<Nutrient, string>();
+  for (const n of NUTRIENTS) {
+    const text = texts[n].trim();
+    if (text === '') continue; // not given
+    const x = parseNumber(text);
+    if (x === null) errors.set(n, 'Not a number');
+    else values[n] = x;
+  }
+  return { values, errors };
+}
+
+/**
+ * A product's name, values and units. Values are entered per g or per ml, one base at a time;
+ * a base is stored exactly when at least one of its values is filled (0 counts).
+ */
 export function ProductForm({ store, id, initialName = '', addToPicker = false }: Props) {
   const data = store.data.value;
   const existing = id === null ? undefined : data.products.find((p) => p.id === id);
 
   const [name, setName] = useState(existing?.name ?? initialName);
   const [unitRows, setUnitRows] = useState<UnitRow[]>(() => productUnitRows(existing?.units ?? []));
-  // Values are entered per an amount of a unit, as on the label's column: per 100 g, per 1 bar…
-  const [basisAmount, setBasisAmount] = useState('100');
-  const [basisUnit, setBasisUnit] = useState(GRAMS);
-  // An existing product is shown per 100 g; empty means 0.
-  const [values, setValues] = useState<Record<Nutrient, string>>(() => {
-    const v = {} as Record<Nutrient, string>;
-    for (const n of NUTRIENTS) {
-      const x = existing?.perGram[n];
-      v[n] = x === undefined ? '' : formatNumber(x * 100, 3);
-    }
-    return v;
+  const [texts, setTexts] = useState<Record<Base, ValueTexts>>(() => ({
+    g: textsOf(existing?.perG),
+    ml: textsOf(existing?.perMl),
+  }));
+  const [shown, setShown] = useState<Base>(existing && !existing.perG ? MILLILITRES : GRAMS);
+  const [basis, setBasis] = useState<Record<Base, Basis>>({
+    g: { amount: '100', unit: GRAMS },
+    ml: { amount: '100', unit: MILLILITRES },
   });
   const [submitted, setSubmitted] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [barcode, setBarcode] = useState(existing?.barcode);
   const [scanning, setScanning] = useState(false);
   const [lookup, setLookup] = useState<ScanStatus | null>(null);
-  // The current units, for the lookup that finishes after a scan.
-  const unitRowsRef = useRef(unitRows);
-  useEffect(() => {
-    unitRowsRef.current = unitRows;
-  }, [unitRows]);
 
   /** A barcode was read: open the product if it's in the library, else look it up and fill the form. */
   const onCode = useCallback(
@@ -75,23 +107,16 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
         setLookup({ kind: 'result', code, result });
         if (result.kind !== 'found') return;
         if (result.name) setName(result.name);
-        const filled = {} as Record<Nutrient, string>;
+        // Per 100 g, or per 100 ml for drinks; the other base is left empty.
+        const base = result.liquid ? MILLILITRES : GRAMS;
+        const filled = emptyTexts();
         for (const n of NUTRIENTS) {
           const v = result.per100[n];
-          filled[n] = v === undefined ? '' : formatNumber(v, 3);
+          if (v !== undefined) filled[n] = formatNumber(v, 3);
         }
-        setValues(filled);
-        if (result.liquid) {
-          // Values are per 100 ml: an ml unit, counted as 1 g unless corrected under Units.
-          const rows = unitRowsRef.current;
-          const ml = rows.find((r) => nameKey(r.name) === 'ml');
-          const row = ml ?? { ...emptyUnitRow(), name: 'ml', valueText: '1' };
-          if (!ml) setUnitRows([...rows, row]);
-          setBasisUnit(row.id);
-        } else {
-          setBasisUnit(GRAMS);
-        }
-        setBasisAmount('100');
+        setTexts({ g: emptyTexts(), ml: emptyTexts(), [base]: filled });
+        setBasis((b) => ({ ...b, [base]: { amount: '100', unit: base } }));
+        setShown(base);
       });
     },
     [store],
@@ -99,46 +124,72 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
 
   if (id !== null && !existing) return <p class="empty">This product does not exist.</p>;
 
-  const { units, errors: unitErrors } = readProductUnits(unitRows);
-  const basisUnits = [{ grams: 1, id: GRAMS, name: GRAMS }, ...units];
-  const basisGrams =
-    (parseNumber(basisAmount) ?? 0) * (basisUnits.find((u) => u.id === basisUnit)?.grams ?? 0);
+  const read = { g: readValues(texts.g), ml: readValues(texts.ml) };
+  /** The bases that have values: the ones stored. */
+  const bases = BASES.filter((b) => Object.keys(read[b].values).length > 0);
+  const { units, errors: unitErrors } = readProductUnits(unitRows, bases);
+  // While values are being typed, the units of the base shown already count for "per 1 bar".
+  const { units: basisChoices } = readProductUnits(unitRows, [...new Set([...bases, shown])]);
 
-  const parsed: NutrientValues = {};
-  const valueErrors = new Map<Nutrient, string>();
-  for (const n of NUTRIENTS) {
-    const text = values[n].trim();
-    if (text === '') continue; // counts as 0
-    const x = parseNumber(text);
-    if (x === null) valueErrors.set(n, 'Not a number');
-    else parsed[n] = x;
+  /** How many g or ml a base's values are about ("per 100 g", "per 1 bar" of 45 g). */
+  function basisSize(base: Base): number | null {
+    const amount = parseNumber(basis[base].amount);
+    if (amount === null || amount <= 0) return null;
+    if (basis[base].unit === base) return amount;
+    const unit = basisChoices.find((u) => u.id === basis[base].unit);
+    const size = unit && (base === GRAMS ? unit.g : unit.ml);
+    return size === undefined ? null : amount * size;
   }
 
   const cleanName = cleanText(name);
   const taken = [...store.foods.value.values()].find(
     (f) => f.id !== id && nameKey(f.name) === nameKey(cleanName),
   );
-  const nameError = !cleanName
-    ? 'Add a name'
-    : isBuiltinName(cleanName)
-      ? `“${cleanName}” is a built-in food`
-      : taken
-        ? `“${taken.name}” already exists`
-        : '';
-  const basisError = basisGrams > 0 ? '' : 'Check the amount';
-  const valid = !nameError && !basisError && valueErrors.size === 0 && unitErrors.size === 0;
+  const nameError = !cleanName ? 'Add a name' : taken ? `“${taken.name}” already exists` : '';
+  const basisErrors = new Map<Base, string>();
+  for (const b of bases) if (basisSize(b) === null) basisErrors.set(b, 'Check the amount');
+  // A base that meals, recipes or quick buttons measure the product in must keep its values.
+  const lostBases = new Map<Base, string>();
+  for (const b of BASES) {
+    const uses = id === null || bases.includes(b) ? 0 : unitUsages(data, id, b);
+    if (uses > 0) {
+      lostBases.set(b, `Used in ${b} ${plural(uses, 'time')}: keep at least one value per ${b}`);
+    }
+  }
+  const valuesError =
+    bases.length === 0 ? 'Enter at least one value, per g or per ml (0 counts)' : '';
+  const valid =
+    !nameError &&
+    !valuesError &&
+    basisErrors.size === 0 &&
+    lostBases.size === 0 &&
+    read.g.errors.size === 0 &&
+    read.ml.errors.size === 0 &&
+    unitErrors.size === 0;
 
-  const used = id === null ? { meals: 0, recipes: 0 } : usages(data, id);
-  const inUse = used.meals + used.recipes > 0;
-  const hint = macroHint(parsed);
+  const used = id === null ? undefined : usages(data, id);
+  const inUse = used !== undefined && isUsed(used);
+  const hint = macroHint(read[shown].values);
 
   function save() {
     setSubmitted(true);
-    if (!valid) return;
+    if (!valid) {
+      // Show the side with a problem, if the one shown has none.
+      const wrong = BASES.find(
+        (b) => read[b].errors.size > 0 || basisErrors.has(b) || lostBases.has(b),
+      );
+      if (wrong && wrong !== shown && !read[shown].errors.size) setShown(wrong);
+      return;
+    }
+    const perOne = (b: Base) =>
+      bases.includes(b) ? perOneFrom(read[b].values, basisSize(b)!) : undefined;
+    const perG = perOne(GRAMS);
+    const perMl = perOne(MILLILITRES);
     const product: Product = {
       id: existing?.id ?? newId(),
       name: cleanName,
-      perGram: perGramFrom(parsed, basisGrams),
+      ...(perG && { perG }),
+      ...(perMl && { perMl }),
       units,
       ...(barcode !== undefined && { barcode }),
     };
@@ -153,6 +204,11 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
   }
 
   const show = (error: string | undefined) => submitted && error && <p class="error">{error}</p>;
+  // The basis selector: the base itself and the units in it.
+  const basisUnits = [
+    { id: shown, name: shown },
+    ...basisChoices.filter((u) => (shown === GRAMS ? u.g : u.ml) !== undefined),
+  ];
 
   return (
     <form
@@ -197,23 +253,39 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
       </label>
 
       <fieldset class="section">
-        <legend class="label">
-          Nutrients per
+        <legend class="label">Nutrients</legend>
+        <div class="segmented" role="group" aria-label="Values per">
+          {BASES.map((b) => (
+            <button
+              key={b}
+              type="button"
+              class="segment"
+              aria-pressed={shown === b}
+              onClick={() => setShown(b)}
+            >
+              per {b}
+              {bases.includes(b) && <span aria-hidden="true"> ✓</span>}
+            </button>
+          ))}
+        </div>
+        <div class="basis-line">
+          Per
           <input
             class="input number basis"
             aria-label="Per amount"
             inputMode="decimal"
-            value={basisAmount}
-            onInput={(e) => setBasisAmount(e.currentTarget.value)}
+            value={basis[shown].amount}
+            onInput={(e) =>
+              setBasis({ ...basis, [shown]: { ...basis[shown], amount: e.currentTarget.value } })
+            }
           />
           <select
             class="input"
             aria-label="Per unit"
-            value={basisUnit}
+            value={basis[shown].unit}
             onChange={(e) => {
               const unit = e.currentTarget.value;
-              setBasisUnit(unit);
-              setBasisAmount(unit === GRAMS ? '100' : '1');
+              setBasis({ ...basis, [shown]: { unit, amount: unit === shown ? '100' : '1' } });
             }}
           >
             {basisUnits.map((u) => (
@@ -222,11 +294,11 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
               </option>
             ))}
           </select>
-        </legend>
-        {show(basisError)}
+        </div>
+        {show(basisErrors.get(shown))}
         <div class="nutrient-grid">
           {NUTRIENTS.map((n) => (
-            <label class="field" key={n}>
+            <label class="field" key={`${shown}-${n}`}>
               <span class="label">
                 {NUTRIENT_LABEL[n]}
                 {n !== 'kcal' && ` (${NUTRIENT_UNIT[n]})`}
@@ -234,21 +306,26 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
               <input
                 class="input number"
                 inputMode="decimal"
-                placeholder="0"
-                value={values[n]}
-                onInput={(e) => setValues({ ...values, [n]: e.currentTarget.value })}
+                value={texts[shown][n]}
+                onInput={(e) =>
+                  setTexts({ ...texts, [shown]: { ...texts[shown], [n]: e.currentTarget.value } })
+                }
               />
-              {show(valueErrors.get(n))}
+              {show(read[shown].errors.get(n))}
             </label>
           ))}
         </div>
+        <p class="hint">Empty means not given; type 0 for none.</p>
         {hint && <p class="hint">{hint}</p>}
+        {show(lostBases.get(shown))}
+        {show(valuesError)}
       </fieldset>
 
       <fieldset class="section">
         <legend class="label">Units</legend>
         <UnitsEditor
           kind="product"
+          bases={bases.length > 0 ? bases : [shown]}
           rows={unitRows}
           onChange={setUnitRows}
           usesOf={(unitId) => (id ? unitUsages(data, id, unitId) : 0)}
@@ -256,12 +333,7 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
         />
       </fieldset>
 
-      {inUse && (
-        <p class="notice">
-          Used in {plural(used.meals, 'meal')} and {plural(used.recipes, 'recipe')}: saving changes
-          them too.
-        </p>
-      )}
+      {inUse && <p class="notice">{usedNotice(used)}</p>}
       {saveError && <p class="error">Could not save: {saveError}</p>}
 
       <div class="actions action-bar">
@@ -286,6 +358,17 @@ export function ProductForm({ store, id, initialName = '', addToPicker = false }
 
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+/** `Used in 3 meals, 1 recipe and 1 quick button: saving changes them too.` */
+export function usedNotice(used: Usages): string {
+  const parts = [
+    used.meals > 0 && plural(used.meals, 'meal'),
+    used.recipes > 0 && plural(used.recipes, 'recipe'),
+    used.quickButtons > 0 && plural(used.quickButtons, 'quick button'),
+  ].filter((p): p is string => typeof p === 'string');
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+  return `Used in ${list}: saving changes them too.`;
 }
 
 /** A hint when label kcal and the macros disagree by more than 15%: likely a typo. */
@@ -329,9 +412,7 @@ function ScanMessage({ status }: { status: ScanStatus }) {
   const { result } = status;
   const text =
     result.kind === 'found'
-      ? result.liquid
-        ? 'Filled from Open Food Facts, per 100 ml: check the values against the label. ml is counted as 1 g; correct it under Units if you know better.'
-        : 'Filled from Open Food Facts, per 100 g: check the values against the label.'
+      ? `Filled from Open Food Facts, per 100 ${result.liquid ? 'ml' : 'g'}: check the values against the label.`
       : result.kind === 'not-found'
         ? `${status.code} isn’t in Open Food Facts. Enter the product from its label.`
         : result.kind === 'offline'

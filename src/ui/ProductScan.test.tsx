@@ -61,11 +61,12 @@ describe('scanning a barcode in a new product', () => {
     expect(store.data.value.products[0]).toMatchObject({
       barcode: CODE,
       name: 'Skyr Natur (Arla)',
-      perGram: { carbs: 0.04, fat: 0.002, kcal: 0.63, protein: 0.11 },
+      perG: { carbs: 0.04, fat: 0.002, kcal: 0.63, protein: 0.11 },
     });
+    expect(store.data.value.products[0]!.perMl).toBeUndefined();
   });
 
-  it('fills a drink per 100 ml, with an ml unit counted as 1 g', async () => {
+  it('fills a drink per 100 ml, stored per ml, with nothing per g', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({
       kind: 'found',
       name: 'Milch 1.5%',
@@ -78,12 +79,14 @@ describe('scanning a barcode in a new product', () => {
     expect(input('Per amount').value).toBe('100');
     const perUnit = screen.getByLabelText('Per unit') as HTMLSelectElement;
     expect(perUnit.selectedOptions[0]!.textContent).toBe('ml');
+    expect(screen.getByRole('button', { name: /per ml/ }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await vi.waitFor(() => expect(store.data.value.products).toHaveLength(1));
-    expect(store.data.value.products[0]).toMatchObject({
-      perGram: { kcal: 0.47, protein: 0.034 },
-      units: [{ grams: 1, name: 'ml' }],
-    });
+    const [milk] = store.data.value.products;
+    expect(milk).toMatchObject({ perMl: { kcal: 0.47, protein: 0.034 }, units: [] });
+    expect(milk!.perG).toBeUndefined();
   });
 
   it('opens a product already in the library instead of making a duplicate', async () => {
@@ -106,6 +109,7 @@ describe('scanning a barcode in a new product', () => {
       ),
     ).toBeTruthy();
     fireEvent.input(screen.getByLabelText(/^Name/), { target: { value: 'Local bread' } });
+    fireEvent.input(input('kcal'), { target: { value: '250' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await vi.waitFor(() => expect(store.data.value.products).toHaveLength(1));
     expect(store.data.value.products[0]).toMatchObject({ barcode: CODE, name: 'Local bread' });

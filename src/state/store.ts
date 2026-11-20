@@ -1,6 +1,6 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
 import { canonical } from '../core/canonical';
-import { usages } from '../core/foods';
+import { isUsed, usages } from '../core/foods';
 import { saveGoals } from '../core/goals';
 import { buildFoodTable, type FoodTable } from '../core/nutrition';
 import type { AppData, Meal, NutrientValues, Product, Recipe } from '../core/types';
@@ -13,7 +13,7 @@ import { validateAppData } from '../core/validate';
  */
 export interface Store {
   readonly data: ReadonlySignal<AppData>;
-  /** Every food (built-in, product, recipe) with its units and portions; rebuilt only when foods change. */
+  /** Every food (product, recipe) with its units and portions; rebuilt only when foods change. */
   readonly foods: ReadonlySignal<FoodTable>;
   /** Adds a product or replaces the one with its id. */
   saveProduct(product: Product): void;
@@ -64,8 +64,7 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
       commit({ ...data.value, recipes: upsert(data.value.recipes, recipe) });
     },
     deleteFood(id) {
-      const used = usages(data.value, id);
-      if (used.meals + used.recipes > 0) throw new InvalidChangeError('the food is in use');
+      if (isUsed(usages(data.value, id))) throw new InvalidChangeError('the food is in use');
       commit({
         ...data.value,
         products: data.value.products.filter((p) => p.id !== id),

@@ -1,27 +1,29 @@
-import type { Nutrient } from '../config';
+import type { Base, Nutrient } from '../config';
 
 /**
- * The stored data: the primary form of the data, exactly as in a backup (see
- * docs/backup-format.md). Normalized (every fact once, nothing derived) and always valid.
- * An omitted field is undefined; an omitted nutrient counts as 0.
+ * The stored data: the primary form of the data, as in a backup (see docs/backup-format.md).
+ * Normalized (every fact once, nothing derived) and always valid. An omitted field is
+ * undefined. In memory, lists and objects that a document may omit when empty are always
+ * present (empty); they are omitted only when the data is written (see `toDocument`).
  */
 
+/** Nutrient values: an omitted nutrient is not given (counted as 0 for now); 0 is a value. */
 export type NutrientValues = Partial<Record<Nutrient, number>>;
 
-/** A unit of a product: how many grams one of it weighs. */
-export interface ProductUnit {
-  grams: number;
-  id: string;
-  name: string;
-}
+/** A unit of a product, in exactly one of its bases: how many g or ml one of it is. */
+export type ProductUnit =
+  | { g: number; id: string; ml?: never; name: string }
+  | { g?: never; id: string; ml: number; name: string };
 
 export interface Product {
   /** The barcode (EAN/UPC digits), when the product was scanned; unique among products. */
   barcode?: string;
   id: string;
   name: string;
-  /** Nutrients in 1 g of the product. */
-  perGram: NutrientValues;
+  /** Nutrients in 1 g: present when the product can be weighed; never empty. */
+  perG?: NutrientValues;
+  /** Nutrients in 1 ml: present when the product can be measured in ml; never empty. */
+  perMl?: NutrientValues;
   units: ProductUnit[];
 }
 
@@ -43,9 +45,9 @@ export interface Recipe {
 /** How much of which food, in which of its units. Shared by meals and recipes. */
 export interface Ingredient {
   amount: number;
-  /** Id of a product, a recipe or a built-in food. */
+  /** Id of a product or a recipe. */
   food: string;
-  /** `g` (products and built-in foods), `ml` (water), or the id of one of the food's units. */
+  /** `g` or `ml` (a product with that base), or the id of one of the food's units. */
   unit: string;
 }
 
@@ -65,9 +67,28 @@ export interface GoalSet {
   setAt: string;
 }
 
+/** A button on the day screen that opens a new meal: empty, or with a food in it. */
+export type QuickButton =
+  { label: string; amount?: never; food?: never; unit?: never } | ({ label: string } & Ingredient);
+
+export interface Settings {
+  quickButtons: QuickButton[];
+}
+
 export interface AppData {
   goals: GoalSet[];
   meals: Meal[];
   products: Product[];
   recipes: Recipe[];
+  settings: Settings;
+}
+
+/** The base a product unit is in, and how many g or ml one of it is. */
+export function unitSize(unit: ProductUnit): { base: Base; size: number } {
+  return unit.g !== undefined ? { base: 'g', size: unit.g } : { base: 'ml', size: unit.ml };
+}
+
+/** The values of a product per 1 of a base, if it has that base. */
+export function valuesPer(product: Product, base: Base): NutrientValues | undefined {
+  return base === 'g' ? product.perG : product.perMl;
 }

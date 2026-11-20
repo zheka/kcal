@@ -1,31 +1,37 @@
+import { GRAMS, type Base } from '../config';
 import { roundStored } from '../core/decimal';
 import { newId } from '../core/foods';
 import { formatNumber, parseNumber } from '../core/format';
 import { cleanText, nameKey } from '../core/text';
-import type { ProductUnit, RecipeUnit } from '../core/types';
+import { unitSize, type ProductUnit, type RecipeUnit } from '../core/types';
 import { isReservedProductUnitName } from '../core/units';
 
 /**
- * A unit as typed in a form. For a product, `valueText` is the grams of one of the unit
- * ("1 piece = 60 g"); for a recipe, how many of the unit the whole recipe makes ("makes 6
- * servings").
+ * A unit as typed in a form. For a product, `valueText` is how many g or ml (`base`) one of
+ * the unit is ("1 piece = 60 g", "1 cup = 250 ml"); for a recipe, how many of the unit the
+ * whole recipe makes ("makes 6 servings").
  */
 export interface UnitRow {
   id: string;
   name: string;
   valueText: string;
+  /** A product unit's base. */
+  base?: Base;
 }
 
 export function productUnitRows(units: readonly ProductUnit[]): UnitRow[] {
-  return units.map((u) => ({ id: u.id, name: u.name, valueText: formatNumber(u.grams, 3) }));
+  return units.map((u) => {
+    const { base, size } = unitSize(u);
+    return { id: u.id, name: u.name, valueText: formatNumber(size, 3), base };
+  });
 }
 
 export function recipeUnitRows(units: readonly RecipeUnit[]): UnitRow[] {
   return units.map((u) => ({ id: u.id, name: u.name, valueText: formatNumber(u.makes, 3) }));
 }
 
-export function emptyUnitRow(): UnitRow {
-  return { id: newId(), name: '', valueText: '' };
+export function emptyUnitRow(base?: Base): UnitRow {
+  return { id: newId(), name: '', valueText: '', ...(base && { base }) };
 }
 
 const isBlank = (row: UnitRow) => row.name.trim() === '' && row.valueText.trim() === '';
@@ -39,8 +45,8 @@ type Kind = 'product' | 'recipe';
 function readRows(
   rows: readonly UnitRow[],
   kind: Kind,
-): { units: { id: string; name: string; value: number }[]; errors: Map<string, string> } {
-  const units: { id: string; name: string; value: number }[] = [];
+): { units: (UnitRow & { value: number })[]; errors: Map<string, string> } {
+  const units: (UnitRow & { value: number })[] = [];
   const errors = new Map<string, string>();
   const names = new Set<string>();
   for (const row of rows.filter((r) => !isBlank(r))) {
@@ -49,23 +55,69 @@ function readRows(
     const value = parsed === null ? null : roundStored(parsed);
     if (!name) errors.set(row.id, 'Add a name');
     else if (kind === 'product' && isReservedProductUnitName(name)) {
-      errors.set(row.id, '“g” is built in: every product has grams');
+      errors.set(row.id, `“${name}” is built in`);
     } else if (names.has(nameKey(name))) errors.set(row.id, `“${name}” is defined twice`);
     else if (value === null || value <= 0) {
-      errors.set(row.id, kind === 'product' ? 'Add its weight in grams' : 'Add how many it makes');
+      errors.set(
+        row.id,
+        kind === 'product' ? `Add how many ${row.base ?? GRAMS} it is` : 'Add how many it makes',
+      );
     }
     names.add(nameKey(name));
-    if (!errors.has(row.id)) units.push({ id: row.id, name, value: value! });
+    if (!errors.has(row.id)) units.push({ ...row, name, value: value! });
   }
   return { units, errors };
 }
 
-export function readProductUnits(rows: readonly UnitRow[]): {
-  units: ProductUnit[];
-  errors: Map<string, string>;
-} {
+/**
+ * Reads a product's typed units. `bases` are the bases that have values: a unit in another
+ * base is an error, since the product can't be measured in it.
+ */
+export function readProductUnits(
+  rows: readonly UnitRow[],
+  bases: readonly Base[],
+): { units: ProductUnit[]; errors: Map<string, string> } {
   const { units, errors } = readRows(rows, 'product');
-  return { units: units.map(({ id, name, value }) => ({ grams: value, id, name })), errors };
+  const kept: ProductUnit[] = [];
+  for (const { id, name, value, base = GRAMS } of units) {
+    if (!bases.includes(base)) {
+      errors.set(id, `${name} is in ${base}: enter at least one value per ${base}`);
+    } else {
+      kept.push(base === GRAMS ? { g: value, id, name } : { id, ml: value, name });
+    }
+  }
+  return { units: kept, errors };
+}
+
+/** A unit's base: a selector when the product has both, else the one base as text. */
+export function BaseSelect({
+  bases,
+  value,
+  onChange,
+  label,
+}: {
+  bases: readonly Base[];
+  value: Base;
+  onChange: (base: Base) => void;
+  label: string;
+}) {
+  // A unit whose base lost its values still shows it, marked by its error.
+  const options = bases.includes(value) ? bases : [...bases, value];
+  if (options.length === 1) return <span>{value}</span>;
+  return (
+    <select
+      class="input base"
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value as Base)}
+    >
+      {options.map((b) => (
+        <option key={b} value={b}>
+          {b}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 export function readRecipeUnits(rows: readonly UnitRow[]): {
@@ -78,6 +130,8 @@ export function readRecipeUnits(rows: readonly UnitRow[]): {
 
 interface Props {
   kind: Kind;
+  /** A product's bases that have values: its units can be in these. */
+  bases?: readonly Base[];
   rows: UnitRow[];
   onChange: (rows: UnitRow[]) => void;
   /** How many ingredients use a unit; used units can't be removed. */
@@ -85,7 +139,7 @@ interface Props {
   errors: Map<string, string>;
 }
 
-export function UnitsEditor({ kind, rows, onChange, usesOf, errors }: Props) {
+export function UnitsEditor({ kind, bases = [GRAMS], rows, onChange, usesOf, errors }: Props) {
   const change = (id: string, patch: Partial<UnitRow>) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
@@ -107,7 +161,7 @@ export function UnitsEditor({ kind, rows, onChange, usesOf, errors }: Props) {
             class="input number"
             aria-label={
               kind === 'product'
-                ? `Grams in 1 ${row.name || 'unit'}`
+                ? `Size of 1 ${row.name || 'unit'}`
                 : `How many ${row.name || 'units'} it makes`
             }
             inputMode="decimal"
@@ -125,7 +179,12 @@ export function UnitsEditor({ kind, rows, onChange, usesOf, errors }: Props) {
                   {name}
                   <span>=</span>
                   {value}
-                  <span>g</span>
+                  <BaseSelect
+                    bases={bases}
+                    value={row.base ?? GRAMS}
+                    onChange={(base) => change(row.id, { base })}
+                    label={`Unit of 1 ${row.name || 'unit'}`}
+                  />
                 </>
               ) : (
                 <>
@@ -149,7 +208,13 @@ export function UnitsEditor({ kind, rows, onChange, usesOf, errors }: Props) {
           </div>
         );
       })}
-      <button type="button" class="button link" onClick={() => onChange([...rows, emptyUnitRow()])}>
+      <button
+        type="button"
+        class="button link"
+        onClick={() =>
+          onChange([...rows, emptyUnitRow(kind === 'product' ? (bases[0] ?? GRAMS) : undefined)])
+        }
+      >
         ＋ Add unit
       </button>
     </div>

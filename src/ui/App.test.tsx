@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { appData, egg, ing, makes, meal, milk, oatFlakes, recipe } from '../core/testData';
+import { appData, egg, ing, makes, meal, milk, oatFlakes, recipe, water } from '../core/testData';
 import type { AppData } from '../core/types';
 import { serializeBackup } from '../data/backup';
 import { createStore, type Store } from '../state/store';
@@ -32,7 +32,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('products', () => {
-  it('stores a label’s per-100 g values per gram, and lists the product', async () => {
+  it('stores a label’s per-100 g values per g, and lists the product', async () => {
     start(appData(), '/library');
     click('＋ Product');
     type(nameField(), '  Skyr  natural ');
@@ -44,9 +44,10 @@ describe('products', () => {
     expect(screen.getByText('63 kcal · 11 g protein / 100 g')).toBeTruthy();
     expect(store.data.value.products[0]).toMatchObject({
       name: 'Skyr natural',
-      perGram: { kcal: 0.63, protein: 0.11 },
+      perG: { kcal: 0.63, protein: 0.11 },
       units: [],
     });
+    expect(store.data.value.products[0]!.perMl).toBeUndefined();
   });
 
   it('converts values copied per unit, e.g. a bar’s column, rounded to 3 decimals', async () => {
@@ -54,7 +55,7 @@ describe('products', () => {
     type(nameField(), 'Protein bar');
     click('＋ Add unit');
     type(field('Unit name'), 'bar');
-    type(field('Grams in 1 bar'), '45');
+    type(field('Size of 1 bar'), '45');
     const bar = store.data.value; // the unit only exists in the form so far
     expect(bar.products).toHaveLength(0);
     const unitId = (field('Per unit') as HTMLSelectElement).options[1]!.value;
@@ -66,32 +67,85 @@ describe('products', () => {
 
     await vi.waitFor(() => expect(store.data.value.products).toHaveLength(1));
     expect(store.data.value.products[0]).toMatchObject({
-      perGram: { kcal: 4.222, protein: 0.2 },
-      units: [{ grams: 45, name: 'bar' }],
+      perG: { kcal: 4.222, protein: 0.2 },
+      units: [{ g: 45, name: 'bar' }],
     });
   });
 
-  it('records the water in drinks', async () => {
+  it('stores a drink per ml, with its water and an explicit 0; nothing per g', async () => {
     start(appData(), '/product/new');
     type(nameField(), 'coffee');
+    click('per ml');
     type(field('kcal'), '2');
+    type(field('Fat'), '0');
     type(field('Water'), '99');
     click('Save');
     await vi.waitFor(() => expect(store.data.value.products).toHaveLength(1));
-    expect(store.data.value.products[0]!.perGram).toEqual({ kcal: 0.02, water: 0.99 });
+    const [coffee] = store.data.value.products;
+    expect(coffee!.perMl).toEqual({ fat: 0, kcal: 0.02, water: 0.99 });
+    expect(coffee!.perG).toBeUndefined();
   });
 
-  it('explains what is wrong instead of saving; nothing is required', () => {
+  it('stores both bases when both have values, each on its own', async () => {
+    start(appData(), '/product/new');
+    type(nameField(), 'milk');
+    type(field('kcal'), '64');
+    click('per ml');
+    expect((field('kcal') as HTMLInputElement).value).toBe('');
+    type(field('kcal'), '66');
+    expect(screen.getByRole('button', { name: /per g/ }).textContent).toBe('per g ✓');
+    click('Save');
+    await vi.waitFor(() => expect(store.data.value.products).toHaveLength(1));
+    expect(store.data.value.products[0]).toMatchObject({
+      perG: { kcal: 0.64 },
+      perMl: { kcal: 0.66 },
+    });
+  });
+
+  it('offers ml for units only once there are values per ml', () => {
+    start(appData(), '/product/new');
+    type(nameField(), 'juice');
+    type(field('kcal'), '45');
+    click('＋ Add unit');
+    // only g has values: the unit is in g, no selector
+    expect(screen.queryByLabelText('Unit of 1 unit')).toBeNull();
+    click('per ml');
+    type(field('kcal'), '44');
+    fireEvent.change(field('Unit of 1 unit'), { target: { value: 'ml' } });
+    type(field('Unit name'), 'glass');
+    type(field('Size of 1 glass'), '200');
+    // clearing the ml values marks the unit, and saving waits
+    type(field('kcal'), '');
+    click('Save');
+    expect(screen.getByText('glass is in ml: enter at least one value per ml')).toBeTruthy();
+    expect(store.data.value.products).toEqual([]);
+  });
+
+  it('keeps a base that meals use: clearing its values is refused', () => {
+    start(
+      appData({
+        products: [water],
+        meals: [meal('2026-11-17T07:00:00.000Z', [ing(water, 250, 'ml')])],
+      }),
+      `/product/${water.id}`,
+    );
+    click('per ml');
+    type(field('Water'), '');
+    click('Save');
+    expect(screen.getByText('Used in ml 1 time: keep at least one value per ml')).toBeTruthy();
+    expect(store.data.value.products).toEqual([water]);
+  });
+
+  it('explains what is wrong instead of saving; at least one value is needed', () => {
     start(appData({ products: [egg] }), '/product/new');
     click('Save');
     expect(screen.getByText('Add a name')).toBeTruthy();
+    expect(screen.getByText('Enter at least one value, per g or per ml (0 counts)')).toBeTruthy();
     type(nameField(), 'EGG');
     type(field('Protein'), 'lots');
     click('Save');
     expect(screen.getByText('“egg” already exists')).toBeTruthy();
     expect(screen.getByText('Not a number')).toBeTruthy();
-    type(nameField(), 'Water');
-    expect(screen.getByText('“Water” is a built-in food')).toBeTruthy();
     expect(store.data.value.products).toEqual([egg]);
   });
 
@@ -114,7 +168,7 @@ describe('products', () => {
     );
     expect((field('kcal') as HTMLInputElement).value).toBe('143');
     expect((field('Protein') as HTMLInputElement).value).toBe('12.6');
-    expect(screen.getByText(/Used in 1 meal and 0 recipes: saving changes them too/)).toBeTruthy();
+    expect(screen.getByText('Used in 1 meal: saving changes them too.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
     expect((screen.getByLabelText('Remove unit piece') as HTMLButtonElement).disabled).toBe(true);
   });
@@ -186,24 +240,22 @@ describe('recipes', () => {
     chip('oat flakes');
     fireEvent.change(field('Unit of oat flakes'), { target: { value: '__new__' } });
     type(field('New unit name'), 'cup');
-    type(field('New unit grams'), '80');
+    type(field('New unit size'), '80');
     click('Add unit');
 
     await vi.waitFor(() =>
-      expect(store.data.value.products[0]!.units).toMatchObject([{ grams: 80, name: 'cup' }]),
+      expect(store.data.value.products[0]!.units).toMatchObject([{ g: 80, name: 'cup' }]),
     );
     const cup = store.data.value.products[0]!.units[0]!;
     expect((field('Unit of oat flakes') as HTMLSelectElement).value).toBe(cup.id);
   });
 
-  it('offers built-in foods, but not recipes that would contain themselves', () => {
+  it('offers foods, but not recipes that would contain themselves', () => {
     const oats = recipe('oats', [ing(oatFlakes, 60)], [makes(1, 'bowl')]);
     start(appData({ products: [oatFlakes], recipes: [oats] }), `/recipe/${oats.id}`);
     const chips = screen.getByLabelText('Foods');
     expect(within(chips).queryByText('oats')).toBeNull();
-    for (const name of ['oat flakes', 'water', 'protein', 'fat', 'carbs']) {
-      expect(within(chips).getByText(name)).toBeTruthy();
-    }
+    expect(within(chips).getByText('oat flakes')).toBeTruthy();
   });
 });
 
@@ -224,10 +276,12 @@ describe('backup', () => {
   it('refuses a broken backup, listing its problems', async () => {
     start(appData({ products: [egg] }), '/menu');
     fireEvent.change(field('Import backup'), {
-      target: { files: [new File(['{"version":"kcal 0.1.0"}'], 'bad.json')] },
+      target: {
+        files: [new File(['{"version":"kcal 0.2.0","goals":{},"products":{}}'], 'bad.json')],
+      },
     });
-    expect(await screen.findByText('Import refused: 4 problems')).toBeTruthy();
-    expect(screen.getByText('products: missing')).toBeTruthy();
+    expect(await screen.findByText('Import refused: 2 problems')).toBeTruthy();
+    expect(screen.getByText('products: must be a list')).toBeTruthy();
     expect(store.data.value.products).toEqual([egg]);
   });
 });
@@ -245,16 +299,15 @@ describe('problem screen', () => {
 });
 
 describe('library and closing screens', () => {
-  it('lists the built-in foods by name among your own, marked and not editable', () => {
-    start(appData({ products: [egg, oatFlakes] }), '/library');
+  it('lists the foods by name, each per 100 of its first base', () => {
+    const juice = { id: 'p:juice', name: 'juice', perMl: { kcal: 0.45 }, units: [] };
+    start(appData({ products: [egg, water, juice, oatFlakes] }), '/library');
     const names = [...document.querySelectorAll('.food-name')].map(
       (n) => n.firstChild?.textContent,
     );
-    expect(names).toEqual(['carbs', 'egg', 'fat', 'oat flakes', 'protein', 'water']);
-    const water = screen.getByLabelText('water, built in, not editable');
-    expect(water.tagName).not.toBe('BUTTON');
-    expect(within(water).getByText('built-in')).toBeTruthy();
-    expect(within(water).getByText('0 kcal · 0 g protein · 100 ml water / 100 g')).toBeTruthy();
+    expect(names).toEqual(['egg', 'juice', 'oat flakes', 'water']);
+    expect(screen.getByText('0 kcal · 0 g protein · 100 ml water / 100 g')).toBeTruthy();
+    expect(screen.getByText('45 kcal · 0 g protein / 100 ml')).toBeTruthy();
   });
 
   it('has no Cancel buttons: × closes a screen and discards its unsaved form', async () => {

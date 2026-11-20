@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'preact/hooks';
 import { NUTRIENT_LABEL, NUTRIENT_UNIT, NUTRIENTS, type Nutrient } from '../config';
-import { isBuiltinName } from '../core/builtins';
-import { newId, pickIngredient, recipesContaining, unitUsages, usages } from '../core/foods';
+import {
+  isUsed,
+  newId,
+  pickIngredient,
+  recipesContaining,
+  unitUsages,
+  usages,
+} from '../core/foods';
 import { formatNutrientValue } from '../core/format';
 import { ingredientsNutrients, type Nutrients } from '../core/nutrition';
 import { cleanText, nameKey } from '../core/text';
@@ -15,7 +21,7 @@ import {
   readIngredients,
   type IngredientRow,
 } from './IngredientsEditor';
-import { plural } from './ProductForm';
+import { usedNotice } from './ProductForm';
 import { goBack, navigate } from './router';
 import {
   emptyUnitRow,
@@ -75,21 +81,15 @@ export function RecipeForm({ store, id, draftKey }: Props) {
     (f) => f.id !== id && nameKey(f.name) === nameKey(cleanName),
   );
   const errors = {
-    name: !cleanName
-      ? 'Add a name'
-      : isBuiltinName(cleanName)
-        ? `“${cleanName}” is a built-in food`
-        : taken
-          ? `“${taken.name}” already exists`
-          : '',
+    name: !cleanName ? 'Add a name' : taken ? `“${taken.name}” already exists` : '',
     ingredients:
       draft.rows.length === 0 ? 'Add ingredients' : invalid.size > 0 ? 'Check the amounts' : '',
     units: units.length === 0 && unitErrors.size === 0 ? 'Say what it makes, e.g. 6 servings' : '',
   };
   const valid = Object.values(errors).every((e) => !e) && unitErrors.size === 0;
 
-  const used = id === null ? { meals: 0, recipes: 0 } : usages(data, id);
-  const inUse = used.meals + used.recipes > 0;
+  const used = id === null ? undefined : usages(data, id);
+  const inUse = used !== undefined && isUsed(used);
 
   function leave() {
     dropDraft(draftKey);
@@ -163,12 +163,7 @@ export function RecipeForm({ store, id, draftKey }: Props) {
 
       <Totals whole={whole} units={units} />
 
-      {inUse && (
-        <p class="notice">
-          Used in {plural(used.meals, 'meal')} and {plural(used.recipes, 'recipe')}: saving changes
-          them too.
-        </p>
-      )}
+      {inUse && <p class="notice">{usedNotice(used)}</p>}
       {saveError && <p class="error">Could not save: {saveError}</p>}
 
       <div class="actions action-bar">

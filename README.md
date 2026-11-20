@@ -31,7 +31,6 @@ src/
   config.ts       what the app tracks: nutrients, g and ml
   core/           pure logic: no DOM, storage or Preact
     types.ts        the stored data (docs/backup-format.md): products, recipes, meals, goals
-    builtins.ts     built-in foods: water, protein, fat, carbs
     nutrition.ts    the in-memory food table (derived, exact quantities), meal and day totals
     canonical.ts    canonical order and JSON: the same data always gives the same file
     validate.ts     integrity checks for saved data and imports
@@ -39,7 +38,7 @@ src/
     goals.ts        goals that apply to a day, saving goals
     meals.ts        meal times (UTC, minute edits), macro split
     foods.ts        picking foods, chip order, usages, ids
-    units.ts        product units, converting label values to per gram
+    units.ts        product units, converting label values to per g or per ml
     text.ts         cleaning names
     time.ts         UTC timestamps and local dates and minutes
     format.ts       reading typed numbers, formatting amounts

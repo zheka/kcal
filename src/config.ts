@@ -9,7 +9,7 @@
  */
 export const APP_NAME = 'kcal';
 
-/** Nutrients, in display order. Each is a number per gram of a food; omitted counts as 0. */
+/** Nutrients, in display order. Each is an amount per g or per ml of a product. */
 export const NUTRIENTS = ['kcal', 'protein', 'fat', 'carbs', 'water'] as const;
 export type Nutrient = (typeof NUTRIENTS)[number];
 
@@ -30,10 +30,14 @@ export const NUTRIENT_LABEL: Readonly<Record<Nutrient, string>> = {
   water: 'Water',
 };
 
-/** The unit every product and built-in food has: grams. Reserved as a product unit name. */
+/** The bases a product can be measured in: grams and millilitres. Reserved as unit names. */
 export const GRAMS = 'g';
-/** Built-in water's second unit: millilitres, equal to grams. */
 export const MILLILITRES = 'ml';
+export const BASES = [GRAMS, MILLILITRES] as const;
+export type Base = (typeof BASES)[number];
+
+/** A quick button's label is at most this many characters as seen (grapheme clusters). */
+export const LABEL_MAX_CHARS = 12;
 
 /** Decimals every stored number may have at most. */
 export const STORED_DECIMALS = 3;

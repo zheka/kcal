@@ -6,6 +6,8 @@ import { cleanText, nameKey } from '../core/text';
 import type { Ingredient } from '../core/types';
 import { roundStored } from '../core/decimal';
 import { isReservedProductUnitName } from '../core/units';
+import { GRAMS, type Base } from '../config';
+import { BaseSelect } from './UnitsEditor';
 import type { Store } from '../state/store';
 import { FoodPicker } from './FoodPicker';
 
@@ -83,10 +85,7 @@ export function IngredientsEditor({
         const kcal =
           amount === null
             ? '–'
-            : formatNutrientValue(
-                ingredientPortion(foods, { ...row, amount }).nutrients.kcal,
-                'kcal',
-              );
+            : formatNutrientValue(ingredientPortion(foods, { ...row, amount }).kcal, 'kcal');
         return (
           <div class="ingredient" key={row.key}>
             <div class="ingredient-main">
@@ -122,7 +121,7 @@ export function IngredientsEditor({
                     {u.name}
                   </option>
                 ))}
-                {food.kind !== 'builtin' && <option value={NEW_UNIT}>＋ new unit…</option>}
+                <option value={NEW_UNIT}>＋ new unit…</option>
               </select>
               <button
                 type="button"
@@ -159,7 +158,8 @@ export function IngredientsEditor({
 
 /**
  * Adds a unit to a food right from an ingredient row, and selects it: for a product, how many
- * grams one weighs; for a recipe, how many of it the whole recipe makes.
+ * g or ml one is (in a base the product has); for a recipe, how many of it the whole recipe
+ * makes.
  */
 function NewUnitForm({
   store,
@@ -172,6 +172,7 @@ function NewUnitForm({
 }) {
   const [name, setName] = useState('');
   const [valueText, setValueText] = useState('');
+  const [base, setBase] = useState<Base>(food.bases[0] ?? GRAMS);
   const [error, setError] = useState('');
   const isProduct = food.kind === 'product';
 
@@ -181,13 +182,13 @@ function NewUnitForm({
     const value = parsed === null ? null : roundStored(parsed);
     if (!unitName) return setError('Add a name');
     if (isProduct && isReservedProductUnitName(unitName)) {
-      return setError('“g” is built in: every product has grams');
+      return setError(`“${unitName}” is built in`);
     }
     if (food.units.some((u) => nameKey(u.name) === nameKey(unitName))) {
       return setError(`“${unitName}” already exists`);
     }
     if (value === null || value <= 0) {
-      return setError(isProduct ? 'Add its weight in grams' : 'Add how many the recipe makes');
+      return setError(isProduct ? `Add how many ${base} it is` : 'Add how many the recipe makes');
     }
     const data = store.data.value;
     const id = newId();
@@ -196,7 +197,10 @@ function NewUnitForm({
         const product = data.products.find((p) => p.id === food.id)!;
         store.saveProduct({
           ...product,
-          units: [...product.units, { grams: value, id, name: unitName }],
+          units: [
+            ...product.units,
+            base === GRAMS ? { g: value, id, name: unitName } : { id, ml: value, name: unitName },
+          ],
         });
       } else {
         const recipe = data.recipes.find((r) => r.id === food.id)!;
@@ -223,7 +227,7 @@ function NewUnitForm({
   const valueInput = (
     <input
       class="input number"
-      aria-label={isProduct ? 'New unit grams' : 'New unit makes'}
+      aria-label={isProduct ? 'New unit size' : 'New unit makes'}
       inputMode="decimal"
       placeholder={isProduct ? '250' : '6'}
       value={valueText}
@@ -241,7 +245,7 @@ function NewUnitForm({
             {nameInput}
             <span>=</span>
             {valueInput}
-            <span>g</span>
+            <BaseSelect bases={food.bases} value={base} onChange={setBase} label="New unit base" />
           </>
         ) : (
           <>

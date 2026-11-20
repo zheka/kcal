@@ -43,7 +43,7 @@ describe('canonical JSON', () => {
   it('gives the same text for the same data in any order', () => {
     const one = appData({ products: [egg, oatFlakes] });
     const other = appData({
-      products: [oatFlakes, { units: egg.units, perGram: egg.perGram, name: egg.name, id: egg.id }],
+      products: [oatFlakes, { units: egg.units, perG: egg.perG!, name: egg.name, id: egg.id }],
     });
     expect(canonicalJson(canonical(one))).toBe(canonicalJson(canonical(other)));
   });

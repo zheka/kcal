@@ -1,7 +1,12 @@
 import { expect, expectNoHorizontalScroll, expectOnScreen, test } from './fixtures';
 
+/** The sample's quick buttons, by their accessible names: 💧 water, then 🍽️ an empty meal. */
+const QUICK = ['💧: water · 250 ml', '🍽️: New meal'] as const;
+
 test.describe('day screen', () => {
-  test('fits the chart, all meals and both buttons on one screen', async ({ seeded: page }) => {
+  test('fits the chart, all meals and the quick buttons on one screen', async ({
+    seeded: page,
+  }) => {
     await page.goto('#/');
     await expectNoHorizontalScroll(page);
     for (const name of ['Previous day', 'Next day', 'Menu']) {
@@ -15,18 +20,37 @@ test.describe('day screen', () => {
     const rows = page.locator('.meal-row');
     await expect(rows).toHaveCount(6);
     for (const row of await rows.all()) await expectOnScreen(row);
-    for (const name of ['＋ Eat', '＋ Water'])
-      await expectOnScreen(page.getByRole('button', { name }));
+    for (const name of QUICK) {
+      const button = page.getByRole('button', { name });
+      await expectOnScreen(button);
+      const box = (await button.boundingBox())!;
+      expect(box.width, `${name} is too small to tap`).toBeGreaterThanOrEqual(48);
+      expect(box.height, `${name} is too small to tap`).toBeGreaterThanOrEqual(48);
+    }
   });
 
-  test('keeps the buttons at the bottom of the screen on an empty day', async ({
+  test('stacks the quick buttons round in the bottom-right corner, in their order', async ({
     seeded: page,
   }) => {
     await page.goto('#/day/2020-01-01');
-    const eat = page.getByRole('button', { name: '＋ Eat' });
-    await expectOnScreen(eat);
-    const box = (await eat.boundingBox())!;
-    expect(915 - (box.y + box.height)).toBeLessThan(40);
+    const [water, eat] = await Promise.all(
+      QUICK.map(async (name) => (await page.getByRole('button', { name }).boundingBox())!),
+    );
+    // the last one at the bottom, within thumb reach, on the right edge
+    expect(915 - (eat!.y + eat!.height)).toBeLessThan(40);
+    expect(412 - (eat!.x + eat!.width)).toBeLessThan(24);
+    expect(water!.y + water!.height).toBeLessThan(eat!.y);
+    expect(water!.x + water!.width).toBeCloseTo(eat!.x + eat!.width, 0);
+    // round
+    expect(eat!.width).toBeCloseTo(eat!.height, 0);
+  });
+
+  test('lets the last meal scroll clear of the quick buttons', async ({ seeded: page }) => {
+    await page.goto('#/');
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const last = (await page.locator('.meal-row').last().boundingBox())!;
+    const top = (await page.getByRole('button', { name: QUICK[0] }).boundingBox())!;
+    expect(last.y + last.height).toBeLessThanOrEqual(top.y);
   });
 
   test('shows meal rows on one line each', async ({ seeded: page }) => {
@@ -70,11 +94,11 @@ test.describe('meal composer', () => {
     await expectOnScreen(page.getByRole('button', { name: 'Save' }));
   });
 
-  test('logs a glass of water with ＋ Water', async ({ seeded: page }) => {
+  test('logs a glass of water with the 💧 quick button', async ({ seeded: page }) => {
     await page.goto('#/');
-    await page.getByRole('button', { name: '＋ Water' }).click();
-    await expect(page.getByRole('heading', { name: 'Drink' })).toBeVisible();
-    await page.getByLabel('Amount of water').fill('250');
+    await page.getByRole('button', { name: QUICK[0] }).click();
+    await expect(page.getByRole('heading', { name: 'New meal' })).toBeVisible();
+    await expect(page.getByLabel('Amount of water')).toHaveValue('250');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
     await expect(page.locator('.meal-row')).toHaveCount(7);
@@ -111,6 +135,9 @@ test.describe('forms', () => {
       'Per unit',
     ]) {
       await expectOnScreen(page.getByLabel(label, { exact: true }));
+    }
+    for (const label of ['per g', 'per ml']) {
+      await expectOnScreen(page.getByRole('button', { name: label, exact: true }));
     }
     for (const unit of await page.getByLabel('Unit name').all()) await expect(unit).toBeVisible();
   });

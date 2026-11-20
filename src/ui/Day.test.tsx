@@ -26,8 +26,11 @@ const goals = [
 function start(data: Partial<AppData> = {}, path = '/') {
   store = createStore(
     appData({
-      products: [egg, oatFlakes, honey],
+      products: [egg, oatFlakes, honey, water],
       goals,
+      settings: {
+        quickButtons: [{ amount: 250, food: water.id, label: '💧', unit: 'ml' }, { label: '🍽️' }],
+      },
       meals: [breakfast, lunch, yesterday],
       ...data,
     }),
@@ -67,8 +70,8 @@ describe('day screen', () => {
 
     const rows = screen.getAllByRole('button', { name: /kcal ·/ });
     expect(rows.map((r) => r.textContent)).toEqual([
-      '13:00370 kcal · 13 g protein · 300 ml water✎',
-      '08:30172 kcal · 15 g protein · 0 ml water✎',
+      '13:00370 kcal · 13 g protein · 300 ml water',
+      '08:30172 kcal · 15 g protein · 0 ml water',
     ]);
   });
 
@@ -99,7 +102,7 @@ describe('day screen', () => {
     start({ goals: [] });
     expect(bar(/^kcal/)).toBe('kcal: 542 taken, no goal');
     expect(screen.getAllByRole('button', { name: /kcal/ }).map((r) => r.textContent)).toContain(
-      '13:00370 kcal✎',
+      '13:00370 kcal',
     );
     click('Set daily goals');
     expect(screen.getByRole('heading', { name: 'Goals' })).toBeTruthy();
@@ -109,7 +112,7 @@ describe('day screen', () => {
 describe('meal composer', () => {
   it('composes a meal against the day and logs it at the exact moment', async () => {
     start();
-    click('＋ Eat');
+    click('🍽️: New meal');
     expect(screen.getByRole('heading', { name: 'New meal' })).toBeTruthy();
     expect(input('Consumed at').value).toBe('2026-11-17T19:45');
     pick('egg');
@@ -127,24 +130,51 @@ describe('meal composer', () => {
     });
   });
 
-  it('logs a glass of water with ＋ Water', async () => {
+  it('shows the quick buttons from the settings, in their order, round or pill-shaped', () => {
+    start({
+      settings: {
+        quickButtons: [
+          { amount: 250, food: water.id, label: '💧', unit: 'ml' },
+          { amount: 2, food: egg.id, label: 'eggs', unit: 'u:piece' },
+          { label: '🍽️' },
+        ],
+      },
+    });
+    const buttons = within(screen.getByRole('navigation', { name: 'Quick buttons' }))
+      .getAllByRole('button')
+      .map((b) => [b.getAttribute('aria-label'), b.className]);
+    expect(buttons).toEqual([
+      ['💧: water · 250 ml', 'quick-button round'],
+      ['eggs: egg · 2 piece', 'quick-button pill'],
+      ['🍽️: New meal', 'quick-button round'],
+    ]);
+    click('eggs: egg · 2 piece');
+    expect(input('Amount of egg').value).toBe('2');
+  });
+
+  it('has no quick buttons, and no plain eat button, when the settings have none', () => {
+    start({ settings: { quickButtons: [] } });
+    expect(screen.queryByRole('navigation', { name: 'Quick buttons' })).toBeNull();
+  });
+
+  it('logs a glass of water with the 💧 quick button, its amount as set', async () => {
     start();
-    click('＋ Water');
-    expect(screen.getByRole('heading', { name: 'Drink' })).toBeTruthy();
-    // the last use of water: 300 ml
-    expect(input('Amount of water').value).toBe('300');
-    expect(bar(/^Water/)).toBe('Water: 300 ml taken, 300 ml this meal, goal 2000 ml');
+    click('💧: water · 250 ml');
+    expect(screen.getByRole('heading', { name: 'New meal' })).toBeTruthy();
+    // the button's amount, not the last use (300 ml)
+    expect(input('Amount of water').value).toBe('250');
+    expect(bar(/^Water/)).toBe('Water: 300 ml taken, 250 ml this meal, goal 2000 ml');
     click('Save');
     await screen.findByRole('heading', { name: 'Today' });
-    expect(store.data.value.meals.at(-1)?.ingredients).toEqual([ing(water, 300, 'ml')]);
+    expect(store.data.value.meals.at(-1)?.ingredients).toEqual([ing(water, 250, 'ml')]);
     expect(screen.getAllByRole('button', { name: /kcal ·/ })[0]!.textContent).toBe(
-      '19:450 kcal · 0 g protein · 300 ml water✎',
+      '19:450 kcal · 0 g protein · 250 ml water',
     );
   });
 
   it('refuses an empty meal', () => {
     start();
-    click('＋ Eat');
+    click('🍽️: New meal');
     click('Save');
     expect(screen.getByText('Add food')).toBeTruthy();
     expect(store.data.value.meals).toHaveLength(3);
@@ -189,7 +219,7 @@ describe('meal composer', () => {
 
   it('adds a meal to a past day a minute after its last meal, with the seconds of now', async () => {
     start({}, '/day/2026-11-16');
-    click('＋ Eat');
+    click('🍽️: New meal');
     expect(input('Consumed at').value).toBe('2026-11-16T09:01');
     pick('egg');
     click('Save');

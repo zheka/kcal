@@ -1,21 +1,36 @@
-import { GRAMS, MILLILITRES } from '../config';
-import { WATER_ID } from './builtins';
 import { byTime, type FoodEntry, type FoodTable } from './nutrition';
 import { nameKey } from './text';
 import type { AppData, Ingredient, Meal, Product, Recipe } from './types';
 
-/** How many meals and recipes use a food directly (shown before editing a used food). */
-export function usages(data: AppData, foodId: string): { meals: number; recipes: number } {
+export interface Usages {
+  meals: number;
+  recipes: number;
+  quickButtons: number;
+}
+
+/** How many meals, recipes and quick buttons use a food directly. */
+export function usages(data: AppData, foodId: string): Usages {
   const uses = (ingredients: Ingredient[]) => ingredients.some((i) => i.food === foodId);
   return {
     meals: data.meals.filter((m) => uses(m.ingredients)).length,
     recipes: data.recipes.filter((r) => uses(r.ingredients)).length,
+    quickButtons: data.settings.quickButtons.filter((b) => b.food === foodId).length,
   };
 }
 
-/** How many ingredients, in meals and recipes, measure a food in one of its units. */
+export function isUsed(used: Usages): boolean {
+  return used.meals + used.recipes + used.quickButtons > 0;
+}
+
+/**
+ * How many ingredients (in meals and recipes) and quick buttons measure a food in one of its
+ * units, or in one of a product's bases (`g`, `ml`).
+ */
 export function unitUsages(data: AppData, foodId: string, unitId: string): number {
-  const all = [...data.meals, ...data.recipes].flatMap((x) => x.ingredients);
+  const all = [
+    ...[...data.meals, ...data.recipes].flatMap((x) => x.ingredients),
+    ...data.settings.quickButtons,
+  ];
   return all.filter((i) => i.food === foodId && i.unit === unitId).length;
 }
 
@@ -35,19 +50,18 @@ function newestFirst(meals: readonly Meal[]): Meal[] {
 
 /**
  * The ingredient to add when a food is picked: the amount and unit of its most recent use (in
- * meals by time, then in recipes), otherwise a default: 250 ml of water, 1 of a recipe's first
- * unit or of a product's own first unit, else 100 g.
+ * meals by time, then in recipes), otherwise a default: 1 of the food's own first unit (a
+ * recipe's, or a product's), else 100 of the product's first base (100 g, or 100 ml).
  */
 export function pickIngredient(data: AppData, food: FoodEntry): Ingredient {
   for (const { ingredients } of [...newestFirst(data.meals), ...[...data.recipes].reverse()]) {
     const last = ingredients.find((i) => i.food === food.id);
     if (last && food.units.some((u) => u.id === last.unit)) return { ...last };
   }
-  if (food.id === WATER_ID) return { amount: 250, food: food.id, unit: MILLILITRES };
-  const own = food.units.find((u) => u.id !== GRAMS);
+  const own = food.units.find((u) => !(food.bases as readonly string[]).includes(u.id));
   return own
     ? { amount: 1, food: food.id, unit: own.id }
-    : { amount: 100, food: food.id, unit: GRAMS };
+    : { amount: 100, food: food.id, unit: food.bases[0]! };
 }
 
 /** Foods for chips: the most recently consumed first, then the rest by name. */

@@ -1,8 +1,7 @@
-import { GRAMS, NUTRIENTS } from '../config';
-import { isBuiltinId, isBuiltinName } from './builtins';
+import { BASES, LABEL_MAX_CHARS, NUTRIENTS, type Base } from '../config';
 import { isStoredPrecision } from './decimal';
 import { buildFoodTable, FoodTableError } from './nutrition';
-import { isClean, nameKey } from './text';
+import { charCount, isClean, nameKey } from './text';
 import { isValidUtc } from './time';
 import type { Product, Recipe } from './types';
 import { isReservedProductUnitName } from './units';
@@ -22,11 +21,13 @@ export function validateAppData(data: object): string[] {
   const meals = check.list(doc.meals, 'meals');
   const products = check.list(doc.products, 'products');
   const recipes = check.list(doc.recipes, 'recipes');
+  const settings = check.settings(doc.settings);
 
   goals.forEach((g, i) => check.goalSet(g, i, goals[i - 1]));
   products.forEach((p, i) => check.product(p, i));
   recipes.forEach((r, i) => check.recipe(r, i));
   meals.forEach((m, i) => check.meal(m, i));
+  settings.quickButtons.forEach((b, i) => check.quickButton(b, i));
 
   // References are checked only on well-formed data, so every message has one cause.
   if (problems.length === 0) check.references();
@@ -41,6 +42,7 @@ const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.is
 interface FoodInfo {
   kind: 'product' | 'recipe';
   name: string;
+  /** Unit ids an ingredient may use: the product's bases and the food's own units. */
   unitIds: Set<string>;
 }
 
@@ -60,10 +62,17 @@ class Checker {
     this.problems.push(`${where}: ${what}`);
   }
 
+  /** An optional list: omitted means empty. */
   list(value: unknown, name: string): unknown[] {
-    if (Array.isArray(value)) return value;
-    this.problems.push(`${name}: ${value === undefined ? 'missing' : 'must be a list'}`);
+    if (value === undefined || Array.isArray(value)) return value ?? [];
+    this.problems.push(`${name}: must be a list`);
     return [];
+  }
+
+  settings(value: unknown): { quickButtons: unknown[] } {
+    if (value === undefined) return { quickButtons: [] };
+    const settings = this.record(value, 'settings', [], ['quickButtons']);
+    return { quickButtons: this.list(settings?.quickButtons, 'settings, quickButtons') };
   }
 
   /** An object with exactly these required and optional fields. */
@@ -102,10 +111,6 @@ class Checker {
       this.problem(where, 'id must be a non-empty text');
       return false;
     }
-    if (isBuiltinId(value)) {
-      this.problem(where, `id "${value}" is a built-in food's`);
-      return false;
-    }
     const seen = this.ids.get(value);
     if (seen) {
       this.problem(where, `id ${value} is also used by ${seen}`);
@@ -115,19 +120,24 @@ class Checker {
     return true;
   }
 
-  private name(value: unknown, where: string): value is string {
+  private name(value: unknown, where: string, field = 'name'): value is string {
     if (typeof value !== 'string' || value.trim() === '') {
-      this.problem(where, 'name must be a non-empty text');
+      this.problem(where, `${field} must be a non-empty text`);
       return false;
     }
-    if (!isClean(value)) this.problem(where, 'name has extra spaces or is not in Unicode NFC form');
+    if (!isClean(value)) {
+      this.problem(where, `${field} has extra spaces or is not in Unicode NFC form`);
+    }
     return true;
   }
 
-  private nutrients(value: unknown, where: string, positive: boolean): void {
+  private nutrients(value: unknown, where: string, positive: boolean, nonEmpty = false): void {
     if (!isRecord(value)) {
       this.problem(where, 'must be an object');
       return;
+    }
+    if (nonEmpty && Object.keys(value).length === 0) {
+      this.problem(where, 'must have at least one nutrient');
     }
     for (const [key, v] of Object.entries(value)) {
       if (!(NUTRIENTS as readonly string[]).includes(key)) {
@@ -143,41 +153,41 @@ class Checker {
     return `${kind} #${index + 1}${name}`;
   }
 
-  /** The fields products and recipes share: id, name, units (each with id and name). */
+  /**
+   * The fields products and recipes share: id, name, units (each with id and name). `unitIds`
+   * starts with the units every such food has (a product's bases).
+   */
   private food(
     value: Rec,
     kind: 'product' | 'recipe',
     where: string,
+    unitFields: { required: string[]; optional?: string[] },
     checkUnit: (unit: Rec, at: string) => void,
+    unitIds = new Set<string>(),
   ): void {
     const hasId = this.id(value.id, where);
     const named = this.name(value.name, where);
     if (named) {
       const key = nameKey(value.name as string);
       const seen = this.names.get(key);
-      if (isBuiltinName(value.name as string)) {
-        this.problem(where, `"${value.name}" is the name of a built-in food`);
-      } else if (seen) {
+      if (seen) {
         this.problem(where, `name is also used by ${seen}`);
       } else {
         this.names.set(key, where);
       }
     }
-    const unitIds = new Set<string>();
-    if (!Array.isArray(value.units)) {
+    // A product's units may be omitted (none); a recipe needs at least one.
+    const units = kind === 'product' && value.units === undefined ? [] : value.units;
+    if (!Array.isArray(units)) {
       this.problem(where, 'units must be a list');
     } else {
-      if (kind === 'recipe' && value.units.length === 0) {
+      if (kind === 'recipe' && units.length === 0) {
         this.problem(where, 'needs at least one unit: recipes are eaten only in their own units');
       }
       const unitNames = new Set<string>();
-      value.units.forEach((u, i) => {
+      units.forEach((u, i) => {
         const at = `${where}, unit #${i + 1}`;
-        const unit = this.record(
-          u,
-          at,
-          kind === 'product' ? ['grams', 'id', 'name'] : ['id', 'makes', 'name'],
-        );
+        const unit = this.record(u, at, unitFields.required, unitFields.optional);
         if (!unit) return;
         if (this.id(unit.id, at)) unitIds.add(unit.id as string);
         if (this.name(unit.name, at)) {
@@ -212,16 +222,42 @@ class Checker {
 
   product(value: unknown, index: number): void {
     const where = this.describe('product', value, index);
-    const product = this.record(value, where, ['id', 'name', 'perGram', 'units'], ['barcode']);
+    const product = this.record(
+      value,
+      where,
+      ['id', 'name'],
+      ['barcode', 'perG', 'perMl', 'units'],
+    );
     if (!product) return;
     this.products.push(product);
-    this.food(product, 'product', where, (unit, at) => {
-      if (typeof unit.name === 'string' && isReservedProductUnitName(unit.name)) {
-        this.problem(at, `"${unit.name}" is reserved: every product has grams`);
-      }
-      this.number(unit.grams, at, 'grams', true);
-    });
-    this.nutrients(product.perGram, `${where}, perGram`, false);
+    const field: Record<Base, string> = { g: 'perG', ml: 'perMl' };
+    const bases = BASES.filter((b) => field[b] in product);
+    if (bases.length === 0) {
+      this.problem(where, 'needs perG, perMl or both: the values per g or per ml');
+    }
+    for (const b of bases) this.nutrients(product[field[b]], `${where}, ${field[b]}`, false, true);
+    this.food(
+      product,
+      'product',
+      where,
+      { required: ['id', 'name'], optional: ['g', 'ml'] },
+      (unit, at) => {
+        if (typeof unit.name === 'string' && isReservedProductUnitName(unit.name)) {
+          this.problem(at, `"${unit.name}" is reserved: g and ml are a product's bases`);
+        }
+        const unitBases = BASES.filter((b) => b in unit);
+        if (unitBases.length !== 1) {
+          this.problem(at, 'needs exactly one of g and ml: how many g or ml one of it is');
+          return;
+        }
+        const base = unitBases[0]!;
+        this.number(unit[base], at, base, true);
+        if (!bases.includes(base)) {
+          this.problem(at, `is in ${base}, but the product has no ${field[base]}`);
+        }
+      },
+      new Set(bases),
+    );
     if ('barcode' in product) this.barcode(product.barcode, where);
   }
 
@@ -241,7 +277,9 @@ class Checker {
     const recipe = this.record(value, where, ['id', 'ingredients', 'name', 'units']);
     if (!recipe) return;
     this.recipes.push(recipe);
-    this.food(recipe, 'recipe', where, (unit, at) => this.number(unit.makes, at, 'makes', true));
+    this.food(recipe, 'recipe', where, { required: ['id', 'makes', 'name'] }, (unit, at) =>
+      this.number(unit.makes, at, 'makes', true),
+    );
     this.ingredientList(recipe.ingredients, where);
   }
 
@@ -254,6 +292,28 @@ class Checker {
     if (!valid)
       this.problem(where, 'consumedAt must be a UTC timestamp like 2026-11-17T07:30:41.512Z');
     this.ingredientList(meal.ingredients, valid ? `${where} (${String(meal.consumedAt)})` : where);
+  }
+
+  /** A quick button: a label, and optionally a food with an amount and unit. */
+  quickButton(value: unknown, index: number): void {
+    const where = `quick button #${index + 1}`;
+    const button = this.record(value, where, ['label'], ['amount', 'food', 'unit']);
+    if (!button) return;
+    if (this.name(button.label, where, 'label') && charCount(button.label) > LABEL_MAX_CHARS) {
+      this.problem(where, `label must be at most ${LABEL_MAX_CHARS} characters`);
+    }
+    const given = ['amount', 'food', 'unit'].filter((f) => f in button);
+    if (given.length === 0) return;
+    if (given.length < 3) {
+      this.problem(where, 'needs food, amount and unit together, or none of them');
+      return;
+    }
+    this.number(button.amount, where, 'amount', true);
+    if (typeof button.food !== 'string') this.problem(where, 'food must be a text (an id)');
+    if (typeof button.unit !== 'string') this.problem(where, 'unit must be a text');
+    if (typeof button.food === 'string' && typeof button.unit === 'string') {
+      this.ingredients.push({ where, food: button.food, unit: button.unit });
+    }
   }
 
   goalSet(value: unknown, index: number, previous: unknown): void {
@@ -277,32 +337,21 @@ class Checker {
 
   references(): void {
     for (const { where, food, unit } of this.ingredients) {
-      if (isBuiltinId(food)) continue; // checked below, with the food table
       const info = this.foods.get(food);
       if (!info) {
         this.problem(where, `refers to food ${food}, which does not exist`);
-      } else if (!info.unitIds.has(unit) && !(info.kind === 'product' && unit === GRAMS)) {
+      } else if (!info.unitIds.has(unit)) {
         this.problem(where, `"${info.name}" has no unit "${unit}"`);
       }
     }
     if (this.problems.length > 0) return;
-    // Units of built-in foods, and recipes that contain each other, show up while deriving.
+    // Recipes that contain each other show up while deriving.
     try {
-      buildFoodTable(this.products as unknown as Product[], this.recipes as unknown as Recipe[]);
-      this.builtinUnits();
+      const products = this.products.map((p) => ({ ...p, units: p.units ?? [] }));
+      buildFoodTable(products as unknown as Product[], this.recipes as unknown as Recipe[]);
     } catch (err) {
       if (!(err instanceof FoodTableError)) throw err;
       this.problems.push(err.message);
-    }
-  }
-
-  private builtinUnits(): void {
-    const table = buildFoodTable([], []);
-    for (const { where, food, unit } of this.ingredients) {
-      const builtin = isBuiltinId(food) ? table.get(food) : undefined;
-      if (builtin && !builtin.units.some((u) => u.id === unit)) {
-        this.problem(where, `"${builtin.name}" has no unit "${unit}"`);
-      }
     }
   }
 }

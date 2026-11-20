@@ -2,7 +2,7 @@
 
 The format of kcal's backup file and of the data the app saves in the browser: `kcal 0.2.0`.
 
-Status (2026-11-20): **agreed, not implemented yet.** The app still writes `kcal 0.1.1`.
+Status (2026-11-20): **agreed and implemented.**
 
 | Version | Change                                                                                                                                                                                              |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -39,8 +39,8 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
   to it (forms, on save) or derived from it (tables, and forms opened for editing). It is:
   - **normalized**: every fact is stored once; nothing derived, duplicated or cached is stored;
   - **consistent**: checked on every change and every load, so it is always valid.
-- The app keeps the stored data in memory in exactly this format; saving writes it out,
-  restoring reads it in.
+- The app keeps the stored data in memory in this format, with omitted lists and objects
+  filled in as empty; saving writes it out (omitting them again), restoring reads it in.
 - **Data flows one way.** Saving a form converts what was typed into stored data; the tables
   are then recomputed from the stored data. Tables are never edited and never written back.
 - **Conversion and rounding happen in one place**: form → stored.
@@ -136,7 +136,14 @@ depends on them, and they can be edited or removed like anything else.
 
 ```json
 {
-  "products": [{ "id": "…", "name": "water", "perG": { "water": 1 }, "perMl": { "water": 1 } }],
+  "products": [
+    {
+      "id": "…",
+      "name": "water",
+      "perG": { "carbs": 0, "fat": 0, "kcal": 0, "protein": 0, "water": 1 },
+      "perMl": { "carbs": 0, "fat": 0, "kcal": 0, "protein": 0, "water": 1 }
+    }
+  ],
   "settings": {
     "quickButtons": [
       { "amount": 250, "food": "<water id>", "label": "💧", "unit": "ml" },

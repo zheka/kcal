@@ -1,3 +1,4 @@
+import { newId } from '../core/foods';
 import type { AppData } from '../core/types';
 import { documentJson, parseDocument } from './backup';
 
@@ -7,7 +8,24 @@ export const STORAGE_KEY = 'kcal';
 /** Saved data beyond this many characters gets a warning: `localStorage` holds about 5 million. */
 export const SIZE_WARNING_CHARS = 3_000_000;
 
-export const EMPTY_DATA: AppData = { goals: [], meals: [], products: [], recipes: [] };
+/**
+ * What the app starts with: a water product and two quick buttons, 💧 (250 ml of water) and
+ * 🍽️ (an empty meal). Ordinary data: nothing depends on it, and all of it can be changed.
+ */
+export function freshData(): AppData {
+  // Water's nutrients are known: zeros, and 1 ml of water per g and per ml.
+  const values = { carbs: 0, fat: 0, kcal: 0, protein: 0, water: 1 };
+  const water = { id: newId(), name: 'water', perG: values, perMl: values, units: [] };
+  return {
+    goals: [],
+    meals: [],
+    products: [water],
+    recipes: [],
+    settings: {
+      quickButtons: [{ amount: 250, food: water.id, label: '💧', unit: 'ml' }, { label: '🍽️' }],
+    },
+  };
+}
 
 export type LoadResult =
   | { ok: true; data: AppData }
@@ -15,12 +33,17 @@ export type LoadResult =
   | { ok: false; problems: string[]; raw: string };
 
 /**
- * Reads the saved data, checked exactly like an import; starts empty when there is none.
- * When the check fails nothing is changed, so the data can be downloaded as it is.
+ * Reads the saved data, checked exactly like an import. When there is none, starts fresh and
+ * saves that at once, so the fresh data's ids stay the same. When the check fails nothing is
+ * changed, so the data can be downloaded as it is.
  */
 export function loadSaved(storage: Storage = localStorage): LoadResult {
   const raw = storage.getItem(STORAGE_KEY);
-  if (raw === null) return { ok: true, data: EMPTY_DATA };
+  if (raw === null) {
+    const data = freshData();
+    saveData(data, storage);
+    return { ok: true, data };
+  }
   const result = parseDocument(raw);
   return result.ok ? result : { ok: false, problems: result.problems, raw };
 }

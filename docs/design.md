@@ -207,7 +207,7 @@ Agreed:
 - **The water goal** is a target like the others (e.g. 2000 ml), and water has its own bar in
   the day chart, on its own scale (ml).
 - **No built-in foods** (agreed). Water is an ordinary product that a fresh start creates
-  (per g and per ml, 1 ml of water each), editable, renamable and deletable when unused like
+  (per g and per ml: 1 ml of water, 0 of everything else), editable, renamable and deletable when unused like
   any other. Pure protein, fat or carbs, to estimate a meal as macros, are products you make
   yourself if you want them.
 - **Quick buttons** (agreed) on the day screen start a meal: each is a label (an emoji or a
@@ -400,8 +400,8 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
   to it (forms, on save) or derived from it (tables, and forms opened for editing). It is:
   - **normalized**: every fact is stored once; nothing derived, duplicated or cached is stored;
   - **consistent**: checked on every change and every load, so it is always valid.
-- The app keeps the stored data in memory in exactly this format; saving writes it out,
-  restoring reads it in.
+- The app keeps the stored data in memory in this format, with omitted lists and objects
+  filled in as empty; saving writes it out (omitting them again), restoring reads it in.
 - **Data flows one way.** Saving a form converts what was typed into stored data; the tables
   are then recomputed from the stored data. Tables are never edited and never written back;
   opening a form to edit starts from the stored data.
@@ -571,8 +571,8 @@ Agreed scope: the smallest app I can use every day for eating against my goals.
    primary form (per-gram products, recipes eaten in their own units, UTC times, canonical
    JSON, at most 3 decimals, exact quantities); water as a nutrient with built-in foods (water,
    protein, fat, carbs) and ＋ Water; meal rows showing the nutrients that have goals.
-7. **Next:** format `kcal 0.2.0`: products per g and/or per ml, units in g or ml, zeros
+7. **Done:** format `kcal 0.2.0`: products per g and/or per ml, units in g or ml, zeros
    stored, empty lists omitted, no built-in foods (water is an ordinary product), quick
-   buttons in `settings` (the day screen's ＋ Eat and ＋ Water become the two default
-   buttons; their layout is discussed separately).
+   buttons in `settings`, round and stacked bottom-right (the day screen's ＋ Eat and ＋ Water
+   became the two default buttons, 🍽️ and 💧); tapping a meal row opens it.
 8. Weight logging; then the Stats screen (reports, weight charts) and the analysis export.

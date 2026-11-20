@@ -1,5 +1,5 @@
 import { APP_NAME } from '../config';
-import { canonical, canonicalJson } from '../core/canonical';
+import { canonicalJson, fromDocument, toDocument } from '../core/canonical';
 import { isValidUtc } from '../core/time';
 import type { AppData } from '../core/types';
 import { validateAppData } from '../core/validate';
@@ -11,11 +11,19 @@ import { validateAppData } from '../core/validate';
  * The version of the format, independent of app releases. While 0.x, a minor bump may break
  * (needs a migration) and a patch only adds optional fields.
  */
-export const SCHEMA_VERSION = '0.1.1';
+export const SCHEMA_VERSION = '0.2.0';
 /** `version` of every kcal document: marks it as kcal data and versions it. */
 export const VERSION_TAG = `${APP_NAME} ${SCHEMA_VERSION}`;
 
-const DOCUMENT_FIELDS = ['exportedAt', 'goals', 'meals', 'products', 'recipes', 'version'];
+const DOCUMENT_FIELDS = [
+  'exportedAt',
+  'goals',
+  'meals',
+  'products',
+  'recipes',
+  'settings',
+  'version',
+];
 
 /** A problem with the version, or null when this app can read it as it is. */
 export function versionProblem(version: unknown): string | null {
@@ -34,7 +42,7 @@ export function versionProblem(version: unknown): string | null {
     (major === ownMajor && minor === ownMinor && patch > ownPatch);
   if (newer) return `version "${version}" is newer than this app (${VERSION_TAG}): update the app`;
   if (major !== ownMajor || minor !== ownMinor) {
-    return `version "${version}" is older than this app (${VERSION_TAG}) and needs an upgrade`;
+    return `version "${version}" is from an older ${APP_NAME} (this app reads ${VERSION_TAG}) and can no longer be read`;
   }
   return null;
 }
@@ -79,16 +87,19 @@ export function parseDocument(text: string): ParseResult {
   }
   const problems = validateDocument(doc);
   if (problems.length > 0) return { ok: false, problems };
-  const { goals, meals, products, recipes } = doc as AppData;
-  return { ok: true, data: canonical({ goals, meals, products, recipes }) };
+  return { ok: true, data: fromDocument(doc as Record<string, unknown>) };
 }
 
 /** The document as the app saves it: the data with its version, canonical. */
 export function documentJson(data: AppData): string {
-  return canonicalJson({ ...canonical(data), version: VERSION_TAG });
+  return canonicalJson({ ...toDocument(data), version: VERSION_TAG });
 }
 
 /** A backup file's contents: the saved document plus when it was written. */
 export function serializeBackup(data: AppData, now: Date): string {
-  return canonicalJson({ ...canonical(data), exportedAt: now.toISOString(), version: VERSION_TAG });
+  return canonicalJson({
+    ...toDocument(data),
+    exportedAt: now.toISOString(),
+    version: VERSION_TAG,
+  });
 }

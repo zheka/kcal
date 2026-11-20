@@ -14,3 +14,10 @@ export function isClean(text: string): boolean {
 export function nameKey(name: string): string {
   return cleanText(name).toLowerCase();
 }
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/** Characters as seen: an emoji (💧, a flag, 👍🏽) counts as one. */
+export function charCount(text: string): number {
+  return [...graphemes.segment(text)].length;
+}

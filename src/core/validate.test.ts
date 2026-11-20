@@ -9,12 +9,15 @@ const valid = (): AppData =>
     goals: [
       { perDay: { kcal: 2000, protein: 150, water: 2000 }, setAt: '2026-11-01T18:20:05.114Z' },
     ],
-    products: [egg, oatFlakes, milk, coffee],
+    products: [egg, oatFlakes, milk, coffee, water],
     recipes: [oats],
     meals: [
       meal('2026-11-17T07:30:41.512Z', [ing(oats, 1, 'u:bowl'), ing(egg, 2, 'u:piece')]),
       meal('2026-11-17T09:00:00.000Z', [ing(water, 330, 'ml'), ing(coffee, 1, 'u:mug')]),
     ],
+    settings: {
+      quickButtons: [{ amount: 250, food: water.id, label: '💧', unit: 'ml' }, { label: '🍽️' }],
+    },
   });
 
 /** Problems of valid data after `change` (on a deep copy). */
@@ -31,27 +34,33 @@ describe('validateAppData', () => {
     expect(validateAppData(appData())).toEqual([]);
   });
 
-  it('requires the four lists', () => {
-    expect(validateAppData({ products: {} })).toEqual([
-      'goals: missing',
-      'meals: missing',
+  it('reads omitted lists and settings as empty', () => {
+    expect(validateAppData({})).toEqual([]);
+    expect(validateAppData({ products: {}, settings: [] })).toEqual([
       'products: must be a list',
-      'recipes: missing',
+      'settings: must be an object',
     ]);
   });
 
   describe('products', () => {
-    it('require nothing in perGram, but only known nutrients, non-negative, 3 decimals', () => {
-      expect(problemsAfter((d) => (d.products[0]!.perGram = {}))).toEqual([]);
+    it('need perG, perMl or both, each with known nutrients, non-negative, 3 decimals', () => {
+      expect(problemsAfter((d) => (d.products[0]!.perMl = { kcal: 1.5 }))).toEqual([]);
+      expect(problemsAfter((d) => (d.products[0]!.perG = { fat: 0 }))).toEqual([]);
+      expect(problemsAfter((d) => delete d.products[1]!.perG)).toEqual([
+        'product #2 "oat flakes": needs perG, perMl or both: the values per g or per ml',
+      ]);
+      expect(problemsAfter((d) => (d.products[1]!.perG = {}))).toEqual([
+        'product #2 "oat flakes", perG: must have at least one nutrient',
+      ]);
       expect(
         problemsAfter((d) => {
-          d.products[0]!.perGram = { fat: -1, kcal: 1.4321 };
-          raw(d.products[0]!.perGram).sugar = 1;
+          d.products[0]!.perG = { fat: -1, kcal: 1.4321 };
+          raw(d.products[0]!.perG).sugar = 1;
         }),
       ).toEqual([
-        'product #1 "egg", perGram: fat must be a non-negative number',
-        'product #1 "egg", perGram: kcal has more than 3 decimals',
-        'product #1 "egg", perGram: unknown nutrient "sugar"',
+        'product #1 "egg", perG: fat must be a non-negative number',
+        'product #1 "egg", perG: kcal has more than 3 decimals',
+        'product #1 "egg", perG: unknown nutrient "sugar"',
       ]);
     });
 
@@ -59,43 +68,52 @@ describe('validateAppData', () => {
       expect(
         problemsAfter((d) => {
           raw(d.products[0]!).archived = false;
-          delete raw(d.products[0]!).units;
+          delete raw(d.products[0]!).name;
+          delete raw(d.products[1]!).units; // omitted: none
         }),
       ).toEqual([
-        'product #1 "egg": unknown field "archived"',
-        'product #1 "egg": missing units',
-        'product #1 "egg": units must be a list',
+        'product #1: unknown field "archived"',
+        'product #1: missing name',
+        'product #1: name must be a non-empty text',
       ]);
     });
 
-    it('need clean, unique names that are not a built-in food', () => {
+    it('need clean, unique names', () => {
       expect(problemsAfter((d) => (d.products[1]!.name = 'oat  flakes'))).toEqual([
         'product #2 "oat  flakes": name has extra spaces or is not in Unicode NFC form',
       ]);
       expect(problemsAfter((d) => (d.products[1]!.name = 'Egg'))).toEqual([
         'product #2 "Egg": name is also used by product #1 "egg"',
       ]);
-      expect(problemsAfter((d) => (d.products[1]!.name = 'Water'))).toEqual([
-        'product #2 "Water": "Water" is the name of a built-in food',
-      ]);
     });
 
-    it('check units: positive grams, unique names, g reserved, ml allowed', () => {
+    it('check units: one positive g or ml, unique names, g and ml reserved', () => {
       expect(
         problemsAfter((d) => {
-          d.products[0]!.units = [
-            { grams: 60, id: 'u:a', name: 'piece' },
-            { grams: 0, id: 'u:b', name: 'Piece' },
-            { grams: 1, id: 'u:c', name: 'G' },
-            { grams: 1.0001, id: 'u:d', name: 'ml' },
+          raw(d.products[0]!).units = [
+            { g: 60, id: 'u:a', name: 'piece' },
+            { g: 0, id: 'u:b', name: 'Piece' },
+            { g: 1, id: 'u:c', name: 'G' },
+            { g: 1.0001, id: 'u:d', name: 'Ml' },
+            { g: 1, id: 'u:e', ml: 1, name: 'both' },
+            { id: 'u:f', name: 'neither' },
           ];
         }),
       ).toEqual([
         'product #1 "egg", unit #2: unit "Piece" is defined twice',
-        'product #1 "egg", unit #2: grams must be a positive number',
-        'product #1 "egg", unit #3: "G" is reserved: every product has grams',
-        'product #1 "egg", unit #4: grams has more than 3 decimals',
+        'product #1 "egg", unit #2: g must be a positive number',
+        'product #1 "egg", unit #3: "G" is reserved: g and ml are a product\'s bases',
+        'product #1 "egg", unit #4: "Ml" is reserved: g and ml are a product\'s bases',
+        'product #1 "egg", unit #4: g has more than 3 decimals',
+        'product #1 "egg", unit #5: needs exactly one of g and ml: how many g or ml one of it is',
+        'product #1 "egg", unit #6: needs exactly one of g and ml: how many g or ml one of it is',
       ]);
+    });
+
+    it('have units only in a base they have values for', () => {
+      expect(
+        problemsAfter((d) => d.products[0]!.units.push({ id: 'u:glass', ml: 200, name: 'glass' })),
+      ).toEqual(['product #1 "egg", unit #2: is in ml, but the product has no perMl']);
     });
   });
 
@@ -148,35 +166,30 @@ describe('validateAppData', () => {
   });
 
   describe('references', () => {
-    it('need an existing food and one of its units; g only for products and built-ins', () => {
+    it('need an existing food and one of its units; g and ml only in a product’s bases', () => {
       expect(
         problemsAfter((d) => {
           d.meals[0]!.ingredients.push({ amount: 1, food: 'p:gone', unit: 'g' });
           d.meals[0]!.ingredients.push({ amount: 1, food: egg.id, unit: 'u:none' });
           d.meals[0]!.ingredients.push({ amount: 100, food: oats.id, unit: 'g' });
+          d.meals[0]!.ingredients.push({ amount: 100, food: egg.id, unit: 'ml' });
+          d.meals[0]!.ingredients.push({ amount: 100, food: coffee.id, unit: 'g' });
         }),
       ).toEqual([
         'meal #1 (2026-11-17T07:30:41.512Z), ingredient #3: refers to food p:gone, which does not exist',
         'meal #1 (2026-11-17T07:30:41.512Z), ingredient #4: "egg" has no unit "u:none"',
         'meal #1 (2026-11-17T07:30:41.512Z), ingredient #5: "oats" has no unit "g"',
+        'meal #1 (2026-11-17T07:30:41.512Z), ingredient #6: "egg" has no unit "ml"',
+        'meal #1 (2026-11-17T07:30:41.512Z), ingredient #7: "coffee" has no unit "g"',
       ]);
     });
 
-    it('check the units of built-in foods', () => {
-      expect(
-        problemsAfter((d) => d.meals[1]!.ingredients.push(ing({ id: 'protein' }, 1, 'ml'))),
-      ).toEqual(['meal #2 (2026-11-17T09:00:00.000Z), ingredient #3: "protein" has no unit "ml"']);
-    });
-
-    it('need ids unique across all records, and not a built-in id', () => {
+    it('need ids unique across all records', () => {
       expect(problemsAfter((d) => (d.meals[0]!.id = egg.id))).toEqual([
         'meal #1: id p:egg is also used by product #1 "egg"',
       ]);
       expect(problemsAfter((d) => (d.products[0]!.units[0]!.id = oats.id))).toEqual([
         'recipe #1 "oats": id r:oats is also used by product #1 "egg", unit #1',
-      ]);
-      expect(problemsAfter((d) => (d.products[0]!.id = 'water'))).toEqual([
-        'product #1 "egg": id "water" is a built-in food\'s',
       ]);
     });
   });
@@ -207,6 +220,45 @@ describe('validateAppData', () => {
         "goal set #2: setAt 2026-11-01T18:20:05.114Z must be after the previous goal set's 2026-11-01T18:20:05.114Z",
         'goal set #2, perDay: kcal must be a positive number',
         'goal set #3: setAt must be a UTC timestamp like 2026-11-17T07:30:41.512Z',
+      ]);
+    });
+  });
+
+  describe('quick buttons', () => {
+    it('need a clean label of at most 12 characters; an emoji counts as one', () => {
+      expect(
+        problemsAfter((d) => (d.settings.quickButtons[1]!.label = '👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽')),
+      ).toEqual([]);
+      expect(
+        problemsAfter((d) => {
+          d.settings.quickButtons[0]!.label = 'morning coffee';
+          d.settings.quickButtons[1]!.label = ' x';
+          d.settings.quickButtons.push({ label: '' });
+        }),
+      ).toEqual([
+        'quick button #1: label must be at most 12 characters',
+        'quick button #2: label has extra spaces or is not in Unicode NFC form',
+        'quick button #3: label must be a non-empty text',
+      ]);
+    });
+
+    it('have food, amount and unit together or none, referring like an ingredient', () => {
+      expect(
+        problemsAfter((d) => {
+          raw(d.settings.quickButtons[1]!).amount = 1;
+          d.settings.quickButtons.push({ amount: 1, food: egg.id, label: 'e', unit: 'ml' });
+        }),
+      ).toEqual(['quick button #2: needs food, amount and unit together, or none of them']);
+      expect(
+        problemsAfter((d) =>
+          d.settings.quickButtons.push({ amount: 1, food: egg.id, label: 'e', unit: 'ml' }),
+        ),
+      ).toEqual(['quick button #3: "egg" has no unit "ml"']);
+    });
+
+    it('refuse unknown fields', () => {
+      expect(problemsAfter((d) => (raw(d.settings).theme = 'dark'))).toEqual([
+        'settings: unknown field "theme"',
       ]);
     });
   });

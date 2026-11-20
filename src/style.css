@@ -8,6 +8,7 @@
   --accent: #1f7a4d;
   --accent-fg: #ffffff;
   --accent-soft: #e3f2ea;
+  --fab: #c4e3d2;
   --recipe: #b26a00;
   --danger: #c0392b;
   --kcal: #1f7a4d;
@@ -32,6 +33,7 @@
     --accent: #4cc38a;
     --accent-fg: #0b1a12;
     --accent-soft: #1d3328;
+    --fab: #24402f;
     --recipe: #f2a43a;
     --danger: #ff6b5b;
     --kcal: #4cc38a;
@@ -246,8 +248,47 @@ select.input {
   width: 5.5em;
 }
 
-legend select.input {
+legend select.input,
+.basis-line select.input,
+select.input.base {
   width: auto;
+}
+
+/* What the values are per: 100 g, 1 bar… */
+.basis-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Two options side by side, one pressed: per g | per ml */
+.segmented {
+  display: flex;
+}
+
+.segment {
+  flex: 1;
+  min-height: var(--tap);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.segment:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.segment:last-child {
+  border-left: none;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.segment[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
 }
 
 .nutrient-grid,
@@ -613,8 +654,8 @@ legend select.input {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* The action bar sits at the bottom of the screen even on a short day. */
-  min-height: calc(100dvh - 72px);
+  /* Room below the last meal, so it can scroll clear of the quick buttons. */
+  padding-bottom: calc(var(--quick-stack, 0px) + 24px);
 }
 
 .day .meal-list {
@@ -652,11 +693,6 @@ legend select.input {
 
 .meal-totals {
   flex: 1;
-}
-
-.meal-edit {
-  color: var(--muted);
-  font-size: 1.1rem;
 }
 
 .goal-history {
@@ -812,17 +848,46 @@ legend select.input {
   font-variant-numeric: tabular-nums;
 }
 
-/* Two main actions sharing the bottom bar */
+/* Quick buttons: round, stacked in the bottom-right corner (Android's floating buttons) */
 
-.action-bar.actions .grow {
-  flex: 1;
+.quick-buttons {
+  position: fixed;
+  /* The app's right edge: the window's, or the centred column's on a wide screen. */
+  right: max(16px, calc((100vw - 560px) / 2 + 16px));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
 }
 
-.button.water {
-  border-color: var(--water);
-  background: transparent;
-  color: var(--water);
+.quick-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 28px;
+  background: var(--fab);
+  color: var(--fg);
+  font-size: 1.5rem;
+  line-height: 1;
+  box-shadow:
+    0 3px 6px rgb(0 0 0 / 0.2),
+    0 1px 2px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+}
+
+.quick-button.pill {
+  padding: 0 20px;
+  font-size: 1rem;
   font-weight: 600;
+}
+
+.quick-button:active {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
 }
 
 /* Barcode scanning in the product form */

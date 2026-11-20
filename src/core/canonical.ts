@@ -1,5 +1,5 @@
 import { byTime } from './nutrition';
-import type { AppData } from './types';
+import type { AppData, Product } from './types';
 
 /**
  * The data in canonical order, so the same data always gives the same file: goals by `setAt`,
@@ -13,7 +13,53 @@ export function canonical(data: AppData): AppData {
     meals: sorted(data.meals, byTime),
     products: sorted(data.products, byId),
     recipes: sorted(data.recipes, byId),
+    settings: data.settings,
   };
+}
+
+type Doc = Record<string, unknown>;
+const isEmpty = (v: unknown) =>
+  Array.isArray(v)
+    ? v.length === 0
+    : typeof v === 'object' && v !== null && Object.keys(v).length === 0;
+
+/** The record without its empty lists and objects: an omitted list or object means empty. */
+function withoutEmpty<T extends object>(record: T): Partial<T> {
+  return Object.fromEntries(Object.entries(record).filter(([, v]) => !isEmpty(v))) as Partial<T>;
+}
+
+/**
+ * The data as written in a document: canonical, with every empty list and object omitted
+ * (the document's lists, a product's units, the settings, an empty `perDay`). A product's
+ * values are never empty, so they are always written when present.
+ */
+export function toDocument(data: AppData): Doc {
+  const { goals, meals, products, recipes, settings } = canonical(data);
+  return withoutEmpty({
+    goals: goals.map((g) => withoutEmpty(g)),
+    meals,
+    products: products.map((p) => withoutEmpty(p)),
+    recipes,
+    settings: withoutEmpty(settings),
+  });
+}
+
+/**
+ * The data of a valid document, in memory: omitted lists and objects filled in as empty, in
+ * canonical order. `[]` and `{}` in the document mean the same as omitted.
+ */
+export function fromDocument(doc: Doc): AppData {
+  const list = <T>(v: unknown) => (v ?? []) as T[];
+  const settings = (doc.settings ?? {}) as Doc;
+  return canonical({
+    goals: list<AppData['goals'][number]>(doc.goals).map(({ perDay, setAt }) =>
+      perDay && !isEmpty(perDay) ? { perDay, setAt } : { setAt },
+    ),
+    meals: list(doc.meals),
+    products: list<Product>(doc.products).map((p) => ({ ...p, units: p.units ?? [] })),
+    recipes: list(doc.recipes),
+    settings: { quickButtons: list(settings.quickButtons) },
+  });
 }
 
 /**

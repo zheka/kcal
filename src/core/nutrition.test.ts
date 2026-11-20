@@ -4,11 +4,11 @@ import {
   dayNutrients,
   FoodTableError,
   ingredientPortion,
-  ingredientsNutrients,
   mealsOn,
 } from './nutrition';
 import {
   coffee,
+  drink,
   egg,
   honey,
   ing,
@@ -21,28 +21,28 @@ import {
   water,
 } from './testData';
 
-const products = [egg, oatFlakes, milk, honey, coffee];
+const products = [egg, oatFlakes, milk, honey, coffee, water];
 const table = buildFoodTable(products, []);
 const kcal = (i: Parameters<typeof ingredientPortion>[1], t = table) =>
-  ingredientPortion(t, i).nutrients.kcal;
+  ingredientPortion(t, i).kcal;
 
 describe('products', () => {
   it('give nutrients for any amount in any of their units', () => {
     expect(kcal(ing(egg, 2, 'u:piece'))).toBeCloseTo(171.6);
-    expect(ingredientPortion(table, ing(egg, 2, 'u:piece')).nutrients.protein).toBeCloseTo(15.12);
+    expect(ingredientPortion(table, ing(egg, 2, 'u:piece')).protein).toBeCloseTo(15.12);
     expect(kcal(ing(oatFlakes, 60))).toBeCloseTo(222);
   });
 
   it('count an omitted nutrient as 0', () => {
-    const tsp = ingredientPortion(table, ing(honey, 1, 'u:tsp')).nutrients;
+    const tsp = ingredientPortion(table, ing(honey, 1, 'u:tsp'));
     expect(tsp.protein).toBe(0);
     expect(tsp.water).toBe(0);
   });
 
   it('give exactly the same result for the same weight in any unit', () => {
     const cup = product('a', { kcal: 3.333, protein: 0.111 }, [
-      { grams: 25, id: 'u:a', name: 'Aa' },
-      { grams: 0.1, id: 'u:t', name: 'tenth' },
+      { g: 25, id: 'u:a', name: 'Aa' },
+      { g: 0.1, id: 'u:t', name: 'tenth' },
     ]);
     const t = buildFoodTable([cup], []);
     const p = (amount: number, unit: string) => ingredientPortion(t, ing(cup, amount, unit));
@@ -52,27 +52,35 @@ describe('products', () => {
   });
 
   it('count water by their water content', () => {
-    expect(ingredientPortion(table, ing(coffee, 1, 'u:mug')).nutrients.water).toBeCloseTo(297);
-    expect(ingredientPortion(table, ing(milk, 1, 'u:cup')).nutrients.water).toBeCloseTo(220);
+    expect(ingredientPortion(table, ing(coffee, 1, 'u:mug')).water).toBeCloseTo(297);
+    expect(ingredientPortion(table, ing(milk, 1, 'u:cup')).water).toBeCloseTo(220);
   });
 });
 
-describe('built-in foods', () => {
-  it('are there without being stored, with grams and, for water, millilitres', () => {
-    expect(table.get('water')?.units.map((u) => u.id)).toEqual(['g', 'ml']);
-    expect(table.get('protein')?.units.map((u) => u.id)).toEqual(['g']);
-    expect(ingredientPortion(table, ing(water, 330, 'ml')).nutrients).toEqual({
-      carbs: 0,
-      fat: 0,
-      kcal: 0,
-      protein: 0,
-      water: 330,
-    });
+describe('bases', () => {
+  it('are g, ml or both: each amount uses the values of its own base', () => {
+    expect(table.get(egg.id)?.units.map((u) => u.id)).toEqual(['g', 'u:piece']);
+    expect(table.get(coffee.id)?.units.map((u) => u.id)).toEqual(['ml', 'u:mug']);
+    expect(table.get(water.id)?.units.map((u) => u.id)).toEqual(['g', 'ml']);
+    // Independent sets: nothing converts between g and ml.
+    const milkBoth = { ...milk, perMl: { kcal: 0.66 } };
+    const t = buildFoodTable([milkBoth], []);
+    expect(kcal(ing(milkBoth, 100, 'g'), t)).toBeCloseTo(64);
+    expect(kcal(ing(milkBoth, 100, 'ml'), t)).toBeCloseTo(66);
   });
 
-  it('let a meal be estimated as macros', () => {
-    const estimate = [ing({ id: 'protein' }, 40), ing({ id: 'fat' }, 20), ing({ id: 'carbs' }, 60)];
-    expect(ingredientsNutrients(table, estimate).kcal).toBe(40 * 4 + 20 * 9 + 60 * 4);
+  it('give no portion in a base the product does not have', () => {
+    expect(table.get(egg.id)?.portion('ml', 100)).toBeUndefined();
+    expect(table.get(coffee.id)?.portion('g', 100)).toBeUndefined();
+  });
+
+  it('are exact in ml too: a 300 ml mug is exactly 300 ml', () => {
+    const juice = drink('juice', { kcal: 0.333 }, [{ id: 'u:glass', ml: 0.1, name: 'drop' }]);
+    const t = buildFoodTable([juice], []);
+    expect(ingredientPortion(t, ing(juice, 3, 'u:glass'))).toEqual(
+      ingredientPortion(t, ing(juice, 0.3, 'ml')),
+    );
+    expect(kcal(ing(coffee, 1, 'u:mug'))).toBe(kcal(ing(coffee, 300, 'ml')));
   });
 });
 
@@ -102,9 +110,13 @@ describe('recipes', () => {
     expect(kcal(ing(thirds, 3, 'u:third'), tt)).toBe(kcal(ing(oatFlakes, 100), tt));
   });
 
-  it('can say how many grams the finished dish weighs', () => {
-    // A pot of 1 kg oat flakes and 2 kg water weighs 2.5 kg once cooked.
-    const pot = recipe('porridge', [ing(oatFlakes, 1000), ing(water, 2000)], [makes(2500, 'g')]);
+  it('can say how many grams the finished dish weighs, and mix g and ml', () => {
+    // A pot of 1 kg oat flakes and 2 l water weighs 2.5 kg once cooked.
+    const pot = recipe(
+      'porridge',
+      [ing(oatFlakes, 1000), ing(water, 2000, 'ml')],
+      [makes(2500, 'g')],
+    );
     const tt = buildFoodTable(products, [pot]);
     expect(kcal(ing(pot, 250, 'u:g'), tt)).toBeCloseTo(370);
   });
@@ -119,11 +131,11 @@ describe('recipes', () => {
     expect(kcal(ing(sweet, 1, 'u:bowl'), buildFoodTable(products, [sweet, plain]))).toBeCloseTo(
       222 + 14 * 3.04,
     );
-    const fixed = { ...oatFlakes, perGram: { ...oatFlakes.perGram, kcal: 3.8 } };
-    const edited = buildFoodTable([fixed, honey], [sweet, plain]);
+    const fixed = { ...oatFlakes, perG: { ...oatFlakes.perG, kcal: 3.8 } };
+    const edited = buildFoodTable([fixed, honey, water], [sweet, plain]);
     expect(kcal(ing(sweet, 1, 'u:bowl'), edited)).toBeCloseTo(228 + 14 * 3.04);
-    // water from the built-in water inside the inner recipe
-    expect(ingredientPortion(edited, ing(sweet, 1, 'u:bowl')).nutrients.water).toBe(240);
+    // water from the water inside the inner recipe
+    expect(ingredientPortion(edited, ing(sweet, 1, 'u:bowl')).water).toBe(240);
   });
 
   it('refuse recipes that contain each other, and unknown foods or units', () => {
