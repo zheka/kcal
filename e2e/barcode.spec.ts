@@ -69,11 +69,13 @@ test('the scanner closes with ×, turning the camera off', async ({ seeded: page
         return Promise.resolve([]);
       }
     };
-    // keep the camera stream the app asks for, to check it's turned off
+    // keep every camera stream the app asks for, to check they're all turned off
+    const streams: MediaStream[] = [];
+    (window as unknown as { cameraStreams: MediaStream[] }).cameraStreams = streams;
     const getUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     navigator.mediaDevices.getUserMedia = async (constraints) => {
       const stream = await getUserMedia(constraints);
-      (window as unknown as { cameraStream: MediaStream }).cameraStream = stream;
+      streams.push(stream);
       return stream;
     };
   });
@@ -88,12 +90,18 @@ test('the scanner closes with ×, turning the camera off', async ({ seeded: page
     .click();
   await expect(page.getByRole('dialog', { name: 'Scan barcode' })).toBeHidden();
   await expect(page.getByRole('heading', { name: 'New product' })).toBeVisible();
-  const states = await page.evaluate(() =>
-    (window as unknown as { cameraStream: MediaStream }).cameraStream
-      .getTracks()
-      .map((t) => t.readyState),
-  );
-  expect(states).toEqual(['ended']);
+  // one stream, its track ended (allowing the browser a moment to report it)
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as unknown as { cameraStreams: MediaStream[] }).cameraStreams.map((s) =>
+            s.getTracks().map((t) => t.readyState),
+          ),
+        ),
+      { timeout: 3000 },
+    )
+    .toEqual([['ended']]);
 });
 
 test('closing while the camera is still starting turns it off too', async ({ seeded: page }) => {
