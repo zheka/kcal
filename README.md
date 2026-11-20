@@ -6,7 +6,8 @@ all data stays on the device (`localStorage`).
 
 Live: https://zheka.github.io/kcal/
 
-See [docs/design.md](docs/design.md) for the design and decisions.
+See [docs/design.md](docs/design.md) for the design and decisions, and
+[docs/barcodes.md](docs/barcodes.md) for the open discussion of barcodes and packs.
 
 ## Development
 
