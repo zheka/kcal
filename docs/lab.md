@@ -71,9 +71,10 @@ entries as a JSON array, oldest first. No key, no image data, no meals.
 
 ## Next steps
 
-- **The meal format** with choices, replacing prompt v3's `parameters`: agreed in discussion, with
-  open problems, in [lab-meal-format.md](lab-meal-format.md); 1,000 example meals in it in
-  [lab-meal-examples.md](lab-meal-examples.md).
+- **The meal format** with choices, replacing prompt v3's `parameters`: agreed in discussion, in
+  [lab-meal-format.md](lab-meal-format.md); 1,000 example meals in it in
+  [lab-meal-examples.md](lab-meal-examples.md); what the prompt must say in
+  [lab-meal-prompt.md](lab-meal-prompt.md). Next: implement it, with a new prompt.
 - **The prompt for whole-context updates.** Prompt v3 was written for "meal so far + new input".
   Now the whole context is sent with the meal so far as it is, so an item from removed context
   (a removed photo of bread) likely stays. Try sending only the user's choices (amounts, variants,

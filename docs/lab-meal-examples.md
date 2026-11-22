@@ -7,7 +7,7 @@ shape: they are not model runs, and amounts are typical, not measured.
 
 Status (2026-11-22): **all 1,000 pass the format's checks**
 (`python3 scripts/check-meal-examples.py docs/lab-meal-examples.md`); the problems they raised are
-listed below and in lab-meal-format.md, Open problems.
+listed below, and settled in lab-meal-format.md, Problems from the examples.
 
 ## How to read them
 
@@ -49,14 +49,14 @@ chip.
   (a dark photo, before and after photos, text only, history, a closed container, eating from
   the pot).
 
-In numbers: 2,525 rows, at most 11 in a meal; 86 meals with a dish, none with a dish in a dish.
-Questions: 1,017 counts, 268 kinds, 191 sizes, 39 kinds with sizes. Options per question: 2 in
-472, 3 in 965, 4 in 77, 5 in 1. Rows by their questions: none 1,520, C 856, P 135, S 111, CP 92,
-CS 39, PS 31, CU 20, U 19, CPS 10.
+In numbers: 2,527 rows, at most 11 in a meal; 84 meals with a dish, none with a dish in a dish.
+Questions: 1,016 counts, 272 kinds, 189 sizes, 41 kinds with sizes. Options per question: 2 in
+469, 3 in 969, 4 in 79, 5 in 1. Rows by their questions: none 1,514, C 856, P 140, S 108, CP 90,
+CS 39, PS 32, CU 21, U 20, CPS 10.
 
 ## Problems and notes, by tag
 
-**Open problems of the format (see lab-meal-format.md, Open problems)**
+**Problems of the format (settled in lab-meal-format.md, Problems from the examples)**
 
 - `presence+kind`: "None" as one of the kinds: one question to a person, two in the format. #59, #87, #175, #431, #566, #885
 - `linked-kinds`: one kind choice should change several rows (pho bo / ga). #371
@@ -190,9 +190,9 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 #### 8. Buckwheat with cutlet, weighed together 350 g · Russian · home
 
 ```text
-- Buckwheat — 200 g
-- Pork cutlet — 150 g
-! total-weight: the plate was weighed whole; the split between rows is the model's
+- Buckwheat with a pork cutlet — 350 g
+  P proportion: mostly buckwheat / [half and half] / mostly cutlet
+! total-weight: settled: the split matters (cutlet vs buckwheat), so one product with a proportion question; the 350 g stays exact
 ```
 
 #### 9. Syrniki with sour cream and jam · Russian · café
@@ -467,7 +467,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 - Soup lagman — 450 g
   P kind: [soup] / fried (kovurma)
   C bowl: 350 g / [450 g] / 550 g
-! bases: soup lagman would be in ml, fried in g; both in g here
+! bases: settled: both in g (a soup's ml ≈ g)
 ```
 
 #### 41. Samsa · Uzbek · street
@@ -641,9 +641,10 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
   S slice: small / [usual] / large
 - Whipped cream — 1 portion
   C cream: none / [1 portion]
-- Coffee with milk — 200 ml
-  C milk: [little] / a lot
-! presence+kind: "milk: none / whole / oat" would need a kind and a 0 in one question
+- Coffee — 200 ml
+- Milk — 30 ml
+  P milk: none / [whole] / oat
+! presence+kind: settled: "none" is a product with all values 0
 ```
 
 #### 60. Leberkäse Semmel · German · street
@@ -899,10 +900,10 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 ```text
 - Crêpe ×1
   - Crêpe — 1
-  - Nutella — 30 g
-    P filling: [Nutella] / sugar and lemon / ham and cheese
-    C filling: little / [usual] / generous
-! presence+kind: the filling's amount depends on the kind (sugar 10 g, Nutella 30 g); here labels are relative, so it works
+  - Nutella — 1 filling
+    U filling: [Nutella, 30 g] / sugar and lemon, 10 g / ham and cheese, 60 g
+    C filling: little ½ / [usual 1] / generous 1½
+! presence+kind: settled: the filling's usual amount comes with its kind (U); the count is relative to it
 ```
 
 #### 88. Galette complète · Breton · crêperie
@@ -973,10 +974,10 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 
 ```text
 - Escargots in garlic butter — 6 pcs
-  S plate: [6] / 12
+  C plate: [6] / 12
 - Bread to dip — 1 piece
   C pieces: none / [1] / 2
-! size-vs-count: "6 or 12" is a menu size of the plate, but it's also just a count; here a size with labels "6" and "12"
+! size-vs-count: "6 or 12" is a menu size that is a number of pieces: a count
 ```
 
 #### 97. Bouillabaisse · French · restaurant
@@ -1644,9 +1645,8 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
   - Bacon — 3 rashers
   - Butter — 10 g
   - Sauce — 15 g
-    P sauce: [brown sauce] / ketchup
-    C sauce: none / [15 g]
-! presence+kind: "none / brown / ketchup" is one question to a person; here it's two
+    P sauce: none / [brown sauce] / ketchup
+! presence+kind: settled: "none" is a product with all values 0
 ```
 
 #### 176. A pint · British · pub
@@ -2011,7 +2011,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 
 ```text
 - Ćevapi — 10
-  S portion: mala 5 / [velika 10]
+  C portion: mala 5 / [velika 10]
 - Lepinja — 1
 - Kajmak — 30 g
   C kajmak: none / [30 g] / 60 g
@@ -2764,8 +2764,11 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 - Dipping sauce — 50 g
   P sauce: [sesame] / garlic and oil / soy and vinegar
   C sauce: 30 g / [50 g] / 80 g
+- Broth picked up with the food — 1 portion
+  P broth: [mala] / yuanyang (half and half) / clear
 - Broth — 0
   C broth: [none] / 1 bowl
+! linked-kinds: settled: the broth's effect on everything pulled out is one row, asked as the broth's kind
 ```
 
 #### 297. Dim sum · Cantonese · restaurant
@@ -3055,6 +3058,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 ```text
 - Tonkotsu ramen ×1
   - Noodles — 150 g
+    S portion: [regular 150 g] / large 225 g
   - Chashu — 2 slices
     P chashu: [pork] / chicken
     C slices: [2] / 4
@@ -3064,7 +3068,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
     C drank: a little / [half] / all
 - Extra noodles (kaedama) — 0
   C kaedama: [none] / 1
-! dish-size: "large ramen" scales noodles and broth but not the egg; with a dish size question, the egg would scale too
+! dish-size: settled: "large" in a ramen shop is more noodles, so the size question is on the noodles, not the dish
 ```
 
 #### 328. Tonkatsu teishoku · Japanese · restaurant
@@ -3083,13 +3087,11 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 #### 329. Gyudon · Japanese · fast food
 
 ```text
-- Gyudon ×1
-  S size: mini / [nami] / ōmori / tokumori
-  - Rice — 250 g
-  - Beef and onion — 85 g
+- Gyudon — nami
+  S size: mini 280 g / [nami 380 g] / ōmori 500 g / tokumori 650 g
 - Raw egg — 0
   C egg: [none] / 1
-! dish-size: tokumori adds mostly beef, not rice; a single factor for the dish is approximate
+! dish-size: settled: nothing to ask inside, so the bowl stays whole, a product whose sizes are its own grams
 ```
 
 #### 330. Curry rice with katsu · Japanese · fast food
@@ -3450,16 +3452,12 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 #### 371. Pho bo · Vietnamese · restaurant
 
 ```text
-- Pho ×1
+- Pho bo tái — 1 bowl
+  P pho: [bo tái (rare beef)] / bo chín (brisket) / bo viên (meatballs) / ga (chicken)
   S bowl: small / [regular] / large
-  - Rice noodles — 200 g
-  - Beef — 80 g
-    P beef: [rare slices] / brisket / meatballs / mixed
-  - Broth — 450 ml
-    C drank: a little / [half] / all
 - Hoisin and sriracha — 15 g
   C sauces: none / [1 tbsp] / 2 tbsp
-! linked-kinds: pho bo vs pho ga changes the meat and the broth together; not expressible as one question
+! linked-kinds: settled: pho stays whole; its light broth makes "how much did you drink" immaterial, so nothing to split
 ```
 
 #### 372. Banh mi · Vietnamese · street
@@ -3784,7 +3782,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
   P soda: [regular] / diet
   S cup: small / [medium] / large
   C refills: [none] / 1 / 2
-! linked-sizes: a combo's size applies to fries and drink together; two separate questions here
+! linked-sizes: settled: two size questions; fries and drink are sized separately in most places, and a combo is not a dish
 ```
 
 #### 407. Burger, protein style · American · restaurant
@@ -4020,10 +4018,9 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 - Granola — 40 g
   C granola: 20 g / [40 g] / 60 g
 - Banana and berries — 80 g
-- Honey or peanut butter drizzle — 15 g
-  P drizzle: [honey] / peanut butter
-  C drizzle: none / [15 g] / 30 g
-! presence+kind: "none / honey / PB" as one question would be better
+- Honey drizzle — 15 g
+  P drizzle: none / [honey] / peanut butter
+! presence+kind: settled: "none" is a product with all values 0
 ```
 
 #### 432. Protein shake · gym · home
@@ -4378,8 +4375,9 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 #### 470. Per-kilo buffet, 520 g · Brazilian · por quilo
 
 ```text
-- Plate, weighed (rice, beans, meat, salad) — 520 g
-! total-weight: one weighed plate; the model splits it, and the parts must still sum to 520 g
+- Plate: rice, beans, meat, salad — 520 g
+  P proportion: mostly rice and beans / [mixed] / mostly meat / mostly salad
+! total-weight: settled: the split matters, so one product with a proportion question; the 520 g stays exact
 ```
 
 #### 471. Feijoada · Brazilian · restaurant
@@ -4691,8 +4689,8 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
   C pieces: 1 / [2] / 3
 - Butter — 10 g
   C butter: none / [10 g] / 20 g
-- Starter — 1 portion
-  P starter: [French onion soup] / escargots / terrine / salade de chèvre chaud
+- French onion soup — 1
+  U starter: [onion soup, 350 g] / escargots, 6 pcs, 120 g / terrine, 100 g / chèvre salad, 200 g
 - Main — 1 portion
   P main: [duck confit] / steak frites / sea bass / boeuf bourguignon
 - Side frites — 150 g
@@ -4702,7 +4700,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 - Wine — 2 glasses
   C glasses: 1 / [2] / 3
 - Coffee — 1
-! menu-choice-kinds: a starter "of the set menu" whose kind is unknown is a P question with very different dishes (soup in ml vs escargots in pieces); the amount "1 portion" hides the base
+! menu-choice-kinds: settled: kinds that differ in portion bring their own (U), all in g
 ```
 
 #### 503. Steakhouse dinner · American · steakhouse
@@ -5142,6 +5140,8 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 - Sauce bar dip — 60 g
   P sauce: [sesame paste] / sesame oil and garlic / vinegar and chili
   C dip: 30 g / [60 g] / 100 g
+- Broth picked up with the food — 1 portion
+  P broth: [mala] / yuanyang (half and half) / clear
 - Soybean milk — 300 ml
 - Beer — 2 bottles
   S bottle: [330 ml] / 500 ml
@@ -5174,7 +5174,8 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
   C eaten: ¾ / [whole]
 - Slice of a friend's pizza — 1
   C slices: none / [1] / 2
-! linked-unknown: the friend's pizza kind is unknown too; a second P on the extra row
+  P pizza: [diavola] / margherita / quattro formaggi
+! linked-unknown: settled: not linked; the friend's slice is its own row with its own kind
 - Beer — 1
 - Babà — 0
   C babà: [none] / 1
@@ -5668,7 +5669,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 - Shake — 1
   P flavor: [vanilla] / chocolate / strawberry
   S size: [regular] / large
-! linked-sizes: "make it large" for the combo moves fries and shake together
+! linked-sizes: settled: two size questions, as in #406
 ```
 
 #### 566. Subway-style sub · American · sandwich chain
@@ -5683,10 +5684,10 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
   - Cheese — 2 slices
     C cheese: none / [2 slices]
   - Sauce — 20 g
-    P sauce: [mayo] / sweet onion / southwest / none-like mustard
+    P sauce: none / [mayo] / sweet onion / southwest
     C sauce: [20 g] / 40 g
   - Vegetables — 60 g
-! presence+kind: sauce "none / mayo / sweet onion" again
+! presence+kind: settled: "none" is a product with all values 0; when chosen, the amount question hides
 ```
 
 #### 567. Chipotle bowl · Tex-Mex · fast casual
@@ -7545,7 +7546,7 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 
 ```text
 - Salad bar box — 380 g (label weight)
-! total-weight: one weighed box of mixed salads; split by the model, sum fixed
+! total-weight: settled: mixed salads of similar values, so one product without a question; the 380 g stays exact
 ```
 
 #### 763. Vegetarian thali · vegetarian · restaurant
@@ -8508,8 +8509,8 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 ```text
 - Curry with rice — 1 plate
   S plate: small / [usual] / large
-  C seconds: [none] / ½
-! two-counts-one-row-again: "seconds" is a count of plates: allowed (count 1 / 1.5), labels "none / ½" mean extra; better as count labels "1 plate / 1½ plates"
+  C plates: [1] / with seconds 1½
+! two-counts-one-row-again: "seconds" is the same count: labels "1 / with seconds 1½"
 ```
 
 #### 877. Spanish late dinner · Spanish · restaurant
@@ -8549,13 +8550,13 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 
 ```text
 - Meatballs — 15
-  S plate: 10 / [15] / 20
+  C plate: 10 / [15] / 20
 - Mashed potatoes — 150 g
 - Gravy — 60 g
 - Lingonberry — 20 g
 - Lingonberry drink — 2 refills
   C glasses: 1 / [2] / 3
-! size-vs-count: IKEA's 10 / 15 / 20 meatballs is a menu size that is also a count; C is enough
+! size-vs-count: IKEA's 10 / 15 / 20 meatballs is a menu size that is a number of pieces: a count
 ```
 
 ### Edge cases
@@ -8601,9 +8602,9 @@ CS 39, PS 31, CU 20, U 19, CPS 10.
 ```text
 - Coffee — 250 ml
 - Milk — 30 ml
-  P milk: [whole] / oat / skim
-  C milk: none / [30 ml] / 60 ml
-! presence+kind: "black / whole / oat" is what the user would tap; it takes two questions here
+  P milk: none / [whole] / oat / skim
+  C milk: splash 15 ml / [usual 30 ml] / a lot 60 ml
+! presence+kind: settled: "none" is a product with all values 0; when chosen, the amount question hides
 ```
 
 #### 886. Fast-food sauce cups · fast food

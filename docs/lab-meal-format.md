@@ -5,8 +5,8 @@ returns, what the meal screen adjusts, what the lab stores and what is sent back
 1,000 example meals in this format, with the problems they raised, are in
 [lab-meal-examples.md](lab-meal-examples.md).
 
-Status (2026-11-22): **agreed in discussion, not implemented.** Open problems and Open questions
-list what is still undecided. The lab today uses prompt v3's `parameters`
+Status (2026-11-22): **agreed in discussion, not implemented.** Open questions lists what is
+still undecided. The lab today uses prompt v3's `parameters`
 (`src/lab/composer/types.ts`); this replaces it.
 
 ## Principles
@@ -45,7 +45,7 @@ itself.
 
 **Split a dish only as far as needed to place its questions.** With no question inside it, a dish
 is one food ("Цезарь с курицей", 320 g). A café caesar whose dressing amount is in doubt becomes
-"Цезарь без заправки" + "Заправка" (0 / 30 / 60 g). Most meals need no dish at all (86 of 1,000
+"Цезарь без заправки" + "Заправка" (0 / 30 / 60 g). Most meals need no dish at all (84 of 1,000
 had one); a dish is mostly a repeated assembly (toasts ×2, tacos ×4, tea with sugar ×3), a wrap
 or bowl with doubtful insides, or a meal described part by part in text.
 
@@ -154,7 +154,21 @@ guess, the alternatives).
 - **Options**: usually 2–3; more only when they really exist (a menu's sizes, a dish's usual
   fillings), up to about 5–6. The chips scroll sideways, so the screen is not the limit; long
   lists mostly come from the model hedging. The reader rejects more than 8. In the 1,000
-  examples: 2 options 472 times, 3 965 times, 4 77 times, 5 once.
+  examples: 2 options 469 times, 3 969 times, 4 79 times, 5 once.
+
+**"None"** is an answer of any question, so "milk: none / whole / oat" is one question, the way
+I'd answer it:
+
+- **a "none" product**: a product (or sized product) whose values are all 0, water included, and,
+  in `sized_products`, whose unit size is 0. Nothing real has all values 0: water has
+  `water: 100`, a diet soda has water too. Its name says so ("Без молока"), its label is the
+  chip ("нет");
+- **a size or count of 0** ("no bun", "sauce: none").
+
+When the chosen product is "none", or the chosen size or count is 0, the row is not eaten: the
+phone shows it as "нет" and hides the row's other questions (a milk kind at count 0 means
+nothing; an amount of "no milk" neither). On a dish row, a count of 0 hides its parts' questions
+too. Switching back brings them back, with their answers.
 
 **The three questions are independent**, so any combination of answers is valid and means what
 its labels say:
@@ -305,34 +319,9 @@ prints counts): `python3 scripts/check-meal-examples.py docs/lab-meal-examples.m
 
 ## What the prompt says
 
-From the examples:
-
-- **Amounts are what is eaten**: no bones, shells, peel, pits, ice, khinkali tops. A weight given
-  with the bones is a product named that way, with values as weighed. A drink with water or ice
-  (rakı, iced coffee) counts the drink.
-- **Shared food: my share**, in the rows, never "⅓ of the platter of dishes".
-- **Lump or drop small things** (banchan, mezze, garnish, the courses of a tasting menu, conveyor
-  sushi plates).
-- **Amounts I state, or a label gives, are certain**: no questions on them.
-- **Refills, broth partly drunk, food left**: counts with labels ("½", "всё"). Something partly
-  eaten or drunk (broth, a dip, syrup in the bowl) is a row or part of its own, so its count can
-  ask "how much".
-- **An add-on is its own row** (syrup, sugar, an extra shot, a sauce cup), with 0 as an option;
-  when the drink or dish has a count of more than one, the add-on goes with it in a dish (tea with
-  sugar ×3).
-- **"No bun", "cup or cone", "burrito or bowl"**: a count of 0 for that part.
-- **Cooking fat is folded into the dish**; how much of it is a kind ("мало масла / обычно /
-  жирно"). Fat or sauce I add myself is a row.
-- **Kind with its own size → `sized_products`**: a pastry, a naan, a drink whose pour comes with it
-  (wine / brandy, fröccs kinds), a corner piece of a cake. Easy to miss.
-- **A menu size that is a number of pieces is a count**: escargots 6 / 12, IKEA meatballs 10 / 15
-  / 20.
-- **"Seconds" are more of the same count**: one count question ("порция / с добавкой").
-- **Different pieces or fillings that can be told apart are separate rows** (two meats on a
-  carvery plate, a bucket of mixed chicken pieces); one row with a kind question only when they
-  can't be told apart.
-- Plus a few short examples, one for each typical question: a kind, a kind with sizes, a menu
-  size, a count with "none", a dish's size, a part partly eaten.
+The rules the model must be told for the format to be used well (when to ask, where a size goes,
+"none", splitting, shared food, add-ons, …), each with its reasons and examples, are in
+[lab-meal-prompt.md](lab-meal-prompt.md).
 
 ## How we got here
 
@@ -355,28 +344,37 @@ Decisions in order, with what was set aside:
 8. **`chosen` by label**, labels on every option; **full names on products**, never composed.
 9. **Typed amounts set aside** for now: choices and × only.
 
-## Open problems
+## Problems from the examples
 
-From the 1,000 examples (see [lab-meal-examples.md](lab-meal-examples.md), Problems).
+The 1,000 examples (see [lab-meal-examples.md](lab-meal-examples.md), Problems) raised five;
+all are settled without changing the format's shape:
 
-1. **"None" as one of the kinds** (6 meals): "milk: none / whole / oat", "sauce: none / ketchup /
-   mayo", "drizzle: none / honey / peanut butter" is one question to a person, two in the format
-   (a kind and a count with 0), and the kind is meaningless at 0. Options:
-   - A. Keep two questions; the phone hides the kind while the count is 0.
-   - B. "None" as a product with zero values (or size 0 in `sized_products`): no format change,
-     one question; the phone shows the row as "нет" when the chosen product has no values.
-     _(recommended)_
-   - C. A first-class "none" option (`"none": true`, no values): explicit, but breaks the fixed
-     option shape.
-2. **One choice that should move several rows** (4 meals): a combo's "make it large" (fries and
-   drink), pho bo / ga (meat and broth), the kind of a friend's pizza and mine. Not expressible:
-   either separate questions, or text. An accepted limit so far.
-3. **A dish's size scales every part** (2 meals): a large ramen scales the egg too; tokumori
-   gyudon adds mostly beef. Approximate; a part that shouldn't scale can be a row of its own.
-4. **Kinds with different bases** (2 meals): a set-menu starter "soup (ml) / escargots (pieces)",
-   soup or fried lagman. The format requires one base per row; the model gives both in g.
-5. **A known total weight across rows** (3 meals): a weighed plate, a per-kilo buffet, a salad bar
-   box. The model splits it; the parts don't stay summed when one changes. An accepted limit.
+1. **"None" as one of the kinds** (6 meals: milk none / whole / oat): a "none" product, see
+   Questions, "None".
+2. **One choice that should move several rows** (4 meals): **no linked questions.** Each case
+   turned out to need none:
+   - a combo's "make it large": fries and drink are sized separately in most places, so two size
+     questions; a combo is not a dish;
+   - pho bo / ga (meat and broth): pho stays whole with a kind question, since drinking more or
+     less of its light broth is immaterial; the dish had been split for an immaterial question;
+   - a set lunch "set B": vague input; the model's best guess from the context (history first),
+     else a typical lunch; more text if that isn't enough;
+   - the hot pot's broth (mala or clear makes everything pulled out oilier): one row "broth
+     picked up with the food" with a kind question, mala / yuanyang / clear;
+   - a thali, veg or non-veg: one row changes; a bento of unknown kind: kept whole.
+3. **A dish's size scales every part** (2 meals: a large ramen would double the egg): the size
+   question goes where the size changes: on the noodles ("large" in a ramen shop is more
+   noodles); a dish with nothing to ask inside stays whole, a product with sizes (gyudon nami /
+   ōmori / tokumori, each its own grams); a dish size only when every part grows together (a sub
+   6″ / 12″, bunny chow ¼ / ½).
+4. **Kinds with different bases** (2 meals: a set-menu starter, soup or escargots): everything in
+   g (a soup's ml ≈ g), and when kinds differ in portion, each brings its own in
+   `sized_products` (onion soup 350 g / escargots 6 pcs ≈ 120 g / terrine 100 g).
+5. **A known total weight across rows** (3 meals: a weighed plate, a per-kilo buffet): the total
+   stays exact. When the split matters to the values (cutlet or buckwheat), the weighed thing is
+   one product with a kind question on the proportion ("mostly buckwheat / half and half /
+   mostly cutlet"); otherwise rows that divide the total, and an edit to one may let the sum
+   drift.
 
 ## Open questions
 
