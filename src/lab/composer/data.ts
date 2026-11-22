@@ -12,9 +12,16 @@ export interface ComposerData {
   /** The Gemini model; empty until the key's models are listed (then the newest Flash). */
   model: string;
   options: Options;
+  /** The language to answer in (`ru`): names, the prompt's language, scanned products' names. */
+  language: string;
 }
 
-export const EMPTY: ComposerData = { meals: [], model: '', options: DEFAULT_OPTIONS };
+export const EMPTY: ComposerData = {
+  meals: [],
+  model: '',
+  options: DEFAULT_OPTIONS,
+  language: 'ru',
+};
 
 /** What was kept, with anything missing (from an older shape) at its default. */
 export function fromStored(stored: Partial<ComposerData> | undefined): ComposerData {
@@ -23,6 +30,7 @@ export function fromStored(stored: Partial<ComposerData> | undefined): ComposerD
     meals: (stored?.meals ?? []).filter((m) => Array.isArray(m.context)),
     model: stored?.model ?? '',
     options: { ...DEFAULT_OPTIONS, ...stored?.options },
+    language: stored?.language || EMPTY.language,
   };
 }
 

@@ -10,7 +10,6 @@ import PROMPT from './prompt-v3.txt?raw';
  * experiment's scope; the prompt's thresholds are absolute) and with no habits yet.
  */
 
-export const LANGUAGE = 'English';
 /** History matches sent per call: enough to cover a meal, few enough to stay cheap. */
 export const MAX_MATCHES = 25;
 
@@ -118,10 +117,11 @@ export function contextBlock(
   meal: readonly Item[],
   matches: readonly Candidate[],
   now: Date,
+  language: string,
 ): string {
   const time = now.toTimeString().slice(0, 5);
   return [
-    `language: ${LANGUAGE}`,
+    `language: ${language}`,
     `time: ${time}, place: unknown`,
     'habits: none',
     `meal so far: ${meal.length > 0 ? JSON.stringify(meal) : 'empty'}`,

@@ -1,3 +1,5 @@
+import { withRetries } from '../../data/retry';
+
 /**
  * A model request and its outcome, the same whatever the provider: what an experiment builds,
  * what the lab logs, what an adapter (gemini.ts) turns into its provider's own request and back.
@@ -97,54 +99,52 @@ export async function run(
   request: ModelRequest,
   options: RunOptions,
 ): Promise<ModelResponse | null> {
-  const {
-    send,
-    check,
-    onRetry,
-    notSent,
-    wait = (ms) => new Promise<void>((r) => setTimeout(r, ms)),
-    now = () => performance.now(),
-  } = options;
+  const { send, check, onRetry, notSent, wait, now = () => performance.now() } = options;
   const retried: string[] = [];
   const also = () => (retried.length > 0 ? { retried } : {});
-  for (let attempt = 0; ; attempt++) {
-    const started = now();
-    const ms = () => Math.round(now() - started);
-    let reply: Reply;
-    try {
-      reply = await send(request);
-    } catch (err) {
-      const error = err instanceof ModelError ? err : null;
-      if (error && !error.options.sent) {
-        notSent?.(error.message);
-        return null;
-      }
-      const delay = RETRY_DELAYS_MS[attempt];
-      if (error?.options.busy && delay !== undefined) {
-        retried.push(error.message);
-        onRetry?.(attempt + 2, RETRY_DELAYS_MS.length + 1, delay);
-        await wait(delay);
-        continue;
-      }
-      return {
-        ...error?.options.reply,
-        ms: ms(),
-        ...also(),
-        error: err instanceof Error ? err.message : String(err),
-      };
+  let started = 0;
+  const ms = () => Math.round(now() - started);
+  let reply: Reply;
+  try {
+    reply = await withRetries(
+      () => {
+        started = now();
+        return send(request);
+      },
+      {
+        delays: RETRY_DELAYS_MS,
+        retriable: (err) => err instanceof ModelError && !!err.options.busy,
+        onRetry: (err, attempt, of, delay) => {
+          retried.push(err instanceof Error ? err.message : String(err));
+          onRetry?.(attempt, of, delay);
+        },
+        ...(wait && { wait }),
+      },
+    );
+  } catch (err) {
+    const error = err instanceof ModelError ? err : null;
+    if (error && !error.options.sent) {
+      notSent?.(error.message);
+      return null;
     }
-    const { text, ...about } = reply;
-    const done = { ...about, ms: ms(), ...also() };
-    if (text.length === 0) return { ...done, error: `no answer: ${reply.stop ?? 'no text'}` };
-    let answer: unknown;
-    try {
-      answer = JSON.parse(text.join(''));
-    } catch {
-      return { ...done, undecoded: text, error: 'answer isn’t JSON' };
-    }
-    const problems = check(answer);
-    return problems.length > 0
-      ? { ...done, answer, error: `answer doesn’t fit the schema: ${problems.join('; ')}` }
-      : { ...done, answer };
+    return {
+      ...error?.options.reply,
+      ms: ms(),
+      ...also(),
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
+  const { text, ...about } = reply;
+  const done = { ...about, ms: ms(), ...also() };
+  if (text.length === 0) return { ...done, error: `no answer: ${reply.stop ?? 'no text'}` };
+  let answer: unknown;
+  try {
+    answer = JSON.parse(text.join(''));
+  } catch {
+    return { ...done, undecoded: text, error: 'answer isn’t JSON' };
+  }
+  const problems = check(answer);
+  return problems.length > 0
+    ? { ...done, answer, error: `answer doesn’t fit the schema: ${problems.join('; ')}` }
+    : { ...done, answer };
 }

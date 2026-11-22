@@ -49,14 +49,14 @@ describe('history candidates', () => {
 
 describe('the prompt', () => {
   it('fills the context and the input into prompt v3', () => {
-    const context = contextBlock(items.slice(0, 1), [], new Date(2026, 10, 21, 12, 30));
-    expect(context).toContain('language: English');
+    const context = contextBlock(items.slice(0, 1), [], new Date(2026, 10, 21, 12, 30), 'ru');
+    expect(context).toContain('language: ru');
     expect(context).toContain('time: 12:30, place: unknown');
     expect(context).toContain('meal so far: [{"name":"Куриные тефтели"');
     expect(context).toContain('history matches: none');
     const prompt = fillPrompt(context);
     expect(prompt).toContain('You are the food-recognition step');
-    expect(prompt).toContain('## Context\n\nlanguage: English');
+    expect(prompt).toContain('## Context\n\nlanguage: ru');
     expect(prompt).toContain('## User input\n\nThe user input follows as separate parts');
     expect(prompt).not.toContain('{CONTEXT}');
   });

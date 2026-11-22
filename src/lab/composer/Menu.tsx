@@ -65,6 +65,8 @@ function Settings({
   setModel,
   options,
   setOptions,
+  language,
+  setLanguage,
 }: {
   keyValue: string;
   setKey: (k: string) => void;
@@ -72,7 +74,10 @@ function Settings({
   setModel: (m: string) => void;
   options: Options;
   setOptions: (o: Options) => void;
+  language: string;
+  setLanguage: (language: string) => void;
 }) {
+  const [languageText, setLanguageText] = useState(language);
   const [temperature, setTemperature] = useState(
     options.temperature === null ? '' : String(options.temperature),
   );
@@ -128,6 +133,23 @@ function Settings({
         </form>
       )}
       {error && <p class="error">Gemini: {error}</p>}
+      <label class="field">
+        <span class="label">Answer language</span>
+        <input
+          id="composer-language"
+          class="input"
+          autoComplete="off"
+          placeholder="a code: ru, en, de…"
+          value={languageText}
+          onInput={(e) => {
+            const text = e.currentTarget.value;
+            setLanguageText(text);
+            // a language code: two or three letters
+            const code = text.trim().toLowerCase();
+            if (/^[a-z]{2,3}$/.test(code)) setLanguage(code);
+          }}
+        />
+      </label>
       {keyValue && (
         <label class="field">
           <span class="label">Model</span>

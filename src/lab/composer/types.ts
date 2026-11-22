@@ -1,3 +1,5 @@
+import type { ScannedProductData } from '../../data/openFoodFacts';
+
 /**
  * The meal composer experiment's records (kept in its lab data, see data.ts). Items are
  * parametric, as the model returns them (prompt-v3.txt): everything after that, picking a
@@ -57,24 +59,12 @@ export interface Answer {
   out_of_focus: string[];
 }
 
-/** A scanned barcode's product, looked up when attached: sent to the model as JSON. */
-export interface ScannedProduct {
-  code: string;
-  /** Where its values come from. */
-  from: 'my foods' | 'Open Food Facts';
-  name: string;
-  /** A drink: `per_100` is per 100 ml, `serving` in ml. */
-  liquid: boolean;
-  per_100: Per100;
-  /** One serving in g (or ml), when known. */
-  serving?: number;
-}
-
 /** What the meal is composed from, as attached (already prepared: photos shrunk, codes looked up). */
 export type Attached =
   | { id: string; kind: 'text'; text: string }
   | { id: string; kind: 'photo'; file: string }
-  | { id: string; kind: 'product'; product: ScannedProduct };
+  /** A scanned barcode: what Open Food Facts says about it, as it is. */
+  | { id: string; kind: 'product'; product: ScannedProductData };
 
 export interface ComposedMeal {
   id: string;

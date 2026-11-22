@@ -22,6 +22,7 @@ describe('composer data', () => {
       meals: [],
       model: 'm',
       options: { ...DEFAULT_OPTIONS, thinking: 'off' },
+      language: 'ru',
     });
   });
 

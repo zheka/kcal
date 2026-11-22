@@ -67,7 +67,15 @@ function Composer({ lab, initial, initialKey, app }: Props) {
   /** Sends the meal's whole context; logs the request and its outcome when it was sent. */
   async function update(meal: ComposedMeal, onBusy: (what: string) => void) {
     const time = new Date();
-    const request = updateRequest(meal, app, data.meals, time, data.model, data.options);
+    const request = updateRequest(
+      meal,
+      app,
+      data.meals,
+      time,
+      data.model,
+      data.options,
+      data.language,
+    );
     const photo = async (id: string) => {
       const blob = await lab.files.get(id);
       return blob ? { type: blob.type || 'image/jpeg', base64: await toBase64(blob) } : null;
@@ -107,6 +115,8 @@ function Composer({ lab, initial, initialKey, app }: Props) {
         setModel={(model) => setData((d) => ({ ...d, model }))}
         options={data.options}
         setOptions={(options) => setData((d) => ({ ...d, options }))}
+        language={data.language}
+        setLanguage={(language) => setData((d) => ({ ...d, language }))}
         downloadLogs={() => void lab.download().catch(fail('download the logs'))}
         clearLogs={() => void lab.clearLogs().catch(fail('clear the logs'))}
         clearAll={() =>
@@ -125,7 +135,7 @@ function Composer({ lab, initial, initialKey, app }: Props) {
       <MealScreen
         lab={lab}
         meal={open}
-        app={app}
+        language={data.language}
         change={(update) => change(open.id, update)}
         update={update}
         close={() => setScreen('list')}

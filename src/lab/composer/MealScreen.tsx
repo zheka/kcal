@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { AppData } from '../../core/types';
 import { newId } from '../../core/foods';
-import { lookUpBarcode } from '../../data/openFoodFacts';
+import { formName, lookUpBarcode } from '../../data/openFoodFacts';
 import { ConfirmButton } from '../../ui/ConfirmButton';
 import { CloseIcon } from '../../ui/icons';
 import { shrinkPhoto } from '../ai/image';
@@ -10,7 +9,6 @@ import { withContext } from './compose';
 import { type ComposerData, one, round } from './data';
 import { InputBar } from './InputBar';
 import { amounts, choose, setCount, total } from './recompute';
-import { productFromFoods, productFromLookup } from './scan';
 import type { Attached, ComposedMeal, Item } from './types';
 
 /**
@@ -24,7 +22,8 @@ type Files = Lab<ComposerData>['files'];
 interface Props {
   lab: Lab<ComposerData>;
   meal: ComposedMeal;
-  app: AppData | null;
+  /** The language to answer in: scanned products' names are asked for in it too. */
+  language: string;
   /** Changes the meal as it is by then (and saves it). */
   change: (update: (meal: ComposedMeal) => ComposedMeal) => void;
   /** Sends the meal's context; `onBusy` says what's happening (a busy model: trying again). */
@@ -33,7 +32,7 @@ interface Props {
   remove: () => void;
 }
 
-export function MealScreen({ lab, meal, app, change, update, close, remove }: Props) {
+export function MealScreen({ lab, meal, language, change, update, close, remove }: Props) {
   // What it's doing now, and since when: shown with the seconds, so a slow step is visible.
   const [busy, setBusyState] = useState<{ what: string; since: number } | null>(null);
   const setBusy = (what: string) =>
@@ -55,18 +54,22 @@ export function MealScreen({ lab, meal, app, change, update, close, remove }: Pr
     }
   }
 
+  /** Open Food Facts' data for the code, attached as it is; a popup when there is none. */
   async function scanned(code: string) {
-    const mine = productFromFoods(code, app);
-    if (mine) return attach({ id: newId(), kind: 'product', product: mine });
     setBusy(`Looking up ${code}`);
-    const result = await lookUpBarcode(code);
+    const result = await lookUpBarcode(code, {
+      language,
+      onRetry: (attempt, of) => setBusy(`Looking up ${code} (try ${attempt} of ${of})`),
+    });
     setBusy('');
     if (result.kind === 'found') {
-      attach({ id: newId(), kind: 'product', product: productFromLookup(code, result) });
+      attach({ id: newId(), kind: 'product', product: result.data });
     } else if (result.kind === 'offline') {
       alert(`Couldn’t look up ${code}: offline.`);
+    } else if (result.kind === 'not-found') {
+      alert(`${code}: not in Open Food Facts. Describe it in text instead.`);
     } else {
-      alert(`${code}: not in your foods or Open Food Facts. Describe it in text instead.`);
+      alert(`Couldn’t look up ${code}: Open Food Facts didn’t answer. Try again later.`);
     }
   }
 
@@ -108,6 +111,7 @@ export function MealScreen({ lab, meal, app, change, update, close, remove }: Pr
         <Context
           context={meal.context}
           files={lab.files}
+          language={language}
           remove={(id) =>
             change((m) =>
               withContext(
@@ -264,10 +268,12 @@ function Choices<T extends string | number>({
 function Context({
   context,
   files,
+  language,
   remove,
 }: {
   context: Attached[];
   files: Files;
+  language: string;
   remove: (id: string) => void;
 }) {
   if (context.length === 0) return null;
@@ -281,13 +287,14 @@ function Context({
             <q class="attached-text">{a.text}</q>
           ) : (
             <span class="attached-text">
-              {a.product.name} <span class="muted">{a.product.code}</span>
+              {formName(a.product, language) || 'A product'}{' '}
+              <span class="muted">{a.product.code}</span>
             </span>
           )}
           <button
             type="button"
             class="icon-button"
-            aria-label={`Remove ${a.kind === 'text' ? `“${a.text}”` : a.kind === 'photo' ? 'the photo' : a.product.name}`}
+            aria-label={`Remove ${a.kind === 'text' ? `“${a.text}”` : a.kind === 'photo' ? 'the photo' : a.product.code}`}
             onClick={() => remove(a.id)}
           >
             <CloseIcon />

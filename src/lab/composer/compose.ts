@@ -13,7 +13,7 @@ import type { Attached, ComposedMeal } from './types';
 /**
  * The request for the meal: prompt v3 (the meal so far and the history matches filled in), then
  * each attached thing as a part of its own, in order: a text, a photo by id, a scanned product
- * as JSON.
+ * (Open Food Facts' data) as JSON.
  */
 export function updateRequest(
   meal: ComposedMeal,
@@ -22,6 +22,7 @@ export function updateRequest(
   now: Date,
   model: string,
   options: Options,
+  language: string,
 ): ModelRequest {
   const texts = meal.context.flatMap((a) => (a.kind === 'text' ? [a.text] : []));
   const others = history.filter((m) => m.id !== meal.id);
@@ -30,7 +31,7 @@ export function updateRequest(
     model,
     instructions: '',
     content: [
-      { text: fillPrompt(contextBlock(meal.items, matches, now)) },
+      { text: fillPrompt(contextBlock(meal.items, matches, now, language)) },
       ...meal.context.map((a) =>
         a.kind === 'text'
           ? { text: a.text }

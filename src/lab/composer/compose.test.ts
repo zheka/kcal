@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { appData, egg, product } from '../../core/testData';
+import { appData, egg } from '../../core/testData';
 import { ANSWER_SCHEMA, parseAnswer } from './answer';
 import { applyUpdate, checkAnswer, updateRequest, withContext } from './compose';
 import food7hist from './fixtures/food7-v2-hist-gemini.json';
-import { productFromFoods, productFromLookup } from './scan';
+import type { ScannedProductData } from '../../data/openFoodFacts';
 import type { Attached, ComposedMeal } from './types';
 
 const NOW = new Date('2026-11-21T11:30:00.000Z');
@@ -23,13 +23,16 @@ const items = parseAnswer(JSON.stringify(food7hist)).answer.items;
 
 describe('the update request', () => {
   it('sends the prompt, then the whole context as attached, in order', () => {
-    const skyr = productFromLookup('4006040', {
-      kind: 'found',
-      name: 'Skyr natur, Arla',
-      per100: { kcal: 63, protein: 11, fat: 0.2, carbs: 4 },
-      liquid: false,
+    const skyr: ScannedProductData = {
+      code: '4006040',
+      language: 'de',
+      names: { de: 'Skyr Natur' },
+      brands: ['Arla'],
+      categories: ['en:skyrs'],
       serving: 150,
-    });
+      liquid: false,
+      per100: { kcal: 63, protein: 11, fat: 0.2, carbs: 4 },
+    };
     const m = meal(
       [
         photo('a'),
@@ -39,7 +42,7 @@ describe('the update request', () => {
       ],
       { items: items.slice(0, 1) },
     );
-    const request = updateRequest(m, null, [], NOW, 'gemini-x', OPTIONS);
+    const request = updateRequest(m, null, [], NOW, 'gemini-x', OPTIONS, 'ru');
     expect(request).toMatchObject({
       model: 'gemini-x',
       instructions: '',
@@ -53,37 +56,16 @@ describe('the update request', () => {
       { text: JSON.stringify(skyr) },
       { text: 'potatoes 100 g' },
     ]);
-    expect(JSON.parse((rest[2] as { text: string }).text)).toEqual({
-      code: '4006040',
-      from: 'Open Food Facts',
-      name: 'Skyr natur, Arla',
-      liquid: false,
-      per_100: { kcal: 63, protein: 11, fat: 0.2, carbs: 4, water_ml: null },
-      serving: 150,
-    });
+    // Open Food Facts' data, as it is
+    expect(JSON.parse((rest[2] as { text: string }).text)).toEqual(skyr);
+    expect((prompt as { text: string }).text).toContain('language: ru');
   });
 
   it('picks history matches by all the texts', () => {
     const app = appData({ products: [egg] });
     const m = meal([text('a', 'two eggs')]);
-    const { content } = updateRequest(m, app, [], NOW, 'gemini-x', OPTIONS);
+    const { content } = updateRequest(m, app, [], NOW, 'gemini-x', OPTIONS, 'ru');
     expect((content[0] as { text: string }).text).toContain('- "egg" (my product)');
-  });
-});
-
-describe('scanned products', () => {
-  it('come from my product with that barcode, per 100 g, with its first unit as a serving', () => {
-    const bar = product('bar', { kcal: 4.5, protein: 0.2 }, [{ id: 'u', name: 'bar', g: 45 }]);
-    const app = appData({ products: [{ ...bar, barcode: '123' }] });
-    expect(productFromFoods('123', app)).toEqual({
-      code: '123',
-      from: 'my foods',
-      name: 'bar',
-      liquid: false,
-      per_100: { kcal: 450, protein: 20, fat: 0, carbs: 0, water_ml: null },
-      serving: 45,
-    });
-    expect(productFromFoods('999', app)).toBeNull();
   });
 });
 

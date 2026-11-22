@@ -18,7 +18,10 @@ vi.mock('../barcode', () => ({
     return { stop: vi.fn() };
   }),
 }));
-vi.mock('../data/openFoodFacts', () => ({ lookUpBarcode: vi.fn() }));
+vi.mock('../data/openFoodFacts', async (original) => ({
+  ...(await original<typeof import('../data/openFoodFacts')>()),
+  lookUpBarcode: vi.fn(),
+}));
 
 let store: Store;
 function start(data: AppData = appData(), path = '/product/new') {
@@ -41,9 +44,15 @@ describe('scanning a barcode in a new product', () => {
   it('fills the name and the macros per 100 g, and keeps the barcode', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({
       kind: 'found',
-      name: 'Skyr Natur (Arla)',
-      per100: { kcal: 63, protein: 11, fat: 0.2, carbs: 4 },
-      liquid: false,
+      data: {
+        code: CODE,
+        names: { de: 'Skyr Natur' },
+        language: 'de',
+        brands: ['Arla'],
+        categories: [],
+        per100: { kcal: 63, protein: 11, fat: 0.2, carbs: 4 },
+        liquid: false,
+      },
     });
     start();
     scan();
@@ -69,9 +78,15 @@ describe('scanning a barcode in a new product', () => {
   it('fills a drink per 100 ml, stored per ml, with nothing per g', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({
       kind: 'found',
-      name: 'Milch 1.5%',
-      per100: { kcal: 47, protein: 3.4 },
-      liquid: true,
+      data: {
+        code: CODE,
+        names: { de: 'Milch 1.5%' },
+        language: 'de',
+        brands: [],
+        categories: [],
+        per100: { kcal: 47, protein: 3.4 },
+        liquid: true,
+      },
     });
     start();
     scan();
@@ -123,9 +138,15 @@ describe('scanning a barcode in a new product', () => {
   it('starts a new product, looked up, for a barcode scanned in a meal that I don’t have', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({
       kind: 'found',
-      name: 'Skyr Natur (Arla)',
-      per100: { kcal: 63, protein: 11 },
-      liquid: false,
+      data: {
+        code: CODE,
+        names: { de: 'Skyr Natur' },
+        language: 'de',
+        brands: ['Arla'],
+        categories: [],
+        per100: { kcal: 63, protein: 11 },
+        liquid: false,
+      },
     });
     start(appData({ products: [egg] }), '/meal/new');
     scan();
@@ -153,9 +174,15 @@ describe('scanning a barcode in a new product', () => {
   it('starts a new product, looked up, for an unknown barcode scanned in the Library', async () => {
     vi.mocked(lookUpBarcode).mockResolvedValue({
       kind: 'found',
-      name: 'Skyr Natur (Arla)',
-      per100: { kcal: 63, protein: 11 },
-      liquid: false,
+      data: {
+        code: CODE,
+        names: { de: 'Skyr Natur' },
+        language: 'de',
+        brands: ['Arla'],
+        categories: [],
+        per100: { kcal: 63, protein: 11 },
+        liquid: false,
+      },
     });
     start(appData(), '/library');
     scan();

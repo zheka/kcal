@@ -16,7 +16,7 @@ import { cleanText, nameKey } from '../core/text';
 import type { NutrientValues, Product } from '../core/types';
 import { perOneFrom } from '../core/units';
 import { validateAppData } from '../core/validate';
-import { lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
+import { formName, lookUpBarcode, type LookupResult } from '../data/openFoodFacts';
 import type { Store } from '../state/store';
 import { CloseIcon } from './icons';
 import { ScanButton } from './ScanButton';
@@ -115,12 +115,14 @@ export function ProductForm({ store, id, initialName = '', initialBarcode, forDr
       void lookUpBarcode(code).then((result) => {
         setLookup({ kind: 'result', code, result });
         if (result.kind !== 'found') return;
-        if (result.name) setName(result.name);
+        const found = result.data;
+        const name = formName(found);
+        if (name) setName(name);
         // Per 100 g, or per 100 ml for drinks; the other base is left empty.
-        const base = result.liquid ? MILLILITRES : GRAMS;
+        const base = found.liquid ? MILLILITRES : GRAMS;
         const filled = emptyTexts();
         for (const n of NUTRIENTS) {
-          const v = result.per100[n];
+          const v = found.per100[n];
           if (v !== undefined) filled[n] = formatNumber(v, 3);
         }
         setTexts({ g: emptyTexts(), ml: emptyTexts(), [base]: filled });
@@ -460,7 +462,7 @@ function ScanMessage({
   const { result } = status;
   const text =
     result.kind === 'found'
-      ? `Filled from Open Food Facts, per 100 ${result.liquid ? 'ml' : 'g'}: check the values against the label.`
+      ? `Filled from Open Food Facts, per 100 ${result.data.liquid ? 'ml' : 'g'}: check the values against the label.`
       : result.kind === 'not-found'
         ? `${status.code} isn’t in Open Food Facts. Enter the product from its label.`
         : result.kind === 'offline'
