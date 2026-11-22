@@ -381,7 +381,12 @@ export function ProductForm({ store, id, initialName = '', initialBarcode, forDr
             label="Delete"
             confirmLabel="Tap again to delete"
             onConfirm={() => {
-              store.deleteFood(existing.id);
+              try {
+                store.deleteFood(existing.id);
+              } catch (err) {
+                setSaveError((err as Error).message);
+                return;
+              }
               goBack('/library');
             }}
           />

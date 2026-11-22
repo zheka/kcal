@@ -323,6 +323,53 @@ describe('backup', () => {
   });
 });
 
+describe('refused saves (storage full: another zheka.github.io project may have used the space)', () => {
+  function startFull(data: AppData, path: string) {
+    store = createStore(data, () => {
+      throw new Error('quota exceeded');
+    });
+    navigate(path);
+    render(<App store={store} />);
+  }
+  const deleteTwice = () => (click('Delete'), click('Tap again to delete'));
+
+  it('says so when goals can’t be saved, and keeps the form', () => {
+    startFull(appData(), '/goals');
+    type(field('kcal'), '2000');
+    click('Save');
+    expect(screen.getByText('Could not save: quota exceeded')).toBeTruthy();
+    expect(store.data.value.goals).toEqual(appData().goals);
+  });
+
+  it('says so when a product, recipe or meal can’t be deleted, and keeps it', () => {
+    const oats = recipe('oats', [ing(oatFlakes, 50)], [makes(1)]);
+    const breakfast = meal('2026-11-20T08:00:00.000Z', [ing(egg, 50)]);
+    const data = appData({ products: [egg, oatFlakes], recipes: [oats] });
+    for (const path of [`/product/${milk.id}`, `/recipe/${oats.id}`, `/meal/${breakfast.id}`]) {
+      cleanup();
+      startFull({ ...data, products: [...data.products, milk], meals: [breakfast] }, path);
+      deleteTwice();
+      expect(screen.getByText('Could not save: quota exceeded')).toBeTruthy();
+    }
+    expect(store.data.value.meals).toEqual([breakfast]);
+  });
+
+  it('says so when an import can’t replace the data, and changes nothing', async () => {
+    startFull(appData({ products: [egg] }), '/menu');
+    const backup = serializeBackup(appData({ products: [milk] }), new Date());
+    fireEvent.change(field('Import backup'), {
+      target: { files: [new File([backup], 'kcal-backup.json')] },
+    });
+    expect(await screen.findByText(/kcal-backup.json: 1 product/)).toBeTruthy();
+    click('Replace my data');
+    click('Tap again to replace');
+    expect(
+      screen.getByText('Could not import: quota exceeded. Your data is unchanged.'),
+    ).toBeTruthy();
+    expect(store.data.value.products).toEqual([egg]);
+  });
+});
+
 describe('problem screen', () => {
   it('lists the problems and starts fresh only after a second tap', () => {
     const onStartFresh = vi.fn();

@@ -13,7 +13,8 @@ import { navigate } from './router';
 type ImportState =
   | { step: 'idle' }
   | { step: 'refused'; problems: string[] }
-  | { step: 'confirm'; data: AppData; fileName: string }
+  /** `error`: replacing the data was refused (e.g. storage full); nothing was changed. */
+  | { step: 'confirm'; data: AppData; fileName: string; error?: string }
   | { step: 'done' };
 
 export function MenuScreen({ store }: { store: Store }) {
@@ -82,12 +83,20 @@ export function MenuScreen({ store }: { store: Store }) {
               {importing.fileName}: {summary(importing.data)}. Importing replaces all data in this
               app ({summary(data)}).
             </p>
+            {importing.error && (
+              <p class="error">Could not import: {importing.error}. Your data is unchanged.</p>
+            )}
             <div class="actions">
               <ConfirmButton
                 label="Replace my data"
                 confirmLabel="Tap again to replace"
                 onConfirm={() => {
-                  store.replaceAll(importing.data);
+                  try {
+                    store.replaceAll(importing.data);
+                  } catch (err) {
+                    setImporting({ ...importing, error: (err as Error).message });
+                    return;
+                  }
                   setImporting({ step: 'done' });
                 }}
               />
@@ -104,8 +113,10 @@ export function MenuScreen({ store }: { store: Store }) {
 
       <section class="section about">
         <p>
-          Saved data: {(size / 1_000_000).toFixed(2)} MB of about 5 MB
-          {size > SIZE_WARNING_CHARS && ' (getting full: time to move the data to IndexedDB)'}
+          Saved data: {(size / 1_000_000).toFixed(2)} MB
+          {size > SIZE_WARNING_CHARS
+            ? ' (over 1\u00a0MB: time to move the data to IndexedDB)'
+            : ' (best kept under 1\u00a0MB: the browser’s 5\u00a0MB is shared with other zheka.github.io projects)'}
         </p>
         <p>Data format: {VERSION_TAG}</p>
       </section>

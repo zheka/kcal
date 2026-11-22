@@ -183,7 +183,12 @@ export function MealComposer({ store, id, date, copyOf, start, draftKey }: Props
               label="Delete"
               confirmLabel="Tap again to delete"
               onConfirm={() => {
-                store.deleteMeal(existing.id);
+                try {
+                  store.deleteMeal(existing.id);
+                } catch (err) {
+                  setSaveError((err as Error).message);
+                  return;
+                }
                 leave();
               }}
             />

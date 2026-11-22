@@ -176,7 +176,12 @@ export function RecipeForm({ store, id, draftKey }: Props) {
             label="Delete"
             confirmLabel="Tap again to delete"
             onConfirm={() => {
-              store.deleteFood(existing.id);
+              try {
+                store.deleteFood(existing.id);
+              } catch (err) {
+                setSaveError((err as Error).message);
+                return;
+              }
               leave();
             }}
           />

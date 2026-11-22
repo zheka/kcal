@@ -18,6 +18,7 @@ export function GoalsScreen({ store }: { store: Store }) {
     return t;
   });
   const [submitted, setSubmitted] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const perDay: NutrientValues = {};
   const errors = new Map<Nutrient, string>();
@@ -32,7 +33,12 @@ export function GoalsScreen({ store }: { store: Store }) {
   function save() {
     setSubmitted(true);
     if (errors.size > 0) return;
-    store.saveGoals(perDay, new Date());
+    try {
+      store.saveGoals(perDay, new Date());
+    } catch (err) {
+      setSaveError((err as Error).message);
+      return;
+    }
     goBack('/');
   }
 
@@ -66,6 +72,7 @@ export function GoalsScreen({ store }: { store: Store }) {
           </label>
         ))}
       </div>
+      {saveError && <p class="error">Could not save: {saveError}</p>}
       <div class="actions action-bar">
         <button type="submit" class="button primary">
           Save
