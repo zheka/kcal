@@ -15,13 +15,14 @@ Requires Node 26 (see `.nvmrc`).
 
 ```bash
 npm install
-npm run dev        # dev server at http://localhost:5280/kcal/, in a Pixel 8a frame (?full: full width)
+npm run dev        # dev server at http://localhost:5280/kcal/, in a Pixel 8a frame (?full: full width);
+                   # the lab at http://localhost:5280/kcal/lab/
 npm test           # unit and UI tests (Vitest, jsdom)
 npm run e2e        # layout tests in Chromium at Pixel 8a size (Playwright; builds and serves the app)
 npm run lint       # ESLint
 npm run format     # Prettier
 npm run typecheck  # TypeScript
-npm run build      # type-check + production build into dist/
+npm run build      # type-check + production build into dist/ (the lab into dist/lab/)
 npm run preview    # serve dist/ at http://localhost:4280/kcal/ (offline mode, updates)
 ```
 
@@ -53,6 +54,7 @@ src/
   ui/             Preact components: screens, forms, the ingredient editor
     router.ts       hash routes, back navigation
   pwa.ts          service worker registration
+  lab/            AI experiments, apart from the app (see Lab below)
   **/*.test.ts(x) tests next to the code they test (run in Europe/Berlin time)
 ```
 
@@ -100,6 +102,33 @@ kcal is a PWA: open https://zheka.github.io/kcal/ in Chrome and choose **⋮ →
 version downloads in the background and takes over on the next launch, or right away from the
 menu: **App version** shows the build (its commit and date), and a tap checks for an update or installs
 one that is ready.
+
+## Lab
+
+AI experiments run on real devices at https://zheka.github.io/kcal/lab/, one at a time, apart
+from the app:
+
+```
+lab/index.html    the lab's page: loads the experiment running now, or src/lab/none/
+src/lab/
+  none/           "No experiment running", and clearing what earlier ones left
+  storage/        openLab(id): an experiment's own IndexedDB database, kcal-lab-<id>, with
+                  one data object, files (photos), secrets (never downloaded) and debug logs;
+                  download as JSON; clearLab(): deletes every kcal-lab-* database
+  <experiment>/   one experiment: its page (main.tsx), UI, settings and logic
+```
+
+Each experiment is a page of its own: it uses what it needs from `storage/` and draws its own
+settings, Download and Clear. To run another one, point `lab/index.html` at its `main.tsx`.
+
+- **Its own build** (`vite.lab.config.ts`, after the app's), so nothing of the lab reaches the
+  app's bundle or its service worker. The app's service worker leaves `/kcal/lab/` to the
+  network (`navigateFallbackDenylist`). The lab has no service worker: it needs a connection.
+  A phone with an older app version shows the app at `/kcal/lab/` until the app has updated
+  (open it, close it fully, open it again).
+- **Read-only access to the app's data.** ESLint keeps them apart: the app never imports the
+  lab, and the lab never imports the app's state or the functions that write its data.
+- **Not linked from the app** and not indexed (`noindex`): it's opened by its address.
 
 ## Dependencies
 

@@ -14,6 +14,7 @@
   "include": [
     "src/config.ts",
     "vite.config.ts",
+    "vite.lab.config.ts",
     "pwa-assets.config.ts",
     "playwright.config.ts",
     "e2e"

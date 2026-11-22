@@ -1,16 +1,13 @@
 /// <reference types="vitest/config" />
 import { execSync } from 'node:child_process';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin, type UserConfig } from 'vite';
 import { APP_NAME } from './src/config.ts';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
+/** What the app's build and the lab's (vite.lab.config.ts) have in common. */
+export const shared = {
   // Served from https://zheka.github.io/kcal/
   base: '/kcal/',
-  // Fixed ports of their own, away from Vite's defaults (5173, 4173) that other local projects
-  // use; strictPort fails loudly instead of silently moving to another port.
-  server: { port: 5280, strictPort: true },
-  preview: { port: 4280, strictPort: true },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion()),
   },
@@ -18,6 +15,14 @@ export default defineConfig({
   oxc: {
     jsx: { runtime: 'automatic', importSource: 'preact' },
   },
+} satisfies UserConfig;
+
+export default defineConfig({
+  ...shared,
+  // Fixed ports of their own, away from Vite's defaults (5173, 4173) that other local projects
+  // use; strictPort fails loudly instead of silently moving to another port.
+  server: { port: 5280, strictPort: true },
+  preview: { port: 4280, strictPort: true },
   plugins: [
     appName(),
     VitePWA({
@@ -45,6 +50,9 @@ export default defineConfig({
           '**/*.{js,css,html,svg,png,ico,webmanifest}',
           '**/roboto-latin-wght-normal-*.woff2',
         ],
+        // The lab (/kcal/lab/, built on its own by vite.lab.config.ts) isn't part of the app:
+        // opening it must load the lab from the network, not this app from the cache.
+        navigateFallbackDenylist: [/^\/kcal\/lab\//],
       },
     }),
   ],
