@@ -1,0 +1,333 @@
+{
+  "meal_label": "Обед: кальмар на гриле, мясо на гриле и овощи",
+  "items": [
+    {
+      "name": "Кальмар на гриле с щупальцами",
+      "count": 1,
+      "unit": "шт.",
+      "grams_per_unit": 240,
+      "per_100g": {
+        "kcal": 120,
+        "protein": 18,
+        "fat": 4,
+        "carbs": 3,
+        "water_ml": null
+      },
+      "source": "visual",
+      "amount_flag": true,
+      "likely_counts": [0.5, 1],
+      "parameters": [
+        {
+          "name": "Размер кальмара",
+          "variants": [
+            {
+              "label": "Средний (~200 г)",
+              "per_100g": null,
+              "grams_per_unit": 200
+            },
+            {
+              "label": "Крупный (~240 г)",
+              "per_100g": null,
+              "grams_per_unit": 240
+            },
+            {
+              "label": "Очень крупный (~320 г)",
+              "per_100g": null,
+              "grams_per_unit": 320
+            }
+          ],
+          "default": "Крупный (~240 г)",
+          "surfaced": true,
+          "why": "Размер тушки меняет вес порции и может дать разницу около 140+ ккал и 20+ г белка."
+        },
+        {
+          "name": "Начинка внутри тушки",
+          "variants": [
+            {
+              "label": "Без начинки",
+              "per_100g": {
+                "kcal": 120,
+                "protein": 18,
+                "fat": 4,
+                "carbs": 3,
+                "water_ml": null
+              },
+              "grams_per_unit": 240
+            },
+            {
+              "label": "Фаршированный (овощи/морепродукты/сыр)",
+              "per_100g": {
+                "kcal": 155,
+                "protein": 15,
+                "fat": 7,
+                "carbs": 8,
+                "water_ml": null
+              },
+              "grams_per_unit": 300
+            }
+          ],
+          "default": "Без начинки",
+          "surfaced": true,
+          "why": "Скрытая начинка внутри целой тушки кальмара по фото не видна, но заметно добавляет калории."
+        }
+      ]
+    },
+    {
+      "name": "Овощи на гриле и отварные (левая тарелка)",
+      "count": 110,
+      "unit": "г",
+      "grams_per_unit": 1,
+      "per_100g": {
+        "kcal": 55,
+        "protein": 1.5,
+        "fat": 2.5,
+        "carbs": 7,
+        "water_ml": null
+      },
+      "source": "visual",
+      "amount_flag": true,
+      "likely_counts": [70, 110, 160],
+      "parameters": [
+        {
+          "name": "Количество масла на овощах",
+          "variants": [
+            {
+              "label": "Минимум масла",
+              "per_100g": {
+                "kcal": 55,
+                "protein": 1.5,
+                "fat": 2.5,
+                "carbs": 7,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            },
+            {
+              "label": "Щедро полито оливковым маслом",
+              "per_100g": {
+                "kcal": 110,
+                "protein": 1.4,
+                "fat": 8.5,
+                "carbs": 6.5,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            }
+          ],
+          "default": "Минимум масла",
+          "surfaced": false,
+          "why": "Разница на порцию 110 г около 60 ккал — ниже порога значимости."
+        }
+      ]
+    },
+    {
+      "name": "Отварной картофель (левая тарелка)",
+      "count": 60,
+      "unit": "г",
+      "grams_per_unit": 1,
+      "per_100g": {
+        "kcal": 85,
+        "protein": 2,
+        "fat": 0.5,
+        "carbs": 18,
+        "water_ml": null
+      },
+      "source": "visual",
+      "amount_flag": true,
+      "likely_counts": [40, 60, 100],
+      "parameters": [
+        {
+          "name": "Заправка",
+          "variants": [
+            {
+              "label": "Без масла",
+              "per_100g": {
+                "kcal": 85,
+                "protein": 2,
+                "fat": 0.5,
+                "carbs": 18,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            },
+            {
+              "label": "С оливковым маслом",
+              "per_100g": {
+                "kcal": 130,
+                "protein": 1.9,
+                "fat": 5.5,
+                "carbs": 17.5,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            }
+          ],
+          "default": "Без масла",
+          "surfaced": false,
+          "why": "Небольшой объём картофеля даёт разницу менее 30 ккал."
+        }
+      ]
+    },
+    {
+      "name": "Кусочки мяса на гриле",
+      "count": 5,
+      "unit": "кусков",
+      "grams_per_unit": 45,
+      "per_100g": {
+        "kcal": 240,
+        "protein": 26,
+        "fat": 15,
+        "carbs": 0,
+        "water_ml": null
+      },
+      "source": "visual",
+      "amount_flag": true,
+      "likely_counts": [3, 5],
+      "parameters": [
+        {
+          "name": "Вид мяса и жирность",
+          "variants": [
+            {
+              "label": "Говядина / телятина средней жирности",
+              "per_100g": {
+                "kcal": 240,
+                "protein": 26,
+                "fat": 15,
+                "carbs": 0,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            },
+            {
+              "label": "Постная вырезка (говядина / свинина)",
+              "per_100g": {
+                "kcal": 175,
+                "protein": 28,
+                "fat": 7,
+                "carbs": 0,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            },
+            {
+              "label": "Жирная свинина / баранина",
+              "per_100g": {
+                "kcal": 310,
+                "protein": 22,
+                "fat": 25,
+                "carbs": 0,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            }
+          ],
+          "default": "Говядина / телятина средней жирности",
+          "surfaced": true,
+          "why": "По нарезанным кускам на гриле сложно определить вид и жирность отруба, а разница превышает 140 ккал."
+        }
+      ]
+    },
+    {
+      "name": "Овощи на гриле и отварные (правая тарелка)",
+      "count": 120,
+      "unit": "г",
+      "grams_per_unit": 1,
+      "per_100g": {
+        "kcal": 55,
+        "protein": 1.5,
+        "fat": 2.5,
+        "carbs": 7,
+        "water_ml": null
+      },
+      "source": "visual",
+      "amount_flag": true,
+      "likely_counts": [80, 120, 170],
+      "parameters": [
+        {
+          "name": "Количество масла на овощах",
+          "variants": [
+            {
+              "label": "Минимум масла",
+              "per_100g": {
+                "kcal": 55,
+                "protein": 1.5,
+                "fat": 2.5,
+                "carbs": 7,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            },
+            {
+              "label": "Щедро полито оливковым маслом",
+              "per_100g": {
+                "kcal": 110,
+                "protein": 1.4,
+                "fat": 8.5,
+                "carbs": 6.5,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            }
+          ],
+          "default": "Минимум масла",
+          "surfaced": false,
+          "why": "Разница на порцию 120 г около 65 ккал — ниже порога значимости."
+        }
+      ]
+    },
+    {
+      "name": "Отварной картофель (правая тарелка)",
+      "count": 70,
+      "unit": "г",
+      "grams_per_unit": 1,
+      "per_100g": {
+        "kcal": 85,
+        "protein": 2,
+        "fat": 0.5,
+        "carbs": 18,
+        "water_ml": null
+      },
+      "source": "visual",
+      "amount_flag": true,
+      "likely_counts": [40, 70, 110],
+      "parameters": [
+        {
+          "name": "Заправка",
+          "variants": [
+            {
+              "label": "Без масла",
+              "per_100g": {
+                "kcal": 85,
+                "protein": 2,
+                "fat": 0.5,
+                "carbs": 18,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            },
+            {
+              "label": "С оливковым маслом",
+              "per_100g": {
+                "kcal": 130,
+                "protein": 1.9,
+                "fat": 5.5,
+                "carbs": 17.5,
+                "water_ml": null
+              },
+              "grams_per_unit": null
+            }
+          ],
+          "default": "Без масла",
+          "surfaced": false,
+          "why": "Небольшой объём картофеля даёт разницу около 30 ккал."
+        }
+      ]
+    }
+  ],
+  "dropped": [],
+  "out_of_focus": [
+    "Бутылки с оливковым маслом и бальзамическим уксусом в правом верхнем углу",
+    "Чашка/блюдце у правого верхнего края",
+    "Фрагмент стакана на правом краю кадра"
+  ]
+}

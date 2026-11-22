@@ -78,14 +78,18 @@ describe('openLab', () => {
     expect(await lab.secret('gemini')).toBeUndefined();
   });
 
-  it('appends log records as JSON, with their time, in order', async () => {
+  it('appends log records as JSON, with their time and build, in order', async () => {
     const lab = await open();
     await lab.log({ event: 'ask', model: 'm', fn: () => 1, at: undefined });
-    await lab.log({ event: 'answer', ms: 1200 });
-    const logs = await lab.logs();
-    expect(logs).toEqual([
-      { time: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/), event: 'ask', model: 'm' },
-      { time: expect.any(String), event: 'answer', ms: 1200 },
+    await lab.log({ time: '2026-11-22T13:48:05.120Z', event: 'answer', ms: 1200 });
+    expect(await lab.logs()).toEqual([
+      {
+        time: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+        build: expect.stringMatching(/^\S+$/),
+        event: 'ask',
+        model: 'm',
+      },
+      { time: '2026-11-22T13:48:05.120Z', build: expect.any(String), event: 'answer', ms: 1200 },
     ]);
   });
 
@@ -105,22 +109,23 @@ describe('openLab', () => {
     expect(await lab.logs()).toEqual([]);
   });
 
-  it('exports data, files and logs, but never secrets', async () => {
+  it('exports only the logs, oldest first, as a pretty-printed array; clears them', async () => {
     const lab = await open<{ n: number }>();
     await lab.data.set({ n: 1 });
-    const id = await lab.files.put(new Blob(['12345'], { type: 'image/png' }));
+    await lab.files.put(new Blob(['12345'], { type: 'image/png' }));
     await lab.setSecret('gemini', 'key-1234');
     await lab.log({ event: 'x' });
+    await lab.log({ event: 'y' });
     const json = await lab.exportJson();
+    expect(json).toMatch(/^\[\n {2}\{\n {4}"time"/);
+    expect(JSON.parse(json)).toEqual([
+      { time: expect.any(String), build: expect.any(String), event: 'x' },
+      { time: expect.any(String), build: expect.any(String), event: 'y' },
+    ]);
     expect(json).not.toContain('key-1234');
-    expect(JSON.parse(json)).toEqual({
-      lab: 'test',
-      version: expect.any(String),
-      exportedAt: expect.any(String),
-      data: { n: 1 },
-      files: [{ id, type: 'image/png', size: 5 }],
-      logs: [{ time: expect.any(String), event: 'x' }],
-    });
+    await lab.clearLogs();
+    expect(await lab.logs()).toEqual([]);
+    expect(await lab.data.get()).toEqual({ n: 1 });
   });
 });
 

@@ -7,7 +7,8 @@ all data stays on the device (`localStorage`).
 Live: https://zheka.github.io/kcal/
 
 See [docs/design.md](docs/design.md) for the design and decisions, and
-[docs/barcodes.md](docs/barcodes.md) for the open discussion of barcodes and packs.
+[docs/barcodes.md](docs/barcodes.md) for the open discussion of barcodes and packs, and
+[docs/lab.md](docs/lab.md) for the AI experiment in the lab.
 
 ## Development
 
@@ -113,13 +114,18 @@ lab/index.html    the lab's page: loads the experiment running now, or src/lab/n
 src/lab/
   none/           "No experiment running", and clearing what earlier ones left
   storage/        openLab(id): an experiment's own IndexedDB database, kcal-lab-<id>, with
-                  one data object, files (photos), secrets (never downloaded) and debug logs;
-                  download as JSON; clearLab(): deletes every kcal-lab-* database
+                  one data object, files (photos), secrets (never downloaded) and logs (the
+                  download); clearLab(): deletes every kcal-lab-* database
+  ai/             model requests and replies, provider-neutral (model.ts), and Gemini
+                  (gemini.ts); shrinking photos to send
+  composer/       running now: the meal composer (photos, text and barcodes → a meal of
+                  parametric items, adjusted on the phone), see docs/lab.md
   <experiment>/   one experiment: its page (main.tsx), UI, settings and logic
 ```
 
 Each experiment is a page of its own: it uses what it needs from `storage/` and draws its own
-settings, Download and Clear. To run another one, point `lab/index.html` at its `main.tsx`.
+settings, Download and Clear. To run another one, point `lab/index.html` at its `main.tsx`
+(or at `none/` when nothing runs).
 
 - **Its own build** (`vite.lab.config.ts`, after the app's), so nothing of the lab reaches the
   app's bundle or its service worker. The app's service worker leaves `/kcal/lab/` to the

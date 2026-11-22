@@ -8,17 +8,22 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
  *   whole on every save;
  * - `files`: blobs (photos), by id, kept out of `data` so saving it stays cheap;
  * - `secrets`: API keys and the like, by name, never downloaded;
- * - `logs`: debug records, appended, each with its time.
+ * - `logs`: debug records, appended, each with its time and build: what the download holds.
  *
  * `clearLab()` (clear.ts) deletes it all, with every other experiment's.
  */
+
+/** The build's commit (__APP_VERSION__ is `<commit> · <date>`). */
+const BUILD = __APP_VERSION__.split(' ')[0]!;
 
 /** Every lab database's name starts with this (see zheka.github.io's SHARED-ORIGIN.md). */
 export const LAB_PREFIX = 'kcal-lab-';
 
 export interface LogRecord {
-  /** When it was logged, ISO 8601 (UTC). */
+  /** When it happened (by default, when it was logged), ISO 8601 (UTC). */
   time: string;
+  /** The commit of the build that logged it. */
+  build: string;
   [field: string]: unknown;
 }
 
@@ -46,12 +51,14 @@ export interface Lab<T> {
   /** Keeps a secret; an empty value forgets it. */
   setSecret(name: string, value: string): Promise<void>;
   /**
-   * Appends a debug record, stored as JSON (what JSON can't hold is dropped), with the time
-   * added. Never fails: a record that can't be kept goes to the console instead.
+   * Appends a debug record, stored as JSON (what JSON can't hold is dropped), with the time (now,
+   * unless it has its own) and the build added. Never fails: a record that can't be kept goes to
+   * the console instead.
    */
-  log(record: Record<string, unknown> & { time?: never }): Promise<void>;
+  log(record: Record<string, unknown> & { time?: string; build?: never }): Promise<void>;
   logs(): Promise<LogRecord[]>;
-  /** Everything but the secrets, as one JSON document; files only by id, type and size. */
+  clearLogs(): Promise<void>;
+  /** The logs, oldest first, as a pretty-printed JSON array. */
   exportJson(): Promise<string>;
   /** Saves exportJson() as a file, `kcal-lab-<id>-<date>.json`. */
   download(): Promise<void>;
@@ -100,7 +107,7 @@ export async function openLab<T>(id: string): Promise<Lab<T>> {
     log: async (record) => {
       try {
         const entry = JSON.parse(
-          JSON.stringify({ time: new Date().toISOString(), ...record }),
+          JSON.stringify({ time: new Date().toISOString(), build: BUILD, ...record }),
         ) as LogRecord;
         await db.add('logs', entry);
       } catch (err) {
@@ -108,28 +115,8 @@ export async function openLab<T>(id: string): Promise<Lab<T>> {
       }
     },
     logs: () => db.getAll('logs'),
-    exportJson: async () => {
-      const tx = db.transaction(['data', 'files', 'logs']);
-      const data = await tx.objectStore('data').get('data');
-      const files: { id: string; type: string; size: number }[] = [];
-      for await (const cursor of tx.objectStore('files')) {
-        files.push({ id: cursor.key, type: cursor.value.type, size: cursor.value.size });
-      }
-      const logs = await tx.objectStore('logs').getAll();
-      await tx.done;
-      return JSON.stringify(
-        {
-          lab: id,
-          version: __APP_VERSION__,
-          exportedAt: new Date().toISOString(),
-          data: data ?? null,
-          files,
-          logs,
-        },
-        null,
-        2,
-      );
-    },
+    clearLogs: () => db.clear('logs'),
+    exportJson: async () => JSON.stringify(await db.getAll('logs'), null, 2),
     download: async () => {
       const json = await lab.exportJson();
       const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));

@@ -25,17 +25,18 @@ test('the app’s service worker leaves navigations to /kcal/lab/ to the network
   }
 });
 
+// Through the experiment running now (the composer), which holds its own database open.
 test('the lab clears its own data and the prototype’s, and leaves everything else', async ({
   page,
 }) => {
-  // Another project's data and the app's, the prototype's leftovers, and two experiments'.
+  // Another project's data and the app's, the prototype's leftovers, and another experiment's.
   await page.goto('lab/');
   await page.evaluate(async () => {
     localStorage.setItem('kcal', '{"real":"data"}');
     localStorage.setItem('clog', 'x');
     localStorage.setItem('kcal-proto-gemini-key', 'k');
     localStorage.setItem('kcal-composer-options', '{}');
-    for (const name of ['kcal-composer', 'kcal-lab-one', 'kcal-lab-two', 'kcal-other', 'clog']) {
+    for (const name of ['kcal-composer', 'kcal-lab-other', 'kcal-other', 'clog']) {
       await new Promise((resolve) => {
         const request = indexedDB.open(name);
         request.onsuccess = () => (request.result.close(), resolve(null));
@@ -43,22 +44,15 @@ test('the lab clears its own data and the prototype’s, and leaves everything e
     }
   });
   await page.reload();
-  await expect(page.getByText('Lab data in this browser:')).toBeVisible();
-  await expect(page.getByRole('listitem')).toHaveText([
-    'kcal-composer',
-    'kcal-lab-one',
-    'kcal-lab-two',
-    'kcal-composer-options',
-    'kcal-proto-gemini-key',
-  ]);
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByLabel('Gemini key').fill('secret-key');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Gemini key saved on this device')).toBeVisible();
+
   // a second tap confirms
-  const clear = page.getByRole('button', { name: 'Clear all lab data' });
-  await clear.click();
-  await expect(page.getByRole('listitem')).toHaveCount(5);
-  await page.getByRole('button', { name: 'Tap again to clear' }).click();
-  await expect(page.getByText('No lab data in this browser.')).toBeVisible();
-  await expect(page.getByRole('listitem')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Clear all lab data' })).toBeHidden();
+  await page.getByRole('button', { name: 'Clear all lab data' }).click();
+  await page.getByRole('button', { name: 'Tap again to clear everything' }).click();
+  await expect(page.getByRole('heading', { name: 'Lab data cleared' })).toBeVisible();
   const left = await page.evaluate(async () => ({
     keys: Object.keys(localStorage).sort(),
     kcal: localStorage.getItem('kcal'),

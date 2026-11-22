@@ -1,0 +1,123 @@
+{
+  "meal_label": "Обед: куриные тефтели, отварной картофель и бутерброд",
+  "items": [
+    {
+      "name": "Куриные тефтели",
+      "count": 8,
+      "unit": "шт.",
+      "grams_per_unit": 25,
+      "per_100g": {
+        "kcal": 160,
+        "protein": 14,
+        "fat": 9,
+        "carbs": 6,
+        "water_ml": null
+      },
+      "source": "history",
+      "amount_flag": true,
+      "likely_counts": [6, 8, 10],
+      "parameters": [
+        {
+          "name": "Вид фарша",
+          "variants": [
+            {
+              "label": "Куриные (из истории)",
+              "per_100g": {
+                "kcal": 160,
+                "protein": 14,
+                "fat": 9,
+                "carbs": 6,
+                "water_ml": null
+              },
+              "grams_per_unit": 25
+            },
+            {
+              "label": "Смешанный фарш (свинина/говядина)",
+              "per_100g": {
+                "kcal": 215,
+                "protein": 14,
+                "fat": 15,
+                "carbs": 6,
+                "water_ml": null
+              },
+              "grams_per_unit": 35
+            }
+          ],
+          "default": "Куриные (из истории)",
+          "surfaced": true,
+          "why": "Смешанный фарш и больший размер заметно увеличивают калорийность порции (80+ ккал)."
+        }
+      ]
+    },
+    {
+      "name": "Отварной картофель",
+      "count": 320,
+      "unit": "г",
+      "grams_per_unit": 1,
+      "per_100g": {
+        "kcal": 82,
+        "protein": 2,
+        "fat": 0.2,
+        "carbs": 18,
+        "water_ml": null
+      },
+      "source": "visual",
+      "amount_flag": true,
+      "likely_counts": [200, 320, 450],
+      "parameters": []
+    },
+    {
+      "name": "Хлеб цельнозерновой",
+      "count": 1,
+      "unit": "ломтик",
+      "grams_per_unit": 45,
+      "per_100g": {
+        "kcal": 253,
+        "protein": 8,
+        "fat": 3,
+        "carbs": 44,
+        "water_ml": null
+      },
+      "source": "history",
+      "amount_flag": false,
+      "likely_counts": [],
+      "parameters": []
+    },
+    {
+      "name": "Сыр гауда",
+      "count": 1,
+      "unit": "ломтик",
+      "grams_per_unit": 30,
+      "per_100g": {
+        "kcal": 370,
+        "protein": 25,
+        "fat": 30,
+        "carbs": 0,
+        "water_ml": null
+      },
+      "source": "history",
+      "amount_flag": false,
+      "likely_counts": [],
+      "parameters": []
+    },
+    {
+      "name": "Куриная варёная колбаса",
+      "count": 2,
+      "unit": "ломтика",
+      "grams_per_unit": 25,
+      "per_100g": {
+        "kcal": 186,
+        "protein": 13,
+        "fat": 14,
+        "carbs": 2,
+        "water_ml": null
+      },
+      "source": "history",
+      "amount_flag": false,
+      "likely_counts": [],
+      "parameters": []
+    }
+  ],
+  "dropped": [],
+  "out_of_focus": ["Белая ручка у правого края доски", "Фрагмент предмета в правом нижнем углу"]
+}
