@@ -5,7 +5,7 @@
  * reading. Answers and the whole output (run.log) are kept in test-results/meal-bench/.
  *
  *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--model lite|flash|<id>] [--only p7,t3]
- *     [--photos <dir with food1.jpg …>] [--parallel 4]
+ *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute 9]
  *
  * Photo cases are skipped without --photos (the photos are personal, not in the repo).
  */
@@ -32,6 +32,7 @@ const { values: args } = parseArgs({
     only: { type: 'string' },
     photos: { type: 'string' },
     parallel: { type: 'string', default: '4' },
+    'per-minute': { type: 'string', default: '9' },
   },
 });
 const key = process.env.GEMINI_API_KEY;
@@ -82,9 +83,30 @@ function why(err: unknown): string {
   return `HTTP ${err.status}${message ? ` ${message}` : ''}`;
 }
 
+/**
+ * At most PER_MINUTE requests in any 60 s, retries included, across the cases run in parallel:
+ * the free tier's quota is per minute, and going over it only earns 429s.
+ */
+const PER_MINUTE = Number(args['per-minute']);
+const sent: number[] = [];
+let turn = Promise.resolve();
+function slot(): Promise<void> {
+  const mine = turn.then(async () => {
+    while (sent.length >= PER_MINUTE) {
+      const wait = sent[0]! + 60_000 - Date.now();
+      if (wait <= 0) sent.shift();
+      else await new Promise((r) => setTimeout(r, wait));
+    }
+    sent.push(Date.now());
+  });
+  turn = mine;
+  return mine;
+}
+
 function call(url: string, init: RequestInit = {}, label = '') {
   return withRetries(
     async () => {
+      await slot();
       const response = await fetch(url, {
         ...init,
         headers: { 'content-type': 'application/json', 'x-goog-api-key': key! },
@@ -152,7 +174,7 @@ const cases = CASES.filter((c) => !only || only.includes(c.id)).filter((c) => {
   return missing.length === 0;
 });
 if (!args.photos) log('Photo cases skipped: no --photos.');
-log(`${cases.length} cases, ${args.parallel} at a time\n`);
+log(`${cases.length} cases, ${args.parallel} at a time, at most ${PER_MINUTE} requests a minute\n`);
 
 interface Stats {
   requests: number;
