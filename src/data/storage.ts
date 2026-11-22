@@ -48,6 +48,14 @@ export function loadSaved(storage: Storage = localStorage): LoadResult {
   return result.ok ? result : { ok: false, problems: result.problems, raw };
 }
 
+/** Reads the saved data without ever writing: null when there is none or it fails its check. */
+export function peekSaved(storage: Storage = localStorage): AppData | null {
+  const raw = storage.getItem(STORAGE_KEY);
+  if (raw === null) return null;
+  const result = parseDocument(raw);
+  return result.ok ? result.data : null;
+}
+
 /** Saves all data. Throws when the browser refuses (e.g. storage full); nothing is changed then. */
 export function saveData(data: AppData, storage: Storage = localStorage): void {
   storage.setItem(STORAGE_KEY, documentJson(data));

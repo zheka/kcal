@@ -15,6 +15,8 @@ export interface FoundProduct {
   per100: NutrientValues;
   /** A drink: values are per 100 ml. */
   liquid: boolean;
+  /** One serving in g (or ml for drinks), when the database gives it. */
+  serving?: number;
 }
 
 export type LookupResult =
@@ -24,7 +26,7 @@ export type LookupResult =
   | { kind: 'offline' }
   | { kind: 'error' };
 
-const FIELDS = 'product_name,brands,quantity,product_quantity_unit,nutriments';
+const FIELDS = 'product_name,brands,quantity,product_quantity_unit,serving_quantity,nutriments';
 
 export async function lookUpBarcode(barcode: string, timeoutMs = 10_000): Promise<LookupResult> {
   if (!navigator.onLine) return { kind: 'offline' };
@@ -70,7 +72,15 @@ export function parseProduct(json: unknown): LookupResult {
   if (fat !== undefined) per100.fat = fat;
   if (carbs !== undefined) per100.carbs = carbs;
 
-  return { kind: 'found', name: productName(p), per100, liquid: isLiquid(p) };
+  const serving =
+    typeof p.serving_quantity === 'string' ? Number(p.serving_quantity) : p.serving_quantity;
+  return {
+    kind: 'found',
+    name: productName(p),
+    per100,
+    liquid: isLiquid(p),
+    ...(typeof serving === 'number' && serving > 0 && Number.isFinite(serving) && { serving }),
+  };
 }
 
 function productName(p: Record<string, unknown>): string {

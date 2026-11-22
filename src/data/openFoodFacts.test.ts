@@ -28,6 +28,15 @@ describe('parseProduct', () => {
     });
   });
 
+  it('keeps one serving’s size when the database gives it', () => {
+    const bar = {
+      status: 1,
+      product: { product_name: 'Bar', serving_quantity: '45', nutriments: {} },
+    };
+    expect(parseProduct(bar)).toMatchObject({ serving: 45 });
+    expect(parseProduct(skyr)).not.toHaveProperty('serving');
+  });
+
   it('does not repeat a brand already in the name', () => {
     const named = { ...skyr, product: { ...skyr.product, product_name: 'Arla Skyr Natur' } };
     expect(parseProduct(named)).toMatchObject({ name: 'Arla Skyr Natur' });

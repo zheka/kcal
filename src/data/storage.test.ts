@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { appData, egg } from '../core/testData';
 import { documentJson } from './backup';
-import { clearSaved, loadSaved, saveData, savedSize, STORAGE_KEY } from './storage';
+import { clearSaved, loadSaved, peekSaved, saveData, savedSize, STORAGE_KEY } from './storage';
 
 describe('storage', () => {
   beforeEach(() => localStorage.clear());
@@ -43,6 +43,23 @@ describe('storage', () => {
     const result = loadSaved();
     expect(!result.ok && result.raw).toBe(raw);
     expect(!result.ok && result.problems).toContain('goals: must be a list');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(raw);
+  });
+
+  it('peeks at the saved data without ever writing (for the lab)', () => {
+    // nothing saved: nothing, and nothing started fresh
+    expect(peekSaved()).toBeNull();
+    expect(localStorage.length).toBe(0);
+    // data that fails the check: nothing, the data unchanged
+    const bad = JSON.stringify({ version: 'kcal 0.2.0', goals: {} });
+    localStorage.setItem(STORAGE_KEY, bad);
+    expect(peekSaved()).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(bad);
+    // saved data: read as loadSaved reads it
+    const data = appData({ products: [egg] });
+    saveData(data);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    expect(peekSaved()).toEqual(data);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(raw);
   });
 
