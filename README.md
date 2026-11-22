@@ -116,5 +116,5 @@ runs the end-to-end tests on every PR, and deploys `dist/` to GitHub Pages on ev
 GitHub Pages serves all of `zheka.github.io`'s projects from one browser origin, so they share
 `localStorage`, IndexedDB and their quota. The rules for using them are in
 [zheka.github.io/SHARED-ORIGIN.md](https://github.com/zheka/zheka.github.io/blob/main/SHARED-ORIGIN.md):
-every key, database and cache kcal keeps is named `kcal` or starts with `kcal-`, and kcal never
-clears anything else.
+every key and database kcal keeps is named `kcal` or starts with `kcal-` (the service worker's
+cache is named by Workbox after its scope, `/kcal/`), and kcal never clears anything else.
