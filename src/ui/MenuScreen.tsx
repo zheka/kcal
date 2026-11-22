@@ -114,9 +114,7 @@ export function MenuScreen({ store }: { store: Store }) {
       <section class="section about">
         <p>
           Saved data: {(size / 1_000_000).toFixed(2)} MB
-          {size > SIZE_WARNING_CHARS
-            ? ' (over 1\u00a0MB: time to move the data to IndexedDB)'
-            : ' (best kept under 1\u00a0MB: the browser’s 5\u00a0MB is shared with other zheka.github.io projects)'}
+          {size > SIZE_WARNING_CHARS && ' (over 1\u00a0MB: time to move the data to IndexedDB)'}
         </p>
         <p>Data format: {VERSION_TAG}</p>
       </section>

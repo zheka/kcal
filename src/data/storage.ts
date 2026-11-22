@@ -5,11 +5,7 @@ import { documentJson, parseDocument } from './backup';
 /** All data lives under one key, as one document shaped like a backup (without `exportedAt`). */
 export const STORAGE_KEY = 'kcal';
 
-/**
- * Saved data beyond this many characters gets a warning. `localStorage` holds about 5 million,
- * shared with the other projects on zheka.github.io, which recommend staying under 1 million
- * each (see README, Deployment).
- */
+/** Saved data beyond this many characters gets a warning. */
 export const SIZE_WARNING_CHARS = 1_000_000;
 
 /**
