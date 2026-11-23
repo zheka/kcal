@@ -6,7 +6,7 @@
  *
  *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--model lite|flash|<id>] [--only p7,t3]
  *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute <n>] [--out <dir>]
- *     [--thinking minimal|low|medium|high] [--thinking-budget <tokens>]
+ *     [--thinking minimal|low|medium|high] [--thinking-budget <tokens>] [--repeat <n>]
  *
  * Photo cases are skipped without --photos (the photos are personal, not in the repo).
  */
@@ -37,6 +37,8 @@ const { values: args } = parseArgs({
     out: { type: 'string', default: 'test-results/meal-bench' },
     /** minimal (Flash-Lite's own default), low (ours: fast, thinks when it needs to), medium, high. */
     thinking: { type: 'string', default: 'low' },
+    /** Each case this many times (as p7#1, p7#2), to tell a rule from chance. */
+    repeat: { type: 'string', default: '1' },
     /** Thinking as a token budget (the Gemini 2.5 way), for a model that ignores the level. */
     'thinking-budget': { type: 'string' },
   },
@@ -341,7 +343,13 @@ function findQuestion(
 
 // The run ---------------------------------------------------------------------------------------
 
-const queue = [...cases];
+const repeat = Number(args.repeat);
+const queue =
+  repeat > 1
+    ? cases.flatMap((c) =>
+        Array.from({ length: repeat }, (_, i) => ({ ...c, id: `${c.id}#${i + 1}` })),
+      )
+    : [...cases];
 const started = Date.now();
 await Promise.all(
   Array.from({ length: Number(args.parallel) }, async () => {

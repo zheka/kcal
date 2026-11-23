@@ -33,9 +33,10 @@ export const CHECKLIST = `Before answering, check your answer against the rules:
   user alone, no questions about leftovers or sharing.
 - Each kind of piece its own row; a plate or tray of separate foods is not a dish.
 - Unsure what a food is: a kind question whose options are different foods (cod / chicken / pork).
-- No question under 80 kcal or 10 g protein, and none about what the input states: a stated
-  kind or amount has one option.
+- No question under 80 kcal or 10 g protein, none about what the input states (a stated kind or
+  amount has one option), none about what the photo shows clearly; at most 3 in the meal.
 - Pieces counted (3 яйца = 3 шт., also in a dish); loose food portions named (маленькая /
-  обычная / большая), never grams the user can't know; a size labelled "г" is 1 g.
+  обычная / большая); small amounts in words (немного / обычно / много); a size "г" is 1 g.
+- A stated total weight is one row.
 - Amount = count × size: a weight in one place only; a dish's parts per serving.
 - Every question with options has a short why; chosen is one of its labels.`;

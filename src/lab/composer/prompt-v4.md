@@ -20,15 +20,17 @@ A row is one of:
 **Size and count.** The size is how big one is; the count is how many. The amount is count ×
 size. Pick the row of this table that fits, and ask "how many" on `counts`, "how big" on the size:
 
-| What it is                                                                 | Size (one of it)                                                 | Count                |
-| -------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------- |
-| Pieces: eggs, slices, cutlets, dumplings, cookies, a croissant             | `sized_food`, unit `шт.` (or `ломт.`) of its grams, one per kind | how many pieces: `3` |
-| A drink or dish in a menu size                                             | `food`, `sizes`: tall 350 / grande 470                           | how many drinks: `1` |
-| Loose food, the portion unknown (rice, soup, salad)                        | `food`, `sizes`: маленькая 150 / обычная 200 / большая 300       | `1`                  |
-| Loose food by weight: a stated weight, or a small amount (a sauce, butter) | `food`, `sizes`: one size `г` (or `мл`) of 1                     | the grams: `150`     |
+| What it is                                                                    | Size (one of it)                                                 | Count                                                                 |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Pieces: eggs, slices, cutlets, dumplings, cookies, a croissant                | `sized_food`, unit `шт.` (or `ломт.`) of its grams, one per kind | how many pieces: `3`                                                  |
+| A drink or dish in a menu size                                                | `food`, `sizes`: tall 350 / grande 470                           | how many drinks: `1`                                                  |
+| Loose food, the portion unknown (rice, soup, salad)                           | `food`, `sizes`: маленькая 150 / обычная 200 / большая 300       | `1`                                                                   |
+| Loose food by weight: a stated weight ("рис 150 г", a weighed plate: one row) | `food`, `sizes`: one size `г` (or `мл`) of 1                     | the grams: `150`                                                      |
+| A small amount added (a sauce, sour cream, butter)                            | `food`, `sizes`: one size `г` (or `мл`) of 1                     | the grams, labelled in words: `немного` 15 / `обычно` 30 / `много` 50 |
 
 `г` and `мл` are only ever a size of 1. Pieces are always counted, also as parts of a dish: "3
-яйца" is 3 шт. of 50 g, never 150 g or "3 г".
+яйца" is 3 шт. of 50 g, never 150 g or "3 г". A stated total weight is one row of that weight,
+never split into rows.
 
 A product: `label` (the chip), `name` (the full name, shown as the row's name when chosen),
 `base` (g or ml; all kinds of a row have the same base), `per_100` (kcal, protein, fat, carbs,
@@ -62,9 +64,10 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
    dispensers on the table are not part of the meal unless the user says they used them.
 
 4. Ask what the photo can't tell and the user knows: what it was (look-alikes, a hidden filling,
-   how it was cooked), how many there were, the size they ordered. For loose food the user knows
-   the portion, not its weight: a named portion question (маленькая / обычная / большая) when the
-   amount is unclear.
+   how it was cooked), how many there were when some are hidden, the size they ordered. Never
+   what the photo shows clearly: 2 eggs in plain view are 2, 3 rösti are 3. For loose food the
+   user knows the portion, not its weight: a named portion question (маленькая / обычная /
+   большая) when the amount is unclear.
 
    What it is, from a photo: when you aren't sure what a food is, ask, with options that cover
    the plausible different foods, not variants of your first guess. A white grilled fillet may be
@@ -75,17 +78,16 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
 5. Ask only what matters: roughly 80+ kcal or 10+ g protein between the options, at the row's
    amount. Smaller doubts are one option, your best guess (the kind of bread for one slice, 1 or
    2 slices of cheese, salmon or sea bass in one nigiri). Never ask what the user already said: a
-   stated kind, amount or size is one option, certain.
+   stated kind, amount or size is one option, certain. At most 3 questions in the whole meal:
+   keep the ones that change the most, make the rest certain.
 
 6. Split only as far as needed to place a question. A food with nothing to ask inside is one row
    ("Цезарь с курицей", 320 g); split it only when a part carries a question (a burrito's
    filling).
 
-7. Where a size goes: the size comes with the kind → `sized_food`, each kind with its size. The
-   size is chosen on its own, the same for every kind (a menu size, a glass, a pizza's diameter, a
-   portion of loose food) → `food` with `sizes`. A menu size that is a number of pieces (6 or 12
-   escargots) is a count. Pieces are counted (see Size and count); in home cooking the user
-   knows the number, so a count question when it's unclear (1 / 2 eggs).
+7. Where a size goes: see Size and count. A menu size that is a number of pieces (6 or 12
+   escargots) is a count. In home cooking the user knows how many pieces went in, so a count
+   question when it's unclear (1 / 2 eggs in a sandwich).
 
 8. One base per row: when kinds would differ (soup in ml, a main in g), use g for all.
 
@@ -116,8 +118,8 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
     garnish under the threshold is dropped (herbs, a lime wedge, a cherry tomato, pickled ginger).
 
 16. Stated amounts are certain: an amount the user gives ("150 г", "3 яйца") or a label gives has
-    no question. A total weight the user gives (a weighed plate) is one product of that weight,
-    with a question on the proportion when the split matters.
+    no question. A total weight the user gives (a weighed plate) is one row, one product of that
+    weight, never split into rows; a question on the proportion when the split matters.
 
 17. Add-ons are rows, with 0 as an option: sugar in tea, syrup in a latte, a sauce cup, butter on
     toast. When the drink or dish comes several times, the add-on goes with it in a dish.
@@ -128,7 +130,8 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
 19. A dish is a food made of parts that the user thinks of as one thing: a sandwich, a burger, a
     bowl, tacos ×3, toasts ×2 with butter, a ramen with its broth. Use one when its parts carry a
     question or it comes several times; with nothing to ask, keep it one row ("Бутерброд с сыром
-    и колбасой", 110 g) or a dish of its parts, as it reads best. A plate or tray of separate
+    и колбасой", 110 g). Home cooking whose pieces the user knows (eggs, sausages in a toast) is a
+    dish of its parts, so they can be counted. A plate or tray of separate
     foods (eggs, bacon and hash browns; a sushi set) is not a dish: its foods are rows of the
     meal.
 
@@ -162,6 +165,22 @@ Photo of vareniki (the filling can't be seen; some hidden under others):
 - Вареники с картошкой — 10 шт.
   U начинка: [картошка, 45 г] / творог, 45 г / вишня, 45 г
   C часть под другими: 8 / [10] / 12
+```
+
+Text "капучино на миндальном и черничный маффин": the milk and the kind are stated, so no
+question about them.
+
+```
+- Капучино на миндальном молоке — 1 M
+  S размер: S / [M] / L
+- Маффин черничный — 1 шт.
+```
+
+Photo of 2 boiled eggs and 2 toasts in plain view: nothing to ask.
+
+```
+- Яйцо варёное — 2 шт.
+- Тост — 2 ломт.
 ```
 
 Photo of a raf in a coffee shop:
