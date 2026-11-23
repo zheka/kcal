@@ -23,11 +23,6 @@ export interface Config {
 
 export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 
-/** The settings part of Config: what the user picks. */
-export type Options = Omit<Config, 'schema'>;
-
-export const DEFAULT_OPTIONS: Options = { thinking: 'default', temperature: 0.2 };
-
 export interface ModelRequest {
   /** As asked: an id or an alias. */
   model: string;
@@ -77,9 +72,6 @@ export interface ModelResponse {
   error?: string;
 }
 
-/** Waits before each new try of a busy provider: two more tries. */
-export const RETRY_DELAYS_MS = [5_000, 15_000];
-
 export interface RunOptions {
   /** Sends the request (an adapter, with its key and photos), timing out by itself. */
   send: (request: ModelRequest) => Promise<Reply>;
@@ -91,12 +83,12 @@ export interface RunOptions {
   notSent?: (why: string) => void;
   wait?: (ms: number) => Promise<void>;
   now?: () => number;
-  /** The waits before each new try of a busy provider; RETRY_DELAYS_MS by default. */
-  delays?: readonly number[];
+  /** The waits before each new try of a busy provider: their number is how many more tries. */
+  delays: readonly number[];
 }
 
 /**
- * Sends the request, again after a busy provider (RETRY_DELAYS_MS), and reads the answer: JSON
+ * Sends the request, again after a busy provider (`delays`), and reads the answer: JSON
  * that fits `check`. Null when nothing was sent (no key, offline): nothing to log then. A
  * response with `error` has no usable answer.
  */
@@ -104,15 +96,7 @@ export async function run(
   request: ModelRequest,
   options: RunOptions,
 ): Promise<ModelResponse | null> {
-  const {
-    send,
-    check,
-    onRetry,
-    notSent,
-    wait,
-    now = () => performance.now(),
-    delays = RETRY_DELAYS_MS,
-  } = options;
+  const { send, check, onRetry, notSent, wait, now = () => performance.now(), delays } = options;
   const retried: string[] = [];
   const also = () => (retried.length > 0 ? { retried } : {});
   let started = 0;

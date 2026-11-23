@@ -5,17 +5,26 @@ import { ConfirmButton } from '../../ui/ConfirmButton';
 import { CloseIcon } from '../../ui/icons';
 import { shrinkPhoto } from '../ai/image';
 import type { Lab } from '../storage/lab';
-import { withContext } from './compose';
+import { type Axis, itemKey, type ProcessedItem } from '../meal/process';
+import { shown, withContext } from './compose';
 import { type ComposerData, one, round } from './data';
 import { InputBar } from './InputBar';
-import { amounts, choose, setCount, total } from './recompute';
-import type { Attached, ComposedMeal, Item } from './types';
+import type { Attached, ComposedMeal } from './types';
 
 /**
- * One meal, as the app's meal screen will be: its items (adjusted here), what it's composed
- * from (attached, removable), Update when that changed. No debugging: requests and answers are
- * in the lab's log.
+ * One meal, as the app's meal screen will be: its dishes and products with their values, the
+ * questions worth asking as chips (an answer updates the values here, with no request), what
+ * it's composed from (attached, removable), Update when that changed. No debugging: requests
+ * and answers are in the lab's log.
  */
+
+/** A question's chips, by what an answer changes (see process.ts). */
+const AXES: Record<Axis, string> = {
+  kind: 'what',
+  size: 'size',
+  count: 'how many',
+  whole: 'which',
+};
 
 type Files = Lab<ComposerData>['files'];
 
@@ -37,8 +46,14 @@ export function MealScreen({ lab, meal, language, change, update, close, remove 
   const [busy, setBusyState] = useState<{ what: string; since: number } | null>(null);
   const setBusy = (what: string) =>
     setBusyState((b) => (what ? { what, since: b?.since ?? Date.now() } : null));
-  const sum = total(meal.items);
-  const setItems = (items: Item[]) => change((m) => ({ ...m, items }));
+  const view = shown(meal, language);
+  const sum = view?.total;
+  /** The user's answer to one of a product's questions: kept, and shown at once. */
+  const answer = (key: string, axis: Axis, label: string) =>
+    change((m) => ({
+      ...m,
+      answers: { ...m.answers, [key]: { ...m.answers[key], [axis]: label } },
+    }));
   const attach = (a: Attached) => change((m) => withContext(m, [...m.context, a]));
 
   async function attachPhoto(photo: Blob) {
@@ -91,23 +106,30 @@ export function MealScreen({ lab, meal, language, change, update, close, remove 
         </button>
       </header>
       <main class="form">
-        {meal.items.length > 0 && (
+        {sum && (
           <p class="composed-total">
             This meal: {round(sum.kcal)} kcal · {round(sum.protein)} g protein · {round(sum.fat)} g
             fat · {round(sum.carbs)} g carbs
-            {sum.water_ml > 0 && ` · ${round(sum.water_ml)} ml water`}
+            {sum.water > 0 && ` · ${round(sum.water)} ml water`}
           </p>
         )}
-        <ul class="composed-items">
-          {meal.items.map((item, i) => (
-            <ItemRow
-              key={`${i}-${item.name}`}
-              item={item}
-              change={(next) => setItems(meal.items.map((x, j) => (j === i ? next : x)))}
-              remove={() => setItems(meal.items.filter((_, j) => j !== i))}
-            />
-          ))}
-        </ul>
+        {view?.dishes.map((dish, d) => (
+          <section class="composed-dish" key={d} aria-label={dish.name}>
+            <h2 class="composed-dish-name">
+              <span class="grow">{dish.name}</span>
+              <span class="muted">{round(dish.values.kcal)} kcal</span>
+            </h2>
+            <ul class="composed-items">
+              {dish.items.map((item, i) => (
+                <ItemRow
+                  key={i}
+                  item={item}
+                  answer={(axis, label) => answer(itemKey(d, i), axis, label)}
+                />
+              ))}
+            </ul>
+          </section>
+        ))}
         <Context
           context={meal.context}
           files={lab.files}
@@ -151,115 +173,62 @@ export function MealScreen({ lab, meal, language, change, update, close, remove 
   );
 }
 
+/** A product: its amount and values, and its questions worth asking, as chips. */
 function ItemRow({
   item,
-  change,
-  remove,
+  answer,
 }: {
-  item: Item;
-  change: (item: Item) => void;
-  remove: () => void;
+  item: ProcessedItem;
+  answer: (axis: Axis, label: string) => void;
 }) {
-  const [all, setAll] = useState(false);
-  const [text, setText] = useState(one(item.count));
-  useEffect(() => setText(one(item.count)), [item.count]);
-  const a = amounts(item);
-  // Only real choices: a parameter with one variant, or one likely amount, offers nothing to pick.
-  const choices = item.parameters.filter((p) => p.variants.length > 1);
-  const shown = choices.filter((p) => all || p.surfaced);
+  const v = item.values;
   return (
     <li class="composed-item">
-      <div class="composed-item-main">
-        <button
-          type="button"
-          class="composed-name"
-          aria-expanded={all}
-          onClick={() => setAll(!all)}
-          title="Alternatives"
-        >
-          {item.name}
-          {item.amount_flag && (
-            <span class="flag" aria-label="unsure amount">
-              {' '}
-              ⚑
-            </span>
-          )}
-        </button>
-        <input
-          class="input number composed-count"
-          inputMode="decimal"
-          aria-label={`Amount of ${item.name}`}
-          value={text}
-          onInput={(e) => {
-            setText(e.currentTarget.value);
-            const n = Number(e.currentTarget.value.replace(',', '.'));
-            if (n > 0 && Number.isFinite(n)) change(setCount(item, n));
-          }}
-        />
-        <span class="composed-unit">{item.unit}</span>
-        <button
-          type="button"
-          class="icon-button"
-          aria-label={`Remove ${item.name}`}
-          onClick={remove}
-        >
-          <CloseIcon />
-        </button>
-      </div>
+      <span class="composed-name">{item.name}</span>
       <p class="composed-values">
-        {round(a.kcal)} kcal · {one(a.protein)} g protein · {round(a.grams)} g
+        {item.amount} · {round(v.kcal)} kcal · {one(v.protein)} g protein
+        {v.water > 0 && ` · ${round(v.water)} ml water`}
       </p>
-      {item.amount_flag && item.likely_counts.length > 1 && (
-        <Choices
-          label="likely"
-          options={item.likely_counts.map((c) => ({ label: `${one(c)} ${item.unit}`, value: c }))}
-          chosen={item.count}
-          pick={(c) => change(setCount(item, c))}
-        />
-      )}
-      {shown.map((p) => (
-        <Choices
-          key={p.name}
-          label={p.name}
-          options={p.variants.map((v) => ({ label: v.label, value: v.label }))}
-          chosen={p.default}
-          pick={(v) => change(choose(item, p.name, v))}
-          why={all ? p.why : ''}
-        />
-      ))}
-      {all && choices.length === 0 && <p class="hint">No alternatives.</p>}
+      {item.questions
+        .filter((q) => q.asked)
+        .map((q) => (
+          <Choices
+            key={q.axis}
+            label={AXES[q.axis]}
+            options={q.options.map((o) => o.label)}
+            chosen={q.options.find((o) => o.chosen)?.label ?? ''}
+            pick={(label) => answer(q.axis, label)}
+          />
+        ))}
     </li>
   );
 }
 
-function Choices<T extends string | number>({
+function Choices({
   label,
   options,
   chosen,
   pick,
-  why = '',
 }: {
   label: string;
-  options: { label: string; value: T }[];
-  chosen: T;
-  pick: (value: T) => void;
-  why?: string;
+  options: string[];
+  chosen: string;
+  pick: (option: string) => void;
 }) {
   return (
     <div class="choices" role="group" aria-label={label}>
       <span class="choices-label">{label}:</span>
       {options.map((o) => (
         <button
-          key={o.label}
+          key={o}
           type="button"
           class="choice"
-          aria-pressed={o.value === chosen}
-          onClick={() => pick(o.value)}
+          aria-pressed={o === chosen}
+          onClick={() => pick(o)}
         >
-          {o.label}
+          {o}
         </button>
       ))}
-      {why && <span class="hint choices-why">{why}</span>}
     </div>
   );
 }

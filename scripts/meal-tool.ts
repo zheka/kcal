@@ -152,9 +152,6 @@ export function limited(send: (r: ModelRequest) => Promise<Reply>): Send {
   };
 }
 
-/** Longer than the lab's waits: a bench run shouldn't lose a case to a busy minute. */
-export const RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 120_000];
-
 /** A meal request and what came of it: the lab's log entry, with the code's side added. */
 export interface Entry {
   time: string;
@@ -187,7 +184,7 @@ export async function ask(a: Ask): Promise<Entry> {
   const response = await run(request, {
     send: (r) => a.send(r, a.hint),
     check: () => [], // the reader is forgiving: any JSON is read, its repairs flagged
-    delays: RETRY_DELAYS_MS,
+    delays: SETTINGS.retryDelaysMs,
     onRetry: (attempt, of, ms) => a.hint?.(`busy; try ${attempt} of ${of} in ${ms / 1000} s…`),
   });
   a.hint?.(
@@ -290,4 +287,4 @@ export function givenText(g: Given): string {
 }
 
 /** The Gemini sender, photos shrunk as the lab does. */
-export const geminiSend = (key: string) => gemini(key, photoData);
+export const geminiSend = (key: string) => gemini(key, photoData, SETTINGS.timeoutMs);

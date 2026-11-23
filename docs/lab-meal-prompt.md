@@ -6,7 +6,8 @@ rules of prompt v5 and why each is there, and the command-line tool and the benc
 The rules come from 1,000 example meals ([lab-meal-examples.md](lab-meal-examples.md), #N) and
 from runs of prompt v4 on real meals.
 
-Status (2026-11-23): **prompt v5 written and run, not used by the lab's screen.**
+Status (2026-11-23): **prompt v5 written and run; the lab's screen sends it too**, the same
+request with the same settings, retries and timeout (the lab is a manual test, see lab.md).
 `src/lab/meal/prompt.md` (the system instruction), `settings.ts` (the model and its settings),
 `request.ts` (the context and the checklist), `schema.ts` (the schema's descriptions);
 `scripts/meal.ts` (the tool), `scripts/meal-bench.ts` (the bench). Prompt v4 (the model wrote
@@ -34,7 +35,12 @@ entry records them with the request.
   rules depend on thinking.
 - **No temperature.** Why: Google's guide says Gemini 3 models reason worse away from their
   default; prompt v3 sent 0.2.
-- **9 requests a minute**, retries included: under the free tier's 15.
+- **9 requests a minute**, retries included: under the free tier's 15 (the tool and the bench;
+  the lab sends one at a time, as tapped).
+- **Retries: 5 more tries after 5, 15, 30, 60 and 120 s**, for a busy Gemini (429, 500, 503,
+  504), one that doesn't answer within **120 s**, or can't be reached; the lab's too. Why: 503s
+  at a busy hour are common (run 5 lost 3 of 20 after these); a timed-out request is as worth
+  another try as a 503.
 - **Photos at most 1024 px on the longer side, JPEG 85**, shrunk the same by the lab
   (`src/lab/ai/image.ts`) and the tool (sharp). Why: enough to tell foods and portions apart,
   small enough to send quickly; the same, so the tool sees what the phone sends.

@@ -51,15 +51,15 @@ describe('the request to Gemini', () => {
 
   it('isn’t sent without a key, offline, or with a photo gone', async () => {
     const notSent = (err: unknown) => err instanceof ModelError && !err.options.sent;
-    await expect(gemini('', photo)(REQUEST)).rejects.toSatisfy(notSent);
+    await expect(gemini('', photo, 1000)(REQUEST)).rejects.toSatisfy(notSent);
     await expect(
-      gemini('k', photo)({ ...REQUEST, content: [{ image: 'gone' }] }),
+      gemini('k', photo, 1000)({ ...REQUEST, content: [{ image: 'gone' }] }),
     ).rejects.toSatisfy(notSent);
     vi.stubGlobal('navigator', { onLine: false });
-    await expect(gemini('k', photo)(REQUEST)).rejects.toThrow('offline');
+    await expect(gemini('k', photo, 1000)(REQUEST)).rejects.toThrow('offline');
   });
 
-  it('gives up when Gemini doesn’t answer in time', async () => {
+  it('gives up when Gemini doesn’t answer in time, as busy: worth another try', async () => {
     vi.stubGlobal(
       'fetch',
       (_url: string, init: RequestInit) =>
@@ -67,7 +67,9 @@ describe('the request to Gemini', () => {
           init.signal!.addEventListener('abort', () => reject(new Error('aborted'))),
         ),
     );
-    await expect(gemini('k', photo, 50)(REQUEST)).rejects.toThrow('no answer within 0.05 s');
+    const err: unknown = await gemini('k', photo, 50)(REQUEST).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect(err).toMatchObject({ message: 'no answer within 0.05 s', options: { busy: true } });
   });
 });
 

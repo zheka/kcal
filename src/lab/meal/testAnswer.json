@@ -1,0 +1,84 @@
+{
+  "title": "Обед",
+  "dishes": [
+    {
+      "name": "Вареники",
+      "products": [
+        {
+          "name": "Вареники с картошкой",
+          "base_unit": "g",
+          "piece_count": 10,
+          "piece_name": "шт.",
+          "piece_size_name": null,
+          "base_units_in_piece": 45,
+          "kcal_per_100_base_units": 150,
+          "protein_g_per_100_base_units": 4,
+          "carbs_g_per_100_base_units": 26,
+          "fat_g_per_100_base_units": 3,
+          "hydration_ml_per_100_base_units": 0,
+          "alternatives": [
+            {
+              "name": "Вареники с творогом",
+              "base_unit": "g",
+              "piece_count": 10,
+              "piece_name": "шт.",
+              "piece_size_name": null,
+              "base_units_in_piece": 45,
+              "kcal_per_100_base_units": 200,
+              "protein_g_per_100_base_units": 10,
+              "carbs_g_per_100_base_units": 24,
+              "fat_g_per_100_base_units": 7,
+              "hydration_ml_per_100_base_units": 0
+            },
+            {
+              "name": "Вареники с картошкой",
+              "base_unit": "g",
+              "piece_count": 14,
+              "piece_name": "шт.",
+              "piece_size_name": null,
+              "base_units_in_piece": 45,
+              "kcal_per_100_base_units": 150,
+              "protein_g_per_100_base_units": 4,
+              "carbs_g_per_100_base_units": 26,
+              "fat_g_per_100_base_units": 3,
+              "hydration_ml_per_100_base_units": 0
+            }
+          ]
+        },
+        {
+          "name": "Сметана 20 %",
+          "base_unit": "g",
+          "piece_count": null,
+          "piece_name": null,
+          "piece_size_name": null,
+          "base_units_in_piece": 30,
+          "kcal_per_100_base_units": 206,
+          "protein_g_per_100_base_units": 2.5,
+          "carbs_g_per_100_base_units": 3.4,
+          "fat_g_per_100_base_units": 20,
+          "hydration_ml_per_100_base_units": 0,
+          "alternatives": []
+        }
+      ]
+    },
+    {
+      "name": "Чай",
+      "products": [
+        {
+          "name": "Чай черный",
+          "base_unit": "ml",
+          "piece_count": 1,
+          "piece_name": "стакан",
+          "piece_size_name": null,
+          "base_units_in_piece": 250,
+          "kcal_per_100_base_units": 1,
+          "protein_g_per_100_base_units": 0,
+          "carbs_g_per_100_base_units": 0.2,
+          "fat_g_per_100_base_units": 0,
+          "hydration_ml_per_100_base_units": 100,
+          "alternatives": []
+        }
+      ]
+    }
+  ]
+}

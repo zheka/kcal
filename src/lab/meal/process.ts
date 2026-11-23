@@ -259,3 +259,49 @@ export function amountText(p: Product, u = units('ru')): string {
 }
 
 export const num = (x: number) => String(Math.round(x * 10) / 10);
+
+/** The user's answers: per product (by `itemKey`), per question, the label of the option chosen. */
+export type Answers = Record<string, Partial<Record<Axis, string>>>;
+
+/** A product's place in the meal, which its answers are kept by. */
+export const itemKey = (dish: number, item: number): string => `${dish}.${item}`;
+
+/**
+ * The meal with the user's answers: each answered product as chosen, with its amount and values,
+ * and the totals again; each question's `chosen` moved to the answer. Answers to independent
+ * questions combine: the kind chosen, at the size and the count chosen. A label that no option
+ * has is ignored (the guess stays).
+ */
+export function answered(meal: Processed, answers: Answers, language = 'ru'): Processed {
+  const u = units(language);
+  const dishes = meal.dishes.map((d, di) => {
+    const items = d.items.map((item, ii): ProcessedItem => {
+      const mine = answers[itemKey(di, ii)] ?? {};
+      let product = item.product;
+      const questions = item.questions.map((q): Question => {
+        const pick = q.options.find((o) => o.label === mine[q.axis]);
+        if (!pick) return q;
+        product = withAnswer(q.axis, product, pick.product);
+        return { ...q, options: q.options.map((o) => ({ ...o, chosen: o === pick })) };
+      });
+      return {
+        ...item,
+        name: product.name,
+        amount: amountText(product, u),
+        product,
+        values: values(product),
+        questions,
+      };
+    });
+    return { ...d, items, values: items.reduce((s, i) => add(s, i.values), ZERO) };
+  });
+  return { ...meal, dishes, total: dishes.reduce((s, d) => add(s, d.values), ZERO) };
+}
+
+/** The product so far with one more answer: only that answer's part of it changes. */
+function withAnswer(axis: Axis, so: Product, chosen: Product): Product {
+  if (axis === 'size') return { ...so, size: chosen.size, alias: chosen.alias };
+  if (axis === 'count') return { ...so, count: chosen.count, unit: chosen.unit };
+  // a kind comes first, with the count of the guess (see questions); a whole answer is all of it
+  return chosen;
+}

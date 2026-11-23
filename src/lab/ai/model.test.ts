@@ -16,7 +16,14 @@ const clock = () => {
   return () => (t += 100);
 };
 const go = (send: () => Promise<Reply>, more: Partial<Parameters<typeof run>[1]> = {}) =>
-  run(REQUEST, { send, check: noCheck, wait: async () => {}, now: clock(), ...more });
+  run(REQUEST, {
+    send,
+    check: noCheck,
+    delays: [5_000, 15_000],
+    wait: async () => {},
+    now: clock(),
+    ...more,
+  });
 
 describe('running a request', () => {
   it('gives the answer decoded, with what the reply says', async () => {

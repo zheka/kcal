@@ -6,11 +6,13 @@ is in [lab-meal-prompt.md](lab-meal-prompt.md). 1,000 example meals written in t
 version (questions written by the model), with the problems they raised, are in
 [lab-meal-examples.md](lab-meal-examples.md).
 
-Status (2026-11-23): **in code with the command-line tool and the bench, not in the lab's UI.**
+Status (2026-11-23): **in code with the command-line tool and the bench, and the lab's meal
+screen runs on it.**
 `src/lab/meal/`: `schema.ts` (what the model answers), `read.ts` (the forgiving reader),
 `process.ts` (amounts, totals, questions), `view.ts` (the text view), `request.ts` and
-`settings.ts` (what is sent, see the prompt doc). The lab's meal screen still
-uses prompt v3's `parameters` (`src/lab/composer/types.ts`). The previous format (v4: questions
+`settings.ts` (what is sent, see the prompt doc); the user's answers on the phone: `answered` in
+`process.ts`. Prompt v3's `parameters` (the lab's screen before) are in git history up to commit
+e3deb33. The previous format (v4: questions
 written by the model) is in git history up to commit 381aee4. Each decision below says why
 ("Why:").
 

@@ -1,58 +1,39 @@
-import type { AppData } from '../../core/types';
-import type { ModelRequest, ModelResponse, Options } from '../ai/model';
-import { ANSWER_SCHEMA, readAnswer } from './answer';
-import { candidates, contextBlock, fillPrompt, pickMatches } from './context';
+import type { ModelRequest, ModelResponse } from '../ai/model';
+import { answered, process, type Processed } from '../meal/process';
+import PROMPT from '../meal/prompt.md?raw';
+import { readMeal } from '../meal/read';
+import { mealRequest } from '../meal/request';
 import type { Attached, ComposedMeal } from './types';
 
 /**
- * Updating a meal: one request with its whole context, as attached, and the meal so far; the
- * answer replaces the items. (Next: what of the meal so far to send when context was removed,
- * see docs/lab.md.)
+ * Updating a meal: one request with its whole context, as attached (prompt v5, the same request
+ * as the command-line tool's: src/lab/meal/request.ts); the answer, read forgivingly, replaces
+ * the meal and the user's answers.
  */
 
-/**
- * The request for the meal: prompt v3 (the meal so far and the history matches filled in), then
- * each attached thing as a part of its own, in order: a text, a photo by id, a scanned product
- * (Open Food Facts' data) as JSON.
- */
-export function updateRequest(
-  meal: ComposedMeal,
-  app: AppData | null,
-  history: readonly ComposedMeal[],
-  now: Date,
-  model: string,
-  options: Options,
-  language: string,
-): ModelRequest {
-  const texts = meal.context.flatMap((a) => (a.kind === 'text' ? [a.text] : []));
-  const others = history.filter((m) => m.id !== meal.id);
-  const matches = pickMatches(candidates(app, others), texts.join('\n'), meal.items);
-  return {
-    model,
-    instructions: '',
-    content: [
-      { text: fillPrompt(contextBlock(meal.items, matches, now, language)) },
-      ...meal.context.map((a) =>
-        a.kind === 'text'
-          ? { text: a.text }
-          : a.kind === 'photo'
-            ? { image: a.file }
-            : { text: JSON.stringify(a.product) },
-      ),
-    ],
-    config: { schema: ANSWER_SCHEMA, ...options },
-  };
+/** The request for the meal: each attached thing as an input, in order. */
+export function updateRequest(meal: ComposedMeal, now: Date, language: string): ModelRequest {
+  return mealRequest({
+    prompt: PROMPT,
+    language,
+    now,
+    inputs: meal.context.map((a) =>
+      a.kind === 'text'
+        ? { text: a.text }
+        : a.kind === 'photo'
+          ? { photo: a.file }
+          : { product: a.product },
+    ),
+  });
 }
 
-/** What doesn't fit the answer's shape (strict: any problem and the answer isn't used). */
-export function checkAnswer(answer: unknown): string[] {
-  return readAnswer(answer).problems;
-}
+/** Any JSON is read (read.ts repairs and flags what it must), as the tool reads it. */
+export const checkAnswer = (): string[] => [];
 
 /**
- * The meal after an update sent with `sent` as its context: the answer's items and label, or
- * the meal as it was with why it failed (no response: nothing was sent). Context attached or
- * removed meanwhile still needs an update.
+ * The meal after an update sent with `sent` as its context: the answer as read, with no answers
+ * yet, or the meal as it was with why it failed (no response: nothing was sent). Context
+ * attached or removed meanwhile still needs an update.
  */
 export function applyUpdate(
   meal: ComposedMeal,
@@ -65,10 +46,15 @@ export function applyUpdate(
   if (error !== undefined || !response) {
     return same ? { ...meal, failed: error ?? 'not sent' } : meal;
   }
-  const { answer } = readAnswer(response.answer);
+  const read = readMeal(response.answer).meal;
   const rest = { ...meal };
   delete rest.failed;
-  return { ...rest, items: answer.items, title: answer.meal_label || meal.title, changed: !same };
+  return { ...rest, meal: read, answers: {}, title: read.title || meal.title, changed: !same };
+}
+
+/** The meal as shown: the answer processed, with the user's answers; null before any. */
+export function shown(meal: ComposedMeal, language: string): Processed | null {
+  return meal.meal ? answered(process(meal.meal, language), meal.answers, language) : null;
 }
 
 /** The meal with a thing attached or removed: it needs an update, any failure is past. */

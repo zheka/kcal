@@ -49,6 +49,19 @@
   font-size: 0.875rem;
 }
 
+.composed-dish {
+  display: flex;
+  flex-direction: column;
+}
+
+.composed-dish-name {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 12px 0 0;
+  font-size: 1rem;
+}
+
 .composed-item {
   display: flex;
   flex-direction: column;
@@ -64,33 +77,7 @@
 }
 
 .composed-name {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--tap);
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--fg);
-  font: inherit;
   font-weight: 600;
-  text-align: left;
-}
-
-.composed-name .flag {
-  color: var(--fat);
-}
-
-.composed-count {
-  width: 5.5em;
-}
-
-.composed-unit {
-  min-width: 3em;
-  color: var(--muted);
-}
-
-.composed-item-main > .icon-button {
-  margin-right: -12px;
 }
 
 .composed-values {
@@ -132,10 +119,6 @@
   background: var(--accent-soft);
   color: var(--fg);
   font-weight: 600;
-}
-
-.choices-why {
-  flex-basis: 100%;
 }
 
 .input-bar {

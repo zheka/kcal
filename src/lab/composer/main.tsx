@@ -1,9 +1,9 @@
 /**
- * The meal composer experiment (lab/index.html): compose a meal from photos, text and barcodes
- * into parametric items, adjust them locally, update it from the whole context (prompt-v3.txt).
- * Reads the app's data (as history), never writes it; keeps its meals, photos, key and logs in
- * the lab (kcal-lab-composer). The meal screen is meant to become the app's; the menu holds the
- * lab's settings and logs.
+ * The meal composer experiment (lab/index.html): compose a meal from photos, text and barcodes,
+ * update it from the whole context (prompt v5, the request of the command-line tool:
+ * src/lab/meal), answer its questions on the phone. Never touches the app's data; keeps its
+ * meals, photos, key and logs in the lab (kcal-lab-composer). The meal screen is meant to become
+ * the app's; the menu holds the lab's settings and logs.
  */
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
@@ -11,19 +11,17 @@ import '@fontsource-variable/roboto/wght.css';
 import '../../style.css';
 import './composer.css';
 import { newId } from '../../core/foods';
-import type { AppData } from '../../core/types';
-import { peekSaved } from '../../data/storage';
 import { MenuIcon } from '../../ui/icons';
 import { gemini } from '../ai/gemini';
 import { toBase64 } from '../ai/image';
 import { run } from '../ai/model';
+import { SETTINGS } from '../meal/settings';
 import { clearLab } from '../storage/clear';
 import { openLab, type Lab } from '../storage/lab';
-import { applyUpdate, checkAnswer, updateRequest } from './compose';
+import { applyUpdate, checkAnswer, shown, updateRequest } from './compose';
 import { type ComposerData, EMPTY, fromStored, round, time, withMeal } from './data';
 import { MealScreen } from './MealScreen';
 import { Menu } from './Menu';
-import { total } from './recompute';
 import type { ComposedMeal } from './types';
 
 /** The Gemini key's name among the lab's secrets. */
@@ -33,11 +31,9 @@ interface Props {
   lab: Lab<ComposerData>;
   initial: ComposerData;
   initialKey: string;
-  /** The app's data, read once (null when there is none). */
-  app: AppData | null;
 }
 
-function Composer({ lab, initial, initialKey, app }: Props) {
+function Composer({ lab, initial, initialKey }: Props) {
   const [data, setData] = useState(initial);
   const [key, setKeyState] = useState(initialKey);
   const [storeError, setStoreError] = useState('');
@@ -66,15 +62,7 @@ function Composer({ lab, initial, initialKey, app }: Props) {
   /** Sends the meal's whole context; logs the request and its outcome when it was sent. */
   async function update(meal: ComposedMeal, onBusy: (what: string) => void) {
     const time = new Date();
-    const request = updateRequest(
-      meal,
-      app,
-      data.meals,
-      time,
-      data.model,
-      data.options,
-      data.language,
-    );
+    const request = updateRequest(meal, time, data.language);
     const photo = async (id: string) => {
       const blob = await lab.files.get(id);
       return blob ? { type: blob.type || 'image/jpeg', base64: await toBase64(blob) } : null;
@@ -83,8 +71,9 @@ function Composer({ lab, initial, initialKey, app }: Props) {
     let notSent: string | undefined;
     try {
       response = await run(request, {
-        send: gemini(key, photo),
+        send: gemini(key, photo, SETTINGS.timeoutMs),
         check: checkAnswer,
+        delays: SETTINGS.retryDelaysMs,
         onRetry: (attempt, of, delay) =>
           onBusy(`The model is busy: trying again in ${delay / 1000} s (${attempt} of ${of})`),
         notSent: (why) => (notSent = why),
@@ -110,10 +99,6 @@ function Composer({ lab, initial, initialKey, app }: Props) {
       <Menu
         keyValue={key}
         setKey={setKey}
-        model={data.model}
-        setModel={(model) => setData((d) => ({ ...d, model }))}
-        options={data.options}
-        setOptions={(options) => setData((d) => ({ ...d, options }))}
         language={data.language}
         setLanguage={(language) => setData((d) => ({ ...d, language }))}
         downloadLogs={() => void lab.download().catch(fail('download the logs'))}
@@ -168,7 +153,8 @@ function Composer({ lab, initial, initialKey, app }: Props) {
               <button type="button" class="composed-row" onClick={() => setScreen({ meal: m.id })}>
                 <span class="composed-title">{m.title || 'New meal'}</span>
                 <span class="composed-sub">
-                  {time(m.at)} · {round(total(m.items).kcal)} kcal
+                  {time(m.at)}
+                  {m.meal && ` · ${round(shown(m, data.language)!.total.kcal)} kcal`}
                 </span>
               </button>
             </li>
@@ -186,7 +172,7 @@ function Composer({ lab, initial, initialKey, app }: Props) {
               title: '',
               at: new Date().toISOString(),
               context: [],
-              items: [],
+              answers: {},
               changed: false,
             };
             setData((d) => ({ ...d, meals: withMeal(d.meals, meal) }));
@@ -205,12 +191,7 @@ async function start(root: HTMLElement): Promise<void> {
     const lab = await openLab<ComposerData>('composer');
     const [stored, key] = await Promise.all([lab.data.get(), lab.secret(KEY)]);
     render(
-      <Composer
-        lab={lab}
-        initial={stored ? fromStored(stored) : EMPTY}
-        initialKey={key ?? ''}
-        app={peekSaved()}
-      />,
+      <Composer lab={lab} initial={stored ? fromStored(stored) : EMPTY} initialKey={key ?? ''} />,
       root,
     );
   } catch (err) {

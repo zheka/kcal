@@ -1,28 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { appData, egg } from '../../core/testData';
-import { ANSWER_SCHEMA, parseAnswer } from './answer';
-import { applyUpdate, checkAnswer, updateRequest, withContext } from './compose';
-import testAnswer from './testAnswer.json';
 import type { ScannedProductData } from '../../data/openFoodFacts';
+import { itemKey } from '../meal/process';
+import { MEAL_SCHEMA } from '../meal/schema';
+import { SETTINGS } from '../meal/settings';
+import testAnswer from '../meal/testAnswer.json';
+import { applyUpdate, shown, updateRequest, withContext } from './compose';
 import type { Attached, ComposedMeal } from './types';
 
 const NOW = new Date('2026-11-21T11:30:00.000Z');
-const OPTIONS = { temperature: 0.2, thinking: 'default' } as const;
 const meal = (context: Attached[] = [], more: Partial<ComposedMeal> = {}): ComposedMeal => ({
   id: 'm1',
   title: '',
   at: NOW.toISOString(),
   context,
-  items: [],
+  answers: {},
   changed: context.length > 0,
   ...more,
 });
 const text = (id: string, t: string): Attached => ({ id, kind: 'text', text: t });
 const photo = (id: string): Attached => ({ id, kind: 'photo', file: `file-${id}` });
-const items = parseAnswer(JSON.stringify(testAnswer)).answer.items;
+const answered = (m: ComposedMeal) => applyUpdate(m, m.context, { ms: 900, answer: testAnswer });
 
 describe('the update request', () => {
-  it('sends the prompt, then the whole context as attached, in order', () => {
+  it('is the tool’s request: prompt v5, the settings, the context as attached, in order', () => {
     const skyr: ScannedProductData = {
       code: '4006040',
       language: 'de',
@@ -33,76 +33,62 @@ describe('the update request', () => {
       liquid: false,
       per100: { kcal: 63, protein: 11, fat: 0.2, carbs: 4 },
     };
-    const m = meal(
-      [
-        photo('a'),
-        text('b', 'chicken meatballs'),
-        { id: 'c', kind: 'product', product: skyr },
-        text('d', 'potatoes 100 g'),
-      ],
-      { items: items.slice(0, 1) },
-    );
-    const request = updateRequest(m, null, [], NOW, 'gemini-x', OPTIONS, 'ru');
-    expect(request).toMatchObject({
-      model: 'gemini-x',
-      instructions: '',
-      config: { schema: ANSWER_SCHEMA, temperature: 0.2, thinking: 'default' },
-    });
-    const [prompt, ...rest] = request.content;
-    expect(prompt).toEqual({ text: expect.stringContaining('meal so far: [{"name":"meatballs') });
-    expect(rest).toEqual([
-      { image: 'file-a' },
-      { text: 'chicken meatballs' },
-      { text: JSON.stringify(skyr) },
-      { text: 'potatoes 100 g' },
+    const m = meal([
+      photo('a'),
+      text('b', 'вареники'),
+      { id: 'c', kind: 'product', product: skyr },
     ]);
-    // Open Food Facts' data, as it is
-    expect(JSON.parse((rest[2] as { text: string }).text)).toEqual(skyr);
-    expect((prompt as { text: string }).text).toContain('language: ru');
-  });
-
-  it('picks history matches by all the texts', () => {
-    const app = appData({ products: [egg] });
-    const m = meal([text('a', 'two eggs')]);
-    const { content } = updateRequest(m, app, [], NOW, 'gemini-x', OPTIONS, 'ru');
-    expect((content[0] as { text: string }).text).toContain('- "egg" (my product)');
+    const request = updateRequest(m, NOW, 'ru');
+    expect(request).toMatchObject({
+      model: SETTINGS.model,
+      instructions: expect.stringContaining('You are the food-recognition step'),
+      config: { schema: MEAL_SCHEMA, thinking: SETTINGS.thinking },
+    });
+    const [context, ...rest] = request.content;
+    expect((context as { text: string }).text).toContain('answer language: ru');
+    expect(rest.slice(0, 3)).toEqual([
+      { image: 'file-a' },
+      { text: 'вареники' },
+      { text: JSON.stringify(skyr) },
+    ]);
+    expect(rest.at(-1)).toEqual({ text: expect.stringContaining('Before answering, check') });
   });
 });
 
 describe('applying an update', () => {
-  const answer = testAnswer;
-
-  it('takes the answer’s items and label; the context is answered', () => {
-    const m = meal([text('a', 'lunch')]);
-    const next = applyUpdate(m, m.context, { ms: 900, answer });
-    expect(next.items.map((i) => i.name)).toEqual(answer.items.map((i) => i.name));
-    expect(next.title).toBe(answer.meal_label);
+  it('takes the answer as read, with no answers yet; the context is answered', () => {
+    const m = meal([text('a', 'вареники')], { answers: { [itemKey(0, 0)]: { count: '14' } } });
+    const next = answered(m);
+    expect(next.meal?.dishes.map((d) => d.name)).toEqual(['Вареники', 'Чай']);
+    expect(next.title).toBe('Обед');
+    expect(next.answers).toEqual({});
     expect(next.changed).toBe(false);
   });
 
+  it('shows the meal with the user’s answers, values and totals updated', () => {
+    const m = answered(meal([text('a', 'вареники')]));
+    expect(shown(meal(), 'ru')).toBeNull();
+    expect(shown(m, 'ru')!.total.kcal).toBeCloseTo(739.3);
+    const more = { ...m, answers: { [itemKey(0, 0)]: { count: '14' } } };
+    expect(shown(more, 'ru')!.total.kcal).toBeCloseTo(1009.3); // + 4 × 45 g × 150 / 100
+    expect(shown(more, 'ru')!.total.water).toBe(250); // the tea
+  });
+
   it('keeps the meal as it was when it failed, saying why, until the context changes', () => {
-    const m = meal([text('a', 'lunch')], { items: items.slice(0, 1), title: 'Lunch' });
+    const m = answered(meal([text('a', 'вареники')]));
     const failed = applyUpdate(m, m.context, { ms: 300, error: 'Gemini 400: bad request' });
     expect(failed).toEqual({ ...m, failed: 'Gemini 400: bad request' });
     expect(applyUpdate(m, m.context, null, 'no API key').failed).toBe('no API key');
-    const added = withContext(failed, [...failed.context, text('b', 'and tea')]);
+    const added = withContext(failed, [...failed.context, text('b', 'и чай')]);
     expect(added.failed).toBeUndefined();
     expect(added.changed).toBe(true);
   });
 
   it('still needs an update when the context changed while it ran', () => {
-    const m = meal([text('a', 'lunch')]);
-    const meanwhile = withContext(m, [...m.context, text('b', 'and tea')]);
-    expect(applyUpdate(meanwhile, m.context, { ms: 900, answer }).changed).toBe(true);
+    const m = meal([text('a', 'вареники')]);
+    const meanwhile = withContext(m, [...m.context, text('b', 'и чай')]);
+    expect(applyUpdate(meanwhile, m.context, { ms: 900, answer: testAnswer }).changed).toBe(true);
     // a failure for what is no longer the context isn't shown
     expect(applyUpdate(meanwhile, m.context, { ms: 9, error: 'x' })).toEqual(meanwhile);
-  });
-
-  it('checks the answer strictly: any problem and it isn’t used', () => {
-    expect(checkAnswer(answer)).toEqual([]);
-    const broken = { ...answer, items: [{ ...answer.items[0], per_100g: null }] };
-    expect(checkAnswer(broken)).toEqual([
-      expect.stringContaining('per_100g is missing or not numbers'),
-    ]);
   });
 });

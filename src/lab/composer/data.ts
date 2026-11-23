@@ -1,35 +1,33 @@
-import { DEFAULT_OPTIONS, type Options } from '../ai/model';
 import type { ComposedMeal } from './types';
 
 /**
  * Everything the composer keeps, as its one lab data object (kcal-lab-composer, see
- * src/lab/storage/lab.ts): the meals, and the settings. Photos are lab
- * files, by id; the Gemini key is a lab secret ('gemini'), never in here.
+ * src/lab/storage/lab.ts): the meals, and the answer language. How the model is asked (model,
+ * thinking, retries) is src/lab/meal/settings.ts, the same as the tool's. Photos are lab files,
+ * by id; the Gemini key is a lab secret ('gemini'), never in here.
  */
 export interface ComposerData {
   /** Newest first. */
   meals: ComposedMeal[];
-  /** The Gemini model; empty until the key's models are listed (then the newest Flash). */
-  model: string;
-  options: Options;
-  /** The language to answer in (`ru`): names, the prompt's language, scanned products' names. */
+  /** The language to answer in (`ru`): names, units, scanned products' names. */
   language: string;
 }
 
-export const EMPTY: ComposerData = {
-  meals: [],
-  model: '',
-  options: DEFAULT_OPTIONS,
-  language: 'ru',
-};
+export const EMPTY: ComposerData = { meals: [], language: 'ru' };
 
-/** What was kept, with anything missing (from an older shape) at its default. */
+/**
+ * What was kept, with anything missing at its default. A meal of an older shape keeps what it is
+ * composed from, without its answer (another format): an update makes it again.
+ */
 export function fromStored(stored: Partial<ComposerData> | undefined): ComposerData {
   return {
-    // meals of an older shape (before whole-context updates) are left out
-    meals: (stored?.meals ?? []).filter((m) => Array.isArray(m.context)),
-    model: stored?.model ?? '',
-    options: { ...DEFAULT_OPTIONS, ...stored?.options },
+    meals: (stored?.meals ?? [])
+      .filter((m) => Array.isArray(m.context)) // before whole-context updates: left out
+      .map((m) => {
+        if (m.answers) return m;
+        const { id, title, at, context } = m;
+        return { id, title, at, context, answers: {}, changed: context.length > 0 };
+      }),
     language: stored?.language || EMPTY.language,
   };
 }

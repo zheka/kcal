@@ -123,7 +123,8 @@ src/lab/
                   scripts/meal.ts (one meal from the command line) and scripts/meal-bench.ts,
                   see docs/lab-meal-prompt.md
   composer/       running now: the meal composer (photos, text and barcodes → a meal of
-                  parametric items, adjusted on the phone), see docs/lab.md
+                  dishes and products by prompt v5, its questions answered on the phone),
+                  see docs/lab.md
   <experiment>/   one experiment: its page (main.tsx), UI, settings and logic
 ```
 

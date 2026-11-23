@@ -7,17 +7,17 @@ import { ModelError, type Config, type ModelRequest, type Reply } from './model.
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
-/** How long a request may take before it is given up. */
-export const TIMEOUT_MS = 120_000;
-
 /** Statuses of an overloaded, rate-limited or timed-out Gemini: worth trying again later. */
 const BUSY = [429, 500, 503, 504];
 
 /** A photo's data, by its id in the request (null when it is gone). */
 export type PhotoData = (id: string) => Promise<{ type: string; base64: string } | null>;
 
-/** Sends requests to Gemini with this key; photos are loaded by id as they are sent. */
-export function gemini(key: string, photo: PhotoData, timeoutMs = TIMEOUT_MS) {
+/**
+ * Sends requests to Gemini with this key; photos are loaded by id as they are sent. A request
+ * taking longer than `timeoutMs` is given up, as busy (worth another try).
+ */
+export function gemini(key: string, photo: PhotoData, timeoutMs: number) {
   return async (request: ModelRequest): Promise<Reply> => {
     if (!key) throw new ModelError('no API key', { sent: false });
     if (!navigator.onLine) throw new ModelError('offline', { sent: false });
@@ -40,7 +40,7 @@ export function gemini(key: string, photo: PhotoData, timeoutMs = TIMEOUT_MS) {
         controller.signal.aborted
           ? `no answer within ${timeoutMs / 1000} s`
           : `couldn’t reach Gemini (${String(err)})`,
-        { sent: true },
+        { sent: true, busy: true }, // timed out or unreachable: worth another try, as a 503 is
       );
     } finally {
       clearTimeout(timer);
@@ -138,19 +138,4 @@ export function readReply(status: number, text: string): Reply {
 function stopReason(reason: string): string {
   const known: Record<string, string> = { STOP: 'end', MAX_TOKENS: 'max_tokens', SAFETY: 'safety' };
   return known[reason] ?? `other: ${reason}`;
-}
-
-/** The models this key can use to answer (generateContent), as ids like `gemini-…-flash`. */
-export async function listModels(key: string): Promise<string[]> {
-  const response = await fetch(`${API}/models?pageSize=1000`, {
-    headers: { 'x-goog-api-key': key },
-  });
-  const body = (await response.json()) as {
-    models?: { name: string; supportedGenerationMethods?: string[] }[];
-    error?: { message?: string };
-  };
-  if (!response.ok) throw new Error(body.error?.message ?? `HTTP ${response.status}`);
-  return (body.models ?? [])
-    .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
-    .map((m) => m.name.replace(/^models\//, ''));
 }

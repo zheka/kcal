@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_OPTIONS } from '../ai/model';
 import { EMPTY, fromStored, withMeal } from './data';
 import type { ComposedMeal } from './types';
 
@@ -8,22 +7,33 @@ const meal = (id: string, at: string): ComposedMeal => ({
   title: id,
   at,
   context: [],
-  items: [],
+  answers: {},
   changed: false,
 });
 
 describe('composer data', () => {
-  it('fills in what a kept object lacks, leaving out meals of an older shape', () => {
+  it('fills in what a kept object lacks, leaving out meals of the oldest shape', () => {
     expect(fromStored(undefined)).toEqual(EMPTY);
-    const old = { id: 'o', title: '', at: '', items: [], inputs: [], calls: [] };
+    const oldest = { id: 'o', title: '', at: '', items: [], inputs: [], calls: [] };
     const now = meal('n', '2026-11-21T08:00:00Z');
-    expect(fromStored({ meals: [old as never, now] }).meals).toEqual([now]);
-    expect(fromStored({ model: 'm', options: { thinking: 'off' } as never })).toEqual({
-      meals: [],
-      model: 'm',
-      options: { ...DEFAULT_OPTIONS, thinking: 'off' },
-      language: 'ru',
-    });
+    expect(fromStored({ meals: [oldest as never, now] }).meals).toEqual([now]);
+    // settings of before (model, thinking, temperature) are settings.ts now
+    expect(fromStored({ model: 'm', options: {} } as never)).toEqual(EMPTY);
+  });
+
+  it('keeps a meal answered by prompt v3 by what it is composed from, to update again', () => {
+    const context = [{ id: 'a', kind: 'text' as const, text: 'lunch' }];
+    const v3 = {
+      id: 'v',
+      title: 'Lunch',
+      at: 'T',
+      context,
+      items: [{ name: 'x' }],
+      changed: false,
+    };
+    expect(fromStored({ meals: [v3 as never] }).meals).toEqual([
+      { id: 'v', title: 'Lunch', at: 'T', context, answers: {}, changed: true },
+    ]);
   });
 
   it('keeps meals newest first, replacing one by id', () => {

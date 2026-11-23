@@ -3,14 +3,13 @@ import type { Page } from '@playwright/test';
 import { expect, expectNoHorizontalScroll, test } from './fixtures';
 
 /**
- * The meal composer experiment in the lab (/kcal/lab/), with Gemini replaced by a made-up answer:
- * attach a photo and text, update, adjust locally, attach more and update with it all, keep the
- * meal; the logs hold every request and answer. Never writes the app's data.
+ * The meal composer experiment in the lab (/kcal/lab/), with Gemini replaced by a made-up answer
+ * (src/lab/meal/testAnswer.json: vareniki, a filling and a count in doubt; sour cream; tea):
+ * attach a photo and text, update, answer its questions locally, keep the meal, attach more and
+ * update with it all; the logs hold every request and answer. Never writes the app's data.
  */
 
-const ANSWER = JSON.parse(readFileSync('src/lab/composer/testAnswer.json', 'utf8')) as {
-  items: { name: string; count: number }[];
-};
+const ANSWER = JSON.parse(readFileSync('src/lab/meal/testAnswer.json', 'utf8')) as object;
 // An 8×8 PNG: something to "photograph".
 const PHOTO = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR4nGM4UaGBFTEMLQkAUtVaAV8W4QQAAAAASUVORK5CYII=',
@@ -28,16 +27,6 @@ async function fakeGemini(
 ): Promise<Sent[]> {
   const sent: Sent[] = [];
   await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
-    if (route.request().url().includes('/models?')) {
-      await route.fulfill({
-        json: {
-          models: [
-            { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
-          ],
-        },
-      });
-      return;
-    }
     const body = route.request().postDataJSON() as { contents: Sent[] };
     sent.push(body.contents[0]!);
     const { status, json } = answer(sent.length);
@@ -51,7 +40,7 @@ const reply = (answer: object) => ({
   json: {
     candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] }, finishReason: 'STOP' }],
     usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 900 },
-    modelVersion: 'gemini-2.5-flash',
+    modelVersion: 'gemini-3.5-flash-lite',
   },
 });
 
@@ -59,7 +48,7 @@ async function saveKey(page: Page) {
   await page.getByRole('button', { name: 'Menu' }).click();
   await page.getByLabel('Gemini key').fill('test-key');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.locator('#composer-model')).toHaveValue('gemini-2.5-flash');
+  await expect(page.getByText('Gemini key saved on this device')).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 }
 
@@ -75,15 +64,10 @@ async function downloadLogs(page: Page): Promise<{ text: string; logs: Entry[] }
   return { text, logs: JSON.parse(text) as Entry[] };
 }
 
-test('composes a meal from its attached context, adjusts it, updates it with more', async ({
+test('composes a meal from its attached context, answers it locally, updates it with more', async ({
   seeded: page,
 }) => {
-  const sent = await fakeGemini(page, (n) => {
-    // the second update ("potatoes 100 g") returns the potatoes at 100 g
-    const answer = structuredClone(ANSWER);
-    if (n > 1) answer.items[1]!.count = 100;
-    return reply(answer);
-  });
+  const sent = await fakeGemini(page, () => reply(ANSWER));
   await page.goto('lab/');
   const appData = await page.evaluate(() => localStorage.getItem('kcal'));
   await saveKey(page);
@@ -92,7 +76,7 @@ test('composes a meal from its attached context, adjusts it, updates it with mor
   await page
     .locator('input[type=file]')
     .setInputFiles({ name: 'meal.png', mimeType: 'image/png', buffer: PHOTO });
-  await page.getByLabel('What you eat').fill('chicken meatballs');
+  await page.getByLabel('What you eat').fill('вареники');
   await page.getByRole('button', { name: 'Add' }).click();
   const attached = page.getByRole('region', { name: 'Attached' }).locator('.attached');
   await expect(attached).toHaveCount(2);
@@ -101,49 +85,58 @@ test('composes a meal from its attached context, adjusts it, updates it with mor
 
   await page.getByRole('button', { name: 'Update' }).click();
   const items = page.locator('.composed-item');
-  await expect(items).toHaveCount(5);
+  await expect(page.locator('.composed-dish')).toHaveCount(2);
+  await expect(items).toHaveCount(3);
   await expect(page.getByRole('button', { name: 'Update' })).toHaveCount(0);
-  // the prompt, then the context as attached
-  expect(sent[0]!.parts).toHaveLength(3);
-  expect(sent[0]!.parts[0]!.text).toContain('meal so far: empty');
-  expect(sent[0]!.parts[0]!.text).toContain('"oats with honey" (my recipe)');
+  // the tool's request: the context, the input as attached, the checklist
+  expect(sent[0]!.parts).toHaveLength(4);
+  expect(sent[0]!.parts[0]!.text).toContain('answer language: ru');
   expect(sent[0]!.parts[1]!.inline_data!.mime_type).toBe('image/jpeg');
-  expect(sent[0]!.parts[2]).toEqual({ text: 'chicken meatballs' });
-  // at defaults: 320 + 262 + 114 + 111 + 93
-  await expect(page.locator('.composed-total')).toContainText('This meal: 900 kcal');
+  expect(sent[0]!.parts[2]).toEqual({ text: 'вареники' });
+  expect(sent[0]!.parts[3]!.text).toContain('Before answering, check');
+  // at the model's guesses: 675 + 62 + 3; the tea's water
+  const total = page.locator('.composed-total');
+  await expect(total).toContainText('This meal: 739 kcal');
+  await expect(total).toContainText('250 ml water');
 
-  // local: pick a variant, edit an amount (no request)
-  await page.getByRole('button', { name: 'pork and beef' }).click();
-  await expect(items.first()).toContainText('602 kcal');
-  await page.getByLabel('Amount of meatballs').fill('6');
-  await expect(items.first()).toContainText('452 kcal');
+  // the questions as chips; an answer updates the values here (no request)
+  await page.getByRole('group', { name: 'how many' }).getByRole('button', { name: '14' }).click();
+  await expect(items.first()).toContainText('14 шт. × 45 г · 945 kcal');
+  await page
+    .getByRole('group', { name: 'what' })
+    .getByRole('button', { name: 'с творогом' })
+    .click();
+  await expect(items.first()).toContainText('Вареники с творогом');
+  await expect(items.first()).toContainText('1260 kcal'); // 14 × 45 g × 200 / 100
+  await expect(total).toContainText('This meal: 1324 kcal');
+  await expect(page.getByRole('button', { name: 'с творогом' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await expect(page.getByRole('button', { name: 'Update' })).toHaveCount(0);
+  expect(sent).toHaveLength(1);
   await expectNoHorizontalScroll(page);
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT, fullPage: true });
 
-  // more context: the update sends it all, with the meal so far and its answers
-  await page.getByLabel('What you eat').fill('potatoes 100 g');
-  await page.getByRole('button', { name: 'Add' }).click();
-  await page.getByRole('button', { name: 'Update' }).click();
-  await expect(page.getByLabel('Amount of potatoes')).toHaveValue('100');
-  expect(sent[1]!.parts.slice(2)).toEqual([
-    { text: 'chicken meatballs' },
-    { text: 'potatoes 100 g' },
-  ]);
-  expect(sent[1]!.parts[0]!.text).toContain('meal so far: [{"name":"meatballs","count":6');
-  expect(sent[1]!.parts[0]!.text).toContain('"default":"pork and beef"');
-
-  // removing context needs an update too
-  await page.getByRole('button', { name: 'Remove “potatoes 100 g”' }).click();
-  await expect(attached).toHaveCount(2);
-  await expect(page.getByRole('button', { name: 'Update' })).toBeVisible();
-
-  // kept: back to the list, reopen after a reload
+  // kept: back to the list, reopen after a reload, answers and all
   await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('.composed-row').first()).toContainText('1324 kcal');
   await page.reload();
   await page.locator('.composed-row').first().click();
-  await expect(items).toHaveCount(5);
+  await expect(total).toContainText('This meal: 1324 kcal');
   await expect(attached).toHaveCount(2);
+
+  // more context: the update sends it all; the new answer comes without the user's answers
+  await page.getByLabel('What you eat').fill('и чай');
+  await page.getByRole('button', { name: 'Add' }).click();
+  await page.getByRole('button', { name: 'Update' }).click();
+  await expect(total).toContainText('This meal: 739 kcal');
+  expect(sent[1]!.parts.slice(2, 4)).toEqual([{ text: 'вареники' }, { text: 'и чай' }]);
+
+  // removing context needs an update too
+  await page.getByRole('button', { name: 'Remove “и чай”' }).click();
+  await expect(attached).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Update' })).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 
   // the logs: every request and its answer, photos by id, never the key
@@ -156,21 +149,22 @@ test('composes a meal from its attached context, adjusts it, updates it with mor
     build: expect.any(String),
     meal: expect.any(String),
     request: {
-      model: 'gemini-2.5-flash',
-      instructions: '',
+      model: 'gemini-3.5-flash-lite',
+      instructions: expect.stringContaining('You are the food-recognition step'),
       content: [
-        { text: expect.stringContaining('You are the food-recognition step') },
+        { text: expect.stringContaining('answer language: ru') },
         { image: expect.any(String) },
-        { text: 'chicken meatballs' },
+        { text: 'вареники' },
+        { text: expect.stringContaining('Before answering, check') },
       ],
-      config: { temperature: 0.2, thinking: 'default' },
+      config: { thinking: 'low' },
     },
     response: {
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash-lite',
       stop: 'end',
       tokens: { input: 2100, output: 900 },
       ms: expect.any(Number),
-      answer: { items: expect.any(Array) },
+      answer: { dishes: expect.any(Array) },
     },
   });
   expect(await page.evaluate(() => localStorage.getItem('kcal'))).toBe(appData);
@@ -184,7 +178,7 @@ test('a failed update keeps the meal, says why, and can be retried; logs both', 
   );
   await page.goto('lab/');
   await page.getByRole('button', { name: 'New meal' }).click();
-  await page.getByLabel('What you eat').fill('chicken meatballs');
+  await page.getByLabel('What you eat').fill('вареники');
   await page.getByRole('button', { name: 'Add' }).click();
 
   // no key: nothing is sent, nothing logged
@@ -198,7 +192,7 @@ test('a failed update keeps the meal, says why, and can be retried; logs both', 
   await expect(page.getByText('Couldn’t update: Gemini 400: Something went wrong')).toBeVisible();
   await expect(page.locator('.composed-item')).toHaveCount(0);
   await page.getByRole('button', { name: 'Retry' }).click();
-  await expect(page.locator('.composed-item')).toHaveCount(5);
+  await expect(page.locator('.composed-item')).toHaveCount(3);
   await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
   expect(sent).toHaveLength(2);
   await page.getByRole('button', { name: 'Close' }).click();

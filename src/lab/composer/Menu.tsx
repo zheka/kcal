@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { ConfirmButton } from '../../ui/ConfirmButton';
 import { CloseIcon } from '../../ui/icons';
-import { listModels } from '../ai/gemini';
-import type { Options } from '../ai/model';
+import { SETTINGS } from '../meal/settings';
 
 /**
- * The lab's menu: the composer's settings (the Gemini key, a lab secret; the model, from the
- * key's list; how it answers), kept by the caller, and the lab's logs and data.
+ * The lab's menu: the composer's settings (the Gemini key, a lab secret; the answer language),
+ * kept by the caller; how the model is asked, as src/lab/meal/settings.ts says (the tool's too);
+ * and the lab's logs and data.
  */
 
 interface LabActions {
@@ -52,49 +52,19 @@ export function Menu(props: Parameters<typeof Settings>[0] & LabActions) {
   );
 }
 
-/** The newest plain Flash model, as a default. */
-function pickDefault(models: string[]): string {
-  const flash = models.filter((m) => /^gemini-[\d.]+-flash$/.test(m)).sort();
-  return flash.at(-1) ?? models.find((m) => m.includes('flash')) ?? models[0] ?? '';
-}
-
 function Settings({
   keyValue,
   setKey,
-  model,
-  setModel,
-  options,
-  setOptions,
   language,
   setLanguage,
 }: {
   keyValue: string;
   setKey: (k: string) => void;
-  model: string;
-  setModel: (m: string) => void;
-  options: Options;
-  setOptions: (o: Options) => void;
   language: string;
   setLanguage: (language: string) => void;
 }) {
   const [languageText, setLanguageText] = useState(language);
-  const [temperature, setTemperature] = useState(
-    options.temperature === null ? '' : String(options.temperature),
-  );
   const [text, setText] = useState('');
-  const [models, setModels] = useState<string[]>([]);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!keyValue) return;
-    setError('');
-    listModels(keyValue)
-      .then(setModels)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
-  }, [keyValue]);
-  // A model this key can't use (or none yet): the newest Flash.
-  useEffect(() => {
-    if (models.length > 0 && !models.includes(model)) setModel(pickDefault(models));
-  }, [models, model, setModel]);
 
   return (
     <section class="section">
@@ -132,7 +102,6 @@ function Settings({
           </button>
         </form>
       )}
-      {error && <p class="error">Gemini: {error}</p>}
       <label class="field">
         <span class="label">Answer language</span>
         <input
@@ -150,58 +119,10 @@ function Settings({
           }}
         />
       </label>
-      {keyValue && (
-        <label class="field">
-          <span class="label">Model</span>
-          <select
-            id="composer-model"
-            class="input"
-            value={model}
-            onChange={(e) => setModel(e.currentTarget.value)}
-          >
-            {(models.length ? models : [model]).map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {keyValue && (
-        <div class="settings-row">
-          <label class="field grow">
-            <span class="label">Thinking</span>
-            <select
-              id="composer-thinking"
-              class="input"
-              value={options.thinking}
-              onChange={(e) =>
-                setOptions({ ...options, thinking: e.currentTarget.value as Options['thinking'] })
-              }
-            >
-              <option value="default">model’s default</option>
-              <option value="off">off (faster)</option>
-            </select>
-          </label>
-          <label class="field grow">
-            <span class="label">Temperature</span>
-            <input
-              id="composer-temperature"
-              class="input number"
-              inputMode="decimal"
-              placeholder="model’s default"
-              value={temperature}
-              onInput={(e) => {
-                const text = e.currentTarget.value;
-                setTemperature(text);
-                const t = Number(text.replace(',', '.'));
-                if (text.trim() === '') setOptions({ ...options, temperature: null });
-                else if (t >= 0 && t <= 2) setOptions({ ...options, temperature: t });
-              }}
-            />
-          </label>
-        </div>
-      )}
+      <p class="hint">
+        {SETTINGS.model}, thinking {SETTINGS.thinking}; up to {SETTINGS.retryDelaysMs.length} more
+        tries when it’s busy (src/lab/meal/settings.ts)
+      </p>
     </section>
   );
 }

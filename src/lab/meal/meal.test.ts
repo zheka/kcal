@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { amountText, axisOf, distinctNames, process, questions, values } from './process.ts';
+import {
+  amountText,
+  answered,
+  axisOf,
+  distinctNames,
+  itemKey,
+  process,
+  questions,
+  values,
+} from './process.ts';
 import { type Product, readMeal } from './read.ts';
 import { changeText, textView } from './view.ts';
 
@@ -150,6 +159,28 @@ describe('questions', () => {
       'с творогом, 8 шт. × 45 г',
       'с картошкой, 12 шт. × 45 г',
     ]);
+  });
+
+  it('takes the user’s answers: the kind chosen, at the count chosen, and the totals again', () => {
+    const cottage = { name: 'Вареники с творогом', kcal_per_100_base_units: 200 };
+    const m = process(readMeal(meal(raw({ alternatives: [cottage, { piece_count: 14 }] }))).meal);
+    const kind = m.dishes[0]!.items[0]!.questions.map((q) => q.axis);
+    expect(kind).toEqual(['kind', 'count']);
+
+    const a = answered(m, { [itemKey(0, 0)]: { kind: 'с творогом', count: '14' } });
+    const item = a.dishes[0]!.items[0]!;
+    expect(item.product).toMatchObject({ name: 'Вареники с творогом', count: 14, size: 45 });
+    expect(item.name).toBe('Вареники с творогом');
+    expect(item.amount).toBe('14 шт. × 45 г');
+    expect(item.values.kcal).toBeCloseTo(1260); // 14 × 45 g × 200 / 100
+    expect(a.total.kcal).toBeCloseTo(1260);
+    expect(item.questions.map((q) => q.options.find((o) => o.chosen)!.label)).toEqual([
+      'с творогом',
+      '14',
+    ]);
+    // none, or a label no option has: the guess
+    expect(answered(m, {}).total.kcal).toBeCloseTo(675);
+    expect(answered(m, { [itemKey(0, 0)]: { count: '99' } }).total.kcal).toBeCloseTo(675);
   });
 
   it('asks only what changes 80 kcal or 10 g protein, at most 3 in a meal, the largest first', () => {
