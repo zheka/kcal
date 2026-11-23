@@ -1,13 +1,14 @@
 # The lab: 1,000 example meals
 
-1,000 meals written in the format of [lab-meal-format.md](lab-meal-format.md), each with the most
+1,000 meals written in the first version of the format of [lab-meal-format.md](lab-meal-format.md)
+(questions written by the model; see its How we got here), each with the most
 uncertainty a photo (or a vague text) plausibly leaves: every material doubt I could answer is a
 question. Written by hand (by Claude, in discussion), not by the model, to test the format's
 shape: they are not model runs, and amounts are typical, not measured.
 
 Status (2026-11-22): **all 1,000 pass the format's checks**
 (`python3 scripts/check-meal-examples.py docs/lab-meal-examples.md`); the problems they raised are
-listed below, and settled in lab-meal-format.md, Problems from the examples.
+listed below, and settled in lab-meal-format.md, How we got here (10).
 
 ## How to read them
 
@@ -56,7 +57,7 @@ CS 39, PS 32, CU 21, U 20, CPS 10.
 
 ## Problems and notes, by tag
 
-**Problems of the format (settled in lab-meal-format.md, Problems from the examples)**
+**Problems of the format (settled in lab-meal-format.md, How we got here (10))**
 
 - `presence+kind`: "None" as one of the kinds: one question to a person, two in the format. #59, #87, #175, #431, #566, #885
 - `linked-kinds`: one kind choice should change several rows (pho bo / ga). #371

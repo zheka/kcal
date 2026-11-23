@@ -71,17 +71,19 @@ entries as a JSON array, oldest first. No key, no image data, no meals.
 
 ## Next steps
 
-- **The meal format with choices, and prompt v4**: in code and tested on the bench
-  (`scripts/meal-bench.ts`), not yet on the meal screen. The format and why each part is so:
-  [lab-meal-format.md](lab-meal-format.md); the model's settings, the prompt's rules and why, the
-  bench and its results: [lab-meal-prompt.md](lab-meal-prompt.md). Next: the meal screen on the
-  new format (rows with chips and their kcal and macros, updated on a tap), requests with prompt
-  v4 at low thinking and no temperature, the old `parameters` (types.ts, answer.ts, recompute.ts,
-  prompt-v3.txt) removed.
-- **What still breaks without thinking** (see lab-meal-prompt.md, What's left): a stated kind
-  in an update, kinds invented for vague input, a weighed plate split. An example of each, or
-  `medium` thinking for updates only.
-- **History in the prompt**: prompt v3 sent "history matches"; prompt v4 sends none yet.
+- **The model perceives, the code decides: prompt v5** (`src/lab/meal/`): the model returns
+  dishes and products with whole alternatives; the code adds up, turns alternatives into
+  questions and asks only those that matter. In code with a local tool (`scripts/meal.ts`) and
+  the bench on it (`scripts/meal-bench.ts`), not yet run on the bench. The format and why:
+  [lab-meal-format.md](lab-meal-format.md); the settings, the prompt's rules and why, the tool
+  and the bench: [lab-meal-prompt.md](lab-meal-prompt.md). Next: bench runs; then the meal
+  screen on the new format (dishes, asked questions as chips, values updated on a tap), with
+  `src/lab/meal/settings.ts` instead of the menu's model, thinking and temperature, and the old
+  `parameters` (types.ts, answer.ts, recompute.ts, prompt-v3.txt) removed.
+- **Choices and a new request**: with no meal sent back, a tap may become a small text in the
+  context (see lab-meal-format.md, Open questions).
+- **History in the prompt**: prompt v3 sent "history matches"; prompt v5 sends none yet. Dish
+  names are meant for matching against it.
 - **The day chart** on the meal screen, as in the app's: today's meals and this one against the
   goals (read-only from the app's data).
 - **Requests in the background.** Model requests and Open Food Facts lookups (with their retries)

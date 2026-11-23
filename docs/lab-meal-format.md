@@ -1,208 +1,154 @@
 # The lab: a meal's format
 
 The format of a meal in the meal composer experiment (see [lab.md](lab.md)): what the model
-returns, what the meal screen adjusts, what the lab stores and what is sent back on an update.
-1,000 example meals written in its first version, with the problems they raised, are in
-[lab-meal-examples.md](lab-meal-examples.md); how the model is told to use it is in
-[lab-meal-prompt.md](lab-meal-prompt.md).
+returns, what the code makes of it, and what the local tool logs. How the model is told to use it
+is in [lab-meal-prompt.md](lab-meal-prompt.md). 1,000 example meals written in the format's first
+version (questions written by the model), with the problems they raised, are in
+[lab-meal-examples.md](lab-meal-examples.md).
 
-Status (2026-11-23): **in code, tested on the bench, not yet in the lab's UI.**
-`src/lab/composer/meal.ts` (types, the strict reader, amounts, the screen form),
-`schema.ts` (the JSON Schema sent to Gemini), `request.ts` (what an update sends besides the
-prompt). The lab's meal screen still uses prompt v3's `parameters` (`types.ts`); the new screen
-is next. Each decision below says why ("Why:").
+Status (2026-11-23): **in code with the local tool and the bench, not yet run on the bench, not
+in the lab's UI.** `src/lab/meal/`: `schema.ts` (what the model answers), `read.ts` (the
+forgiving reader), `process.ts` (amounts, totals, questions), `view.ts` (the text view),
+`request.ts` and `settings.ts` (what is sent, see the prompt doc). The lab's meal screen still
+uses prompt v3's `parameters` (`src/lab/composer/types.ts`). The previous format (v4: questions
+written by the model) is in git history up to commit 381aee4. Each decision below says why
+("Why:").
 
 ## Principles
 
+- **The model perceives, the code decides.** The model says what was eaten, how much, its values
+  per 100, and what else each food could be. The code adds up, decides which alternatives are
+  worth asking about, turns them into questions and labels the chips. Why: in v4 the model wrote
+  the questions itself (`why`, `chosen`, `options` on three axes) and had to judge "80+ kcal
+  between options, at most 3 questions in the meal", which needs arithmetic and a view of rows it
+  hadn't written yet; without thinking, Flash-Lite broke those rules at random (see the prompt
+  doc, the v4 results). Code does them exactly.
+- **Flat, forgiving, natural.** A schema the model writes the way it thinks ("it's X, 2 pieces of
+  50 g; it could be Y"), and a reader that uses whatever it can. Why: v4's fixed shapes (wrappers,
+  `sized_food` vs `food`, a size-and-count table with `г` only of 1) existed to make the model's
+  answer a UI; with the code making the UI, the model needs none of them.
+- **Only the input is sent, never the meal so far.** Every request perceives the whole context
+  (texts, photos, scanned products) afresh. Why: one kind of request, no update rules in the
+  prompt, nothing to keep in sync between the stored meal and the model. A correction is more
+  input ("тефтели куриные"). What happens to choices tapped on the phone is open (below).
 - **The lab only.** Not bound by the app's data (products, recipes, the backup format).
-- **One format.** The meal with its choices is the main format: the model's answer, the meal
-  screen's state, the stored meal and the "meal so far" sent back are all the same thing. A
-  certain meal is the same format with every question certain. Anything that only needs what was
-  eaten (totals, the meals list, history) reads the current answers and ignores the alternatives.
-  The lab's own wrapper around it: id, time, the attached context, the update state.
-- **Products are local.** No product library: a product is a name with values, inside the row
-  that uses it. A name may drift over time ("Овсянка" with milk, later with water), so past
-  meals are examples for the model, never a database. Milk in g and in ml is two products.
-- **Choices are shortcuts.** They let me fine-tune the model's answer in a few taps, with no
-  round trip. Anything bigger (an exact weight, a different dish, something missed, something
-  not eaten) is text, and a new request.
-- **On the phone: choices only.** No typed amounts (a typed number can't be an option, and text
-  survives updates where a local edit may not). Each row shows its kcal and macros, updated as
-  chips are tapped, so what a choice is worth is seen without annotating every option.
-- **All of it, by me alone.** By default everything served was eaten and drunk, by me alone: no
-  questions about leftovers or sharing; I say otherwise in text. Why: questions about how much
-  broth I drank or my share of a plate were guesses about what the photo can't show, cluttered
-  every meal, and are rare; one line of text says them exactly.
-- **Easy for the model.** Fixed shapes with every field required (the schema guarantees them),
-  values the model knows (absolute values per 100, never differences), no arithmetic, nothing
-  written twice.
+- **Products are local.** No product library: a product is a name with values, inside the dish
+  that has it. Past meals will be examples for the model, never a database.
+- **All of it, by me alone.** By default everything served was eaten and drunk, by me alone; I
+  say otherwise in text. Why: questions about how much broth I drank or my share of a plate were
+  guesses about what the photo can't show, cluttered every meal, and are rare.
 
-## Structure
+## What the model returns
 
 ```
-meal = { title, items: [row] }
-row  = { sized_food } | { food } | { dish }
-dish = { name, items: [{ sized_food } | { food }], counts }
+meal    = { title, dishes: [dish] }
+dish    = { name, products: [product + alternatives] }
+product = { name, basis_unit, count, unit_name, amount_alias, unit_amount, per_100 }
+per_100 = { calories, protein_g, carbs_g, fat_g, water_g }
 ```
 
-**Rows are one-key wrappers in one list.** Each row is an object with a single key naming its
-kind. Why:
+- **A dish is a food as a menu or a food diary names it** ("Борщ", "Тефтели с картофелем",
+  "Капучино"), with what it is made of or served with as its part (a side, a sauce, the sour
+  cream in the soup, the sugar in the tea). A food of its own is a dish of its own, even on the
+  same plate (bread, a pampushka, a drink, a dessert); each kind in a sushi set too. The name is
+  what is certain, the same each time: never the plate, cup or board, never the meal
+  ("Завтрак"), no amounts, no doubts (vareniki of a filling in doubt: "Вареники"). Why: dish
+  names are for finding the same dish in my history later; grouping by plate (the first idea)
+  named containers ("Тарелка с завтраком"), which would never match.
+- **The amount** is `count` × `unit_amount` for pieces (eggs, slices, dumplings, drinks), else
+  `unit_amount` alone with `count` null (loose food, a stated weight). `unit_name` is the piece
+  as counted (шт., ломт., стакан), `amount_alias` a size name when there is one (M, grande,
+  обычная). `basis_unit` (g or ml) comes before the amount, so it is decided before the number.
+  Why: what the model writes anyway; `count` null for loose food leaves no slot to fill with a
+  weight twice.
+- **Values per 100 g or ml as eaten**, water included (the app tracks it).
+- **Alternatives are whole products**, each as it would be if that reading were right: another
+  food (cod / chicken / pork, another filling), another size, another count when pieces are
+  hidden; one change per alternative. Why: "it could be X" is how the model thinks; it doesn't
+  judge whether a doubt matters, the code does.
+- **No notes.** Why: prose can't be shown as chips, and a free-text field invites questions in
+  prose.
 
-- **Order:** one list keeps the model's order (the plate, or my text: "omelette, toast, coffee"),
-  and an add-on next to what it's added to (a syrup row after its latte). Separate lists by kind
-  (`sized_foods`, `foods`, `dishes`) were considered and set aside for this.
-- **Well defined:** the schema says `anyOf` the three wrappers, each with its one key required,
-  so the kind is the first thing the model writes and decides, and the reader knows the kind
-  from the key. Plain `anyOf` of the three shapes would share field names (`sizes`, `counts`) and
-  couldn't be told apart early.
-- **Two levels by schema:** a dish's `items` allow only `sized_food` and `food`; a dish in a dish
-  can't be written. (In 1,000 example meals nothing needed one.)
+**The schema** (`schema.ts`) is Gemini's `responseJsonSchema`, every field required, nullable
+ones as `[type, "null"]`, no number or array limits (Gemini rejected those as "too many states"
+in v4). The rules broken most are in the fields' descriptions, where the model is as it writes
+them (see the prompt doc).
 
-**`title`** is the only meal-level field: the meals list needs it. `dropped` and `out_of_focus`
-(prompt v3) and `source` (visual / published / history) were dropped: nothing showed or used
-them.
+## Reading: forgiving
 
-## A row
+`readMeal` (`read.ts`) never rejects an answer: what can be used is used, and each repair is a
+flag (kept in the log, shown in the text view). Why: in v4 any problem lost the whole answer; a
+slip in one product shouldn't cost a meal.
 
-```jsonc
-{ "sized_food": { "sized_products": Q<SizedProduct>, "counts": Q<Count> } }
-{ "food":       { "products": Q<Product>, "sizes": Q<Size>, "counts": Q<Count> } }
-{ "dish":       { "name": "Тако", "items": [ … ], "counts": Q<Count> } }
-```
+- **Filled in:** an alternative's missing fields are its product's (an alternative of `{count:
+12}` is the product with 12); a missing value is 0; an unknown base is g; products with no
+  dishes are one dish.
+- **Dropped:** a product with no `unit_amount`, a dish left empty, an alternative that is the same
+  as the product or one before it.
+- **Kept but flagged:** kcal that don't match the macros (4·P + 4·C + 9·F, off by more than 30
+  %), more than 105 g in 100 g, a product over 3 kg or 3,000 kcal (the model multiplying twice: a
+  weight as both count and size), a count of 0.
 
-- **A product:** `label` (the chip), `name` (the full name: the row's name when chosen), `base`
-  (`g` or `ml`; all kinds of a row have the same base), `per_100` (kcal, protein, fat, carbs,
-  water per 100 g or ml as eaten). A sized product adds `unit`: its name and size.
-- **A size:** `{ label, size }` in the product's base. The label is the unit in the amount ("1
-  grande", "150 г").
-- **A count:** `{ label, count }`; 0 is valid, fractions are.
-- **The amount** is count × size (the product's unit, or the chosen size); values are amount ×
-  per_100 / 100. A dish's count multiplies its parts, each given per serving.
+## Processing: what the code makes of it
 
-**`sizes` is always there** on a food (one certain option when nothing is asked). Why: a fixed
-shape with every field required; the model never decides whether to write a field.
+`process.ts`: each product's amount and values, each dish's and the meal's totals, and the
+questions.
 
-**A dish has no size** of its own, only a count of servings. Why: in the examples a dish size was
-only ever asked with a count of 1 (11 of 84 dishes), and the bench's first runs showed the model
-misusing a dish's size and count together; a dish's "large" is its count (`[6-inch] 1 /
-footlong 2`) or a size on the part that grows (a ramen's noodles).
+**Questions from alternatives.** Each alternative is compared with the model's guess and sorted
+by what it changes:
 
-### Size and count
+| Axis    | Changes                                                    | Example           |
+| ------- | ---------------------------------------------------------- | ----------------- |
+| `kind`  | what it is (name and values; may bring its own piece size) | картошка / творог |
+| `size`  | how big (`unit_amount`, `amount_alias`), the same food     | S / M / L         |
+| `count` | how many, the same food and size                           | 10 / 12           |
+| `whole` | more than one of these                                     | творог, 8 шт.     |
 
-The size is how big one is; the count is how many. Four cases, as the prompt states them:
+- When every alternative changes one axis, they become **independent questions** (what, how
+  big, how many), as v4's were: any combination of answers is valid. Otherwise (an alternative
+  changes two things, or kinds bring their own sizes while a size is also asked) the product
+  gets **one question of whole products**. Why: the model's alternatives usually change one
+  thing, as asked; when they don't, a whole-row choice still works.
+- **Asked** when an answer changes the product by **80+ kcal or 10+ g protein**; at most **3 in
+  a meal**, those that change the most. The rest are kept, not asked ("more"). Why: the
+  threshold from the examples (#49, #128); the limit keeps the chips few.
+- **Labels** come from the difference: the words names share are dropped ("Вареники с
+  картошкой" / "Вареники с творогом" → "с картошкой" / "с творогом"; a preposition stays with
+  its word), a size's alias or grams, a count's number; amounts are added when labels would
+  repeat.
+- **Order:** sizes and counts small to large; kinds as the model gave them, most likely first.
 
-| What it is                                                      | Size (one of it)                                    | Count                                      |
-| --------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------ |
-| Pieces: eggs, slices, cutlets, dumplings, a croissant           | `sized_food`, unit `шт.` of its grams, one per kind | how many pieces                            |
-| A drink or dish in a menu size                                  | `sizes`: tall 350 / grande 470                      | how many drinks                            |
-| Loose food, the portion unknown (rice, soup, salad)             | `sizes`: маленькая 150 / обычная 200 / большая 300  | 1                                          |
-| Loose food by weight: a stated weight, a small amount (a sauce) | one size `г` (or `мл`) of 1                         | the grams, small amounts labelled in words |
+## The text view
 
-`г` and `мл` are only ever a size of 1. Why each:
-
-- **Pieces are counted, also in a dish.** The model wrote eggs in a dish as "110 g" (and once "3
-  яйца" as 180 g): I can't fix that with a tap (no 1 / 2 / 3 eggs), a stated count is lost, and
-  4 eggs hidden in "110 g × 2" go unnoticed. As pieces, I see them and the count is a chip.
-- **Named portions for loose food.** I know the portion, not the grams; the model wrote loose
-  food this way by itself, and it's what I'd answer. A weight I state stays grams.
-- **`г` of size 1 only.** A "г" label on a 50 g size showed an egg as "3 г" (the amount right,
-  the text wrong).
-- **Size in one place.** A kind with its own size (a croissant plain 60 g / almond 90 g) is a
-  `sized_food`; a size chosen on its own (a menu size) is `sizes`. Never both: where a size
-  choice exists for some kinds only, it's one `sized_products` question of the real
-  combinations.
-
-## Questions
-
-`sized_products` / `products`, `sizes` and `counts` are each a question of the same shape:
-`why`, `chosen`, `options`, all required. A certain question is one option with an empty `why`.
-
-```jsonc
-{ "why": "", "chosen": "1", "options": [ { "label": "1", "count": 1 } ] }       // certain
-{ "why": "начинка", "chosen": "картошка", "options": [ … ] }                      // in doubt
-```
-
-- **`chosen` is a label**, copied from an option, never a position; labels differ within a
-  question. Why: a position breaks when options are reordered; a label is what I tapped.
-- **`why` per question**: each question is shown with its own hint.
-- **Options**: usually 2–3, up to 4 for what a food is; the reader rejects more than 8. Order:
-  natural where there is one (small → large, counts ascending), else most likely first.
-- **"None"** is an answer: a "none" product (all values 0, water too; in `sized_products` a unit
-  of 0), or a count of 0. A row whose answer is "none" isn't eaten, and the phone hides its other
-  questions.
-- **The three questions are independent**: any combination of answers is valid and means what
-  its labels say.
-
-What is asked, and when, is the prompt's (see [lab-meal-prompt.md](lab-meal-prompt.md)).
-
-## What the model gets and returns
-
-- **Gemini's `responseJsonSchema`** (standard JSON Schema), not `responseSchema` (Google's
-  OpenAPI subset). Why: it's the current form; it keeps the schema's key order (Gemini 2.5 and
-  later), so the fields come in the order the model should decide them (`why`, then `chosen`,
-  then `options`; the kind's key first); and it takes `anyOf` for the wrappers.
-- **No number or array limits in the schema** (`minimum`, `minItems`, `maxItems`). Why: with
-  them Gemini rejected the schema as "too many states for serving"; without them it is
-  accepted, with the wrappers, the dish inside and every field required. The reader checks them
-  instead.
-- **Descriptions in the schema** carry the rules broken most (one option when certain or
-  stated, options that are different foods, pieces counted, `г` only for 1). Why: without
-  thinking, Flash-Lite writes field by field and doesn't re-read the prompt; a field's
-  description is where it is when it writes the field. It fixed stated facts and invented kinds
-  in the bench where the prompt alone hadn't.
-- **The update** sends the meal so far (my current answers) as JSON in the context, and the whole
-  attached context again. **Nothing about rows I removed:** what I didn't eat, or a guess too far
-  off for the choices, I say in text. Why: simpler, and text is exact; a list of removed names
-  needed matching against renamed rows, and the model brought rows back anyway in one run.
-
-## Checks
-
-One strict reader for the model's answers and the stored meals (`readMeal`); any problem and the
-answer isn't used, the meal stays as it was.
-
-- A row is one wrapper with one key; a dish's items are foods; a dish has a name and items.
-- Every question has `why`, `chosen` and options; labels differ; `chosen` is one of them; at most
-  8 options.
-- Counts, sizes and values are numbers ≥ 0; all kinds of a row have the same base.
-- **No row over 3 kg or 3,000 kcal at any of its answers.** Why: it catches the model
-  multiplying twice (a weight written as both count and size: an omelette of 72,000 kcal; a
-  dish's servings counted again in a part: 9 tacos for 3), which the first bench run had twice.
-
-Notes, not problems (the answer is used; the bench shows them): a `why` on a certain question
-(dropped), a choice without a `why`, a size labelled `г`/`мл` that isn't 1. Why notes: a slip in
-a hint or a label shouldn't cost me an update; the prompt is what fixes them, not the reader
-("no smart post-processing": the reader doesn't rewrite the model's answer).
-
-## The screen form
-
-How the bench prints a meal, and the form the examples and the prompt use: a row is
-`- name — amount (kcal · P · F · C)`, a dish `- name — ×count` with its parts indented, each
-question with more than one option a line under its row, `[chosen]`; certain questions aren't
-shown.
-
-| Mark | Question                                   |
-| ---- | ------------------------------------------ |
-| `U`  | `sized_products`: a kind with its own size |
-| `P`  | `products`: a kind                         |
-| `S`  | `sizes`: how big                           |
-| `C`  | `counts`: how many, or how much            |
+How the tool and the bench show a meal (`view.ts`), for judging by reading:
 
 ```
+gemini-3.5-flash-lite, 3.4 s, tokens in 2100 out 900 thinking 0, stop end
 # Обед
-- Тефтели куриные — 6 шт. (324 kcal · 27 P · 18 F · 9 C)
-  U мясо в тефтелях: [курица, 30 g] / свинина, 30 g
-  C количество тефтелей: 5 / [6] / 7
-- Картофель отварной — 1 обычная (164 kcal · 4 P · 0.2 F · 34 C)
-  S порция: маленькая 150 / [обычная 200] / большая 300
-- Бутерброд с колбасой и сыром — ×1 (278 kcal · 15.7 P · 17.8 F · 13.5 C)
-  - Хлеб ржано-пшеничный — 1 ломт. (63 kcal · …)
-  - Сыр полутвердый — 2 ломт. (140 kcal · …)
-  - Колбаса вареная — 2 ломт. (75 kcal · …)
-= 750 kcal · 46.3 P · 35.9 F · 53.1 C
+## Вареники — 736 kcal
+- Вареники с картошкой — 10 шт. × 45 г (450: 675 kcal · 18 P · 13.5 F · 117 C)
+  ? что: [с картошкой] / с творогом (+135, +27 P)
+  ? сколько: [10] / 12 (+135)
+- Сметана 20 % — обычно, 30 г (30: 61 kcal · 0.8 P · 6 F · 1 C)
+= 736 kcal · 18.8 P · 19.5 F · 118 C
+! dishes[0].products[1]: …
 ```
 
-[lab-meal-examples.md](lab-meal-examples.md) uses the first version of this form (amounts only,
-dish sizes, partly eaten and shared rows), checked by `scripts/check-meal-examples.py`.
+- A product: its name, the amount as said, then in brackets its total g or ml and its values.
+- A question: `?` asked, `·` not (under the threshold, or over the meal's 3); the axis (`что`,
+  `размер`, `сколько`, `или`); the model's guess in brackets, each other option with what it
+  changes (kcal, and protein when 10 g or more).
+- `=` the meal's total at the model's guesses; `!` the reader's flags.
+
+On the phone only the asked questions will be chips, and the values update on a tap instead of
+deltas.
+
+## The log entry
+
+What the tool writes for each request (`entry.json`, see the prompt doc): the lab's log entry
+(time, build, the request, the response with the raw answer) plus the inputs as given, the
+answer as read with its flags (`read`), and the processed meal (`processed`). `--replay`
+recomputes `read` and `processed` from the stored answer with the code as it is now.
 
 ## How we got here
 
@@ -231,12 +177,21 @@ Decisions in order, with what was set aside:
     one list; `responseJsonSchema` without limits; no dish size; `sizes` always present; named
     portions; pieces counted; the 3 kg / 3,000 kcal check; `title` only at the meal level; all of
     it eaten by me alone; no removed rows sent.
+12. **The model perceives, the code decides** (2026-11-23): the questions (3–8) leave the model.
+    It writes products with whole alternatives; the code splits them into the three questions
+    where they fit (4 survives, now derived), applies the threshold and the limit, and labels the
+    chips. The strict reader becomes forgiving; the meal so far is no longer sent; dishes are
+    named foods, for matching against history (grouping by plate was considered first, and set
+    aside: it names containers). v4's `sized_food`, `sizes` always present, `г` only of 1 and
+    dish servings are gone with the shapes that needed them.
 
 ## Open questions
 
-- **History:** past meals as examples for the model (prompt v3 sent "history matches"; prompt
-  v4 sends none yet): which rows, in what form.
-- **The meal screen:** rows with their chips and values, "none" shown as нет, × on a row (and
-  what it means now that removed rows aren't sent: likely just "not eaten", local).
-- **Totals across a weighed plate** split into rows may drift when one row's answer changes; the
-  prompt keeps a stated weight as one row.
+- **Choices tapped on the phone, and a new request.** With no meal sent back, a new answer may
+  differ where I already chose. One way: a tap becomes a small text in the context ("Вареники: с
+  творогом").
+- **History:** past meals as examples for the model, matched by dish name: which, in what form.
+- **The `why`:** questions show their axis ("что"), not the model's reason ("начинка"). A short
+  reason on each alternative would read better, for a few tokens.
+- **The meal screen** on this format: dishes with their products, asked questions as chips,
+  values updated on a tap.
