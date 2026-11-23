@@ -6,7 +6,7 @@
  *
  *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--model lite|flash|<id>] [--only p7,t3]
  *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute <n>] [--out <dir>]
- *     [--thinking minimal|low|medium|high]
+ *     [--thinking minimal|low|medium|high] [--thinking-budget <tokens>]
  *
  * Photo cases are skipped without --photos (the photos are personal, not in the repo).
  */
@@ -37,6 +37,8 @@ const { values: args } = parseArgs({
     out: { type: 'string', default: 'test-results/meal-bench' },
     /** minimal (Flash-Lite's default), low, medium, high; none sent by default. */
     thinking: { type: 'string' },
+    /** Thinking as a token budget (the Gemini 2.5 way), for a model that ignores the level. */
+    'thinking-budget': { type: 'string' },
   },
 });
 const key = process.env.GEMINI_API_KEY;
@@ -169,7 +171,11 @@ if (!model || !models.includes(model)) {
   process.exit(1);
 }
 PER_MINUTE = perMinute(model);
-log(`model: ${model}, thinking: ${args.thinking ?? 'the model’s default'}`);
+const thinking =
+  [args.thinking, args['thinking-budget'] && `budget ${args['thinking-budget']}`]
+    .filter(Boolean)
+    .join(', ') || 'the model’s default';
+log(`model: ${model}, thinking: ${thinking}`);
 
 // The cases -------------------------------------------------------------------------------------
 
@@ -267,7 +273,14 @@ async function run(c: Case): Promise<void> {
               responseMimeType: 'application/json',
               responseJsonSchema: MEAL_SCHEMA,
               // no temperature: Gemini 3 reasons worse away from its default
-              ...(args.thinking && { thinkingConfig: { thinkingLevel: args.thinking } }),
+              ...((args.thinking || args['thinking-budget']) && {
+                thinkingConfig: {
+                  ...(args.thinking && { thinkingLevel: args.thinking }),
+                  ...(args['thinking-budget'] && {
+                    thinkingBudget: Number(args['thinking-budget']),
+                  }),
+                },
+              }),
             },
           }),
         },
