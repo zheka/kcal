@@ -13,14 +13,22 @@ A row is one of:
   its own `unit` (name and size: a croissant plain 60 g / almond 90 g); `counts` is how many
   units.
 - `food`: a food whose size is chosen on its own. `products` are its kinds; `sizes` is how big
-  one is; `counts` is how many. Three ways, pick the one that says it:
-  - a menu size: `sizes` tall 350 / grande 470 ml, `counts` how many drinks;
-  - loose food as a named portion: `sizes` маленькая 150 / обычная 200 / большая 300 g,
-    `counts` 1;
-  - loose food by weight (a weight the user states, or a small amount like a sauce): `sizes` one
-    certain size `г` (or `мл`) of 1, `counts` the grams (or ml).
+  one is; `counts` is how many.
 - `dish`: a repeated assembly, counted in servings. `items` are its foods (never dishes), each
   with its amount per serving; `counts` is how many servings.
+
+**Size and count.** The size is how big one is; the count is how many. The amount is count ×
+size. Pick the row of this table that fits, and ask "how many" on `counts`, "how big" on the size:
+
+| What it is                                                                 | Size (one of it)                                                 | Count                |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------- |
+| Pieces: eggs, slices, cutlets, dumplings, cookies, a croissant             | `sized_food`, unit `шт.` (or `ломт.`) of its grams, one per kind | how many pieces: `3` |
+| A drink or dish in a menu size                                             | `food`, `sizes`: tall 350 / grande 470                           | how many drinks: `1` |
+| Loose food, the portion unknown (rice, soup, salad)                        | `food`, `sizes`: маленькая 150 / обычная 200 / большая 300       | `1`                  |
+| Loose food by weight: a stated weight, or a small amount (a sauce, butter) | `food`, `sizes`: one size `г` (or `мл`) of 1                     | the grams: `150`     |
+
+`г` and `мл` are only ever a size of 1. Pieces are always counted, also as parts of a dish: "3
+яйца" is 3 шт. of 50 g, never 150 g or "3 г".
 
 A product: `label` (the chip), `name` (the full name, shown as the row's name when chosen),
 `base` (g or ml; all kinds of a row have the same base), `per_100` (kcal, protein, fat, carbs,
@@ -76,12 +84,8 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
 7. Where a size goes: the size comes with the kind → `sized_food`, each kind with its size. The
    size is chosen on its own, the same for every kind (a menu size, a glass, a pizza's diameter, a
    portion of loose food) → `food` with `sizes`. A menu size that is a number of pieces (6 or 12
-   escargots) is a count.
-
-   Pieces are counted, never weighed: eggs, slices, cutlets, dumplings, sausages, cookies are a
-   count of pieces with the piece's size (`sized_food` with unit `шт.`), also as parts of a dish.
-   "3 яйца" is 3 шт., not 150 g; in home cooking the user knows the number, so a count question
-   when it's unclear (1 / 2 eggs). Grams only for loose food.
+   escargots) is a count. Pieces are counted (see Size and count); in home cooking the user
+   knows the number, so a count question when it's unclear (1 / 2 eggs).
 
 8. One base per row: when kinds would differ (soup in ml, a main in g), use g for all.
 

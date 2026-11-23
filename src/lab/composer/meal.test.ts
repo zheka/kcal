@@ -114,7 +114,7 @@ describe('readMeal', () => {
 });
 
 describe('readMeal, a piece labelled as the unit', () => {
-  it('is relabelled шт., the amount unchanged', () => {
+  it('is noted, and read as it is', () => {
     const eggs = {
       title: 'Омлет',
       items: [
@@ -129,8 +129,8 @@ describe('readMeal, a piece labelled as the unit', () => {
     };
     const read = readMeal(eggs);
     expect(read.problems).toEqual([]);
-    expect(read.notes).toEqual(['items[0].sizes: a size of 50 labelled as the unit, as шт.']);
-    expect(amountText(read.meal.items[0]!)).toBe('3 шт.');
+    expect(read.notes).toEqual(['items[0].sizes: a size of 50 labelled "г"']);
+    expect(amountText(read.meal.items[0]!)).toBe('3 г');
     expect(amounts(read.meal.items[0]!).amount).toBe(150);
   });
 });
