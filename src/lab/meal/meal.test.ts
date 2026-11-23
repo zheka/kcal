@@ -7,6 +7,7 @@ import {
   itemKey,
   process,
   questions,
+  budget,
   values,
 } from './process.ts';
 import { type Product, readMeal } from './read.ts';
@@ -183,7 +184,11 @@ describe('questions', () => {
     expect(answered(m, { [itemKey(0, 0)]: { count: '99' } }).total.kcal).toBeCloseTo(675);
   });
 
-  it('asks only what changes 80 kcal or 10 g protein, at most 3 in a meal, the largest first', () => {
+  it('has a budget of 8 % of the meal’s kcal, at least 15, at most 80', () => {
+    expect([budget(5), budget(500), budget(2000)]).toEqual([15, 40, 80]);
+  });
+
+  it('asks the largest first until what is left fits the budget, however many that is', () => {
     const p = (name: string, kcal: number) => ({
       name,
       base_unit: 'g',
@@ -195,11 +200,42 @@ describe('questions', () => {
       kcal_per_100_base_units: 100,
       alternatives: [{ name: `${name} 2`, kcal_per_100_base_units: 100 + kcal }],
     });
-    const out = process(
-      readMeal(meal(p('a', 50), p('b', 90), p('c', 200), p('d', 150), p('e', 100))).meal,
+    const asked = (...changes: number[]) =>
+      process(readMeal(meal(...changes.map((c, i) => p(`f${i}`, c)))).meal).dishes[0]!.items.map(
+        (i) => i.questions[0]!.asked,
+      );
+    // 500 kcal: a budget of 40; the rest as independent errors: √(30² + 25²) = 39
+    expect(asked(30, 25, 3, 2, 0)).toEqual([false, false, false, false, false]);
+    expect(asked(35, 25, 3, 2, 0)).toEqual([true, false, false, false, false]); // 43, then 25
+    // many small ones: √(5 × 20²) = 45 over 40, the 20s asked until the rest fits (√(4 × 20²) = 40)
+    expect(asked(20, 20, 20, 20, 20)).toEqual([true, false, false, false, false]);
+    // never under the minimum (15), however many: 10 snacks of 10 kcal, each ±14 (√ = 44 over 15)
+    const snack = (i: number) => ({
+      ...p(`s${i}`, 0),
+      base_units_in_piece: 10,
+      alternatives: [{ name: `s${i} 2`, kcal_per_100_base_units: 240 }],
+    });
+    const snacks = process(readMeal(meal(...Array.from({ length: 10 }, (_, i) => snack(i)))).meal);
+    expect(snacks.dishes[0]!.items.flatMap((i) => i.questions.map((q) => q.asked))).toEqual(
+      Array(10).fill(false),
     );
-    const asked = out.dishes[0]!.items.map((i) => i.questions[0]!.asked);
-    expect(asked).toEqual([false, false, true, true, true]);
+    // no cap: 6 large ones (600 kcal, a budget of 48), all asked
+    expect(asked(200, 150, 100, 90, 80, 60)).toEqual([true, true, true, true, true, true]);
+  });
+
+  it('asks about a coffee alone with milk or not', () => {
+    const coffee = raw({
+      name: 'Кофе черный',
+      base_unit: 'ml',
+      piece_count: 1,
+      piece_name: 'чашка',
+      base_units_in_piece: 250,
+      kcal_per_100_base_units: 2,
+      alternatives: [{ name: 'Кофе с молоком', kcal_per_100_base_units: 9 }], // 30 ml of milk
+    });
+    const q = process(readMeal(meal(coffee)).meal).dishes[0]!.items[0]!.questions[0]!;
+    expect(q.change).toBeCloseTo(17.5);
+    expect(q.asked).toBe(true);
   });
 });
 

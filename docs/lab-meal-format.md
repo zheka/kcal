@@ -124,9 +124,29 @@ by what it changes:
   changes two things, or kinds bring their own sizes while a size is also asked) the product
   gets **one question of whole products**. Why: the model's alternatives usually change one
   thing, as asked; when they don't, a whole-row choice still works.
-- **Asked** when an answer changes the product by **80+ kcal or 10+ g protein**; at most **3 in
-  a meal**, those that change the most. The rest are kept, not asked ("more"). Why: the
-  threshold from the examples (#49, #128); the limit keeps the chips few.
+- **Asked: the largest first, until what is left fits the meal's budget**, the budget being
+  **8 % of its kcal, at least 15 and at most 80** (at the model's guesses: 40 kcal in a 500-kcal
+  lunch, 15 for a coffee alone, 80 from 1,000 kcal up). Each question counts its largest change;
+  what is left counts as independent errors do, the root of the sum of squares (some guesses are
+  over, some under). A change under 15 kcal is never asked. No cap on the number. Why:
+  - **The budget, not a threshold per question.** A day can't be counted better than about 5–10
+    % whatever is asked: foods vary 10–20 % from their table values, labels may be about 20 % off,
+    careful weighing is 5–10 % off, a day's burn is known to about ±10 %. A question is worth a
+    tap only if what is left without it would be more than that. A flat 80 kcal or 10 g protein
+    (from the examples, #49, #128) left 9 of the bench's 20 meals asking nothing, the model's
+    alternatives being one step either way (S/M/L, ±2 dumplings, ±50 g: 40–70 kcal); and two
+    doubts each just under it (the p8 borscht's meat, 60, and its sour cream, 64) were never
+    asked though together 15 % of the meal.
+  - **As independent errors**, not a plain sum: a plain sum assumes every guess wrong the same
+    way, and a set of ten sushi, each ±15 kcal, would ask five questions of 15 kcal.
+  - **The minimum** lets a coffee alone ask about its milk (30 ml, 18 kcal) or sugar (a teaspoon,
+    20); and nothing smaller is worth a tap in any meal.
+  - **Kcal only:** what changes protein a lot changes kcal too.
+  - **No cap:** the budget bounds the questions by itself; a cap of 3 never bit on the bench.
+
+  On runs 5–6: 19 questions in 20 meals, at most 3 in one, 6 meals asking nothing (4 with no
+  alternatives at all).
+
 - **Labels** come from the difference: the words names share are dropped ("Вареники с
   картошкой" / "Вареники с творогом" → "с картошкой" / "с творогом"; a preposition stays with
   its word), a size's alias or grams, a count's number; amounts are added when labels would

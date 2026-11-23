@@ -2,8 +2,9 @@
  * What the code makes of a meal the model perceived (read.ts): each product's amount and values,
  * the meal's totals, and the questions worth asking. The model's alternatives are split into
  * independent questions where they fit (what it is, how big, how many), else kept whole (one
- * question of whole products); a question is worth asking when an answer changes the product by
- * THRESHOLD, and at most MAX_QUESTIONS are asked in a meal, the ones that change the most.
+ * question of whole products). Questions are asked largest first until what is left unasked fits
+ * the meal's budget (`budget`), combined as independent errors are (the root of the sum of
+ * squares: some guesses are over, some under); none under the budget's minimum is ever asked.
  */
 import { type Item, type Meal, type Product, sameName, samePer100 } from './read.ts';
 
@@ -17,9 +18,18 @@ export interface Values {
   water: number;
 }
 
-/** A change worth asking about: one of these, either way. */
-export const THRESHOLD = { kcal: 80, protein: 10 };
-export const MAX_QUESTIONS = 3;
+/**
+ * How much the questions left unasked may typically change a meal, in kcal: a share of the meal,
+ * at least `min` (a coffee alone: a splash of milk, 18 kcal, or a teaspoon of sugar, 20, is
+ * asked), at most `max` (asked in any meal). `min` is also the smallest change ever asked. Kcal
+ * only: what changes protein a lot changes kcal too. Why these: a day can't be counted better
+ * than about 5–10 % (docs/lab-meal-format.md).
+ */
+export const BUDGET = { share: 0.08, min: 15, max: 80 };
+
+/** The meal's budget, by its kcal at the model's guesses. */
+export const budget = (mealKcal: number): number =>
+  Math.min(BUDGET.max, Math.max(BUDGET.min, BUDGET.share * mealKcal));
 
 /** What an answer changes: `kind` what it is, `size` how big, `count` how many, `whole` all. */
 export type Axis = 'kind' | 'size' | 'count' | 'whole';
@@ -38,9 +48,10 @@ export interface Option {
 export interface Question {
   axis: Axis;
   options: Option[];
-  /** The largest change of an answer, in thresholds: 1 or more is worth asking. */
-  impact: number;
-  /** Asked: worth it and among the meal's MAX_QUESTIONS. */
+  /** The largest change of an answer, kcal either way. */
+  change: number;
+  /** Asked: left unasked, it and the smaller ones would typically change the meal by more than
+   * its budget. */
   asked: boolean;
 }
 
@@ -114,18 +125,19 @@ export function process(meal: Meal, language = 'ru'): Processed {
     const items = d.items.map((i) => processItem(i, u));
     return { name: d.name, items, values: items.reduce((s, i) => add(s, i.values), ZERO) };
   });
-  // the meal's most telling questions are asked, the rest kept for "more"
-  const all = dishes.flatMap((d) => d.items.flatMap((i) => i.questions));
-  all
-    .filter((q) => q.impact >= 1)
-    .sort((a, b) => b.impact - a.impact)
-    .slice(0, MAX_QUESTIONS)
-    .forEach((q) => (q.asked = true));
-  return {
-    title: meal.title,
-    dishes,
-    total: dishes.reduce((s, d) => add(s, d.values), ZERO),
-  };
+  const total = dishes.reduce((s, d) => add(s, d.values), ZERO);
+  // the largest first, until the rest fits the budget (as squares: independent errors)
+  const left = dishes
+    .flatMap((d) => d.items.flatMap((i) => i.questions))
+    .sort((a, b) => b.change - a.change);
+  let rest = left.reduce((s, q) => s + q.change ** 2, 0);
+  const most = budget(total.kcal);
+  for (const q of left) {
+    if (rest <= most ** 2 || q.change < BUDGET.min) break;
+    q.asked = true;
+    rest -= q.change ** 2;
+  }
+  return { title: meal.title, dishes, total };
 }
 
 function processItem(item: Item, u: { g: string; ml: string }): ProcessedItem {
@@ -197,15 +209,8 @@ function question(
   // natural order where there is one: small to large, counts ascending
   if (axis === 'size' || axis === 'count')
     options.sort((a, b) => a.values.amount - b.values.amount);
-  const impact = Math.max(
-    ...options.map((o) =>
-      Math.max(
-        Math.abs(o.delta.kcal) / THRESHOLD.kcal,
-        Math.abs(o.delta.protein) / THRESHOLD.protein,
-      ),
-    ),
-  );
-  return { axis, options, impact, asked: false };
+  const change = Math.max(...options.map((o) => Math.abs(o.delta.kcal)));
+  return { axis, options, change, asked: false };
 }
 
 /** The chips: only what tells the options apart; made unique by their amounts if need be. */

@@ -121,7 +121,7 @@ alternatives matter and asks; the model never judges whether a doubt is worth as
 11. **Names in full** (an alternative's too), units and aliases short, all in the answer
     language. Why: a chip's label is computed from the names' difference.
 
-**What v4's rules became:** the threshold (80+ kcal or 10+ g protein), "at most 3 questions",
+**What v4's rules became:** the threshold (now a share of the meal's kcal), "at most 3 questions",
 labels in words, the order of options, independent questions and "none" as an answer are now
 the code's (format doc, Processing); "updating a meal" is gone with the meal so far; size
 wrappers and `г` only of 1 are gone with the shapes.
