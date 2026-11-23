@@ -44,7 +44,7 @@ written by the model) is in git history up to commit 381aee4. Each decision belo
 meal    = { title, dishes: [dish] }
 dish    = { name, products: [product + alternatives] }
 product = { name, basis_unit, count, unit_name, amount_alias, unit_amount, per_100 }
-per_100 = { calories, protein_g, carbs_g, fat_g, water_g }
+per_100 = { calories, protein_g, carbs_g, fat_g, hydration_ml }
 ```
 
 - **A dish is a food as a menu or a food diary names it** ("Борщ", "Тефтели с картофелем",
@@ -61,7 +61,11 @@ per_100 = { calories, protein_g, carbs_g, fat_g, water_g }
   обычная). `basis_unit` (g or ml) comes before the amount, so it is decided before the number.
   Why: what the model writes anyway; `count` null for loose food leaves no slot to fill with a
   weight twice.
-- **Values per 100 g or ml as eaten**, water included (the app tracks it).
+- **Values per 100 g or ml as eaten**, and the water to drink in them (`hydration_ml`): from
+  drinks and soups, 0 for food. Why: the app's water nutrient is hydration (design.md, Water);
+  as `water_g` the model gave every food its water content (squid 75, waffles 22), which would
+  have filled the water bar with food. The name and the description carry the difference: the
+  field is the same number in the same place.
 - **Alternatives are whole products**, each as it would be if that reading were right: another
   food (cod / chicken / pork, another filling), another size, another count when pieces are
   hidden; one change per alternative. Why: "it could be X" is how the model thinks; it doesn't
@@ -143,7 +147,7 @@ How the tool and the bench show a meal (`view.ts`), for judging by reading:
   hold a `:`, so a line splits at its last `: `.
 - Numbers in one form, each with its unit:
   `<amount>g|ml, <kcal>kcal, <protein>p, <fat>f, <carbs>c, <water>w`; kcal, g and ml whole, the
-  rest to a tenth. The amount for a product only: a dish's or a meal's would add g to ml.
+  rest to a tenth. `w` is the water to drink (`hydration_ml`), ml. The amount for a product only: a dish's or a meal's would add g to ml.
 - A question: its axis (`что`, `размер`, `сколько`, `или`), then its answers in order (sizes and
   counts small to large). Another answer shows what it changes against the guess in the same
   form, signed, with only what changes, aligned within the question.

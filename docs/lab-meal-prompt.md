@@ -74,6 +74,12 @@ alternatives matter and asks; the model never judges whether a doubt is worth as
 - **Alternatives are complete products, one change each** (what it is, how big, or how many);
   an add-on that may not be there has an alternative of 0. Why: one change each is what lets the
   code split them into independent questions.
+- **`hydration_ml`: the water to drink**, from drinks and soups; food 0, a soup's sour cream
+  included, and so is a food or drink cooked into a food. Only what it means, no values: how much
+  water a drink gives is the model's to find, as kcal are. Why: the field was `water_g` and the
+  model gave food its water content; the app counts drinks and soups only (design.md, Water). In
+  run 3 the milk in an omelette got 44 ml (hence cooked-in), and with a list of values in the
+  prompt (coffee 99) a cappuccino got 99 where its milk makes it about 90.
 
 **The rules** (the numbers are the prompt's):
 

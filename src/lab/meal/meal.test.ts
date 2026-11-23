@@ -3,7 +3,7 @@ import { amountText, axisOf, distinctNames, process, questions, values } from '.
 import { type Product, readMeal } from './read.ts';
 import { changeText, textView } from './view.ts';
 
-const PER = { calories: 150, protein_g: 4, carbs_g: 26, fat_g: 3, water_g: 64 };
+const PER = { calories: 150, protein_g: 4, carbs_g: 26, fat_g: 3, hydration_ml: 0 };
 const raw = (over: Record<string, unknown> = {}) => ({
   name: 'Вареники с картошкой',
   basis_unit: 'g',
@@ -26,7 +26,7 @@ const product = (over: Partial<Product> = {}): Product => ({
   unit: 'шт.',
   alias: null,
   size: 45,
-  per_100: { kcal: 150, protein: 4, carbs: 26, fat: 3, water: 64 },
+  per_100: { kcal: 150, protein: 4, carbs: 26, fat: 3, water: 0 },
   ...over,
 });
 
@@ -69,6 +69,15 @@ describe('readMeal', () => {
     expect(flags.join('\n')).toMatch(/22500 g/);
   });
 
+  it('reads the water to drink, and an answer without it as 0, flagged', () => {
+    const borscht = raw({ basis_unit: 'ml', per_100: { ...PER, hydration_ml: 88 } });
+    expect(readMeal(meal(borscht)).meal.dishes[0]!.items[0]!.per_100.water).toBe(88);
+    const old = { calories: 150, protein_g: 4, carbs_g: 26, fat_g: 3, water_g: 64 }; // before it
+    const { meal: m, flags } = readMeal(meal(raw({ per_100: old })));
+    expect(m.dishes[0]!.items[0]!.per_100.water).toBe(0);
+    expect(flags).toEqual([expect.stringContaining('per_100.hydration_ml')]);
+  });
+
   it('never throws', () => {
     expect(readMeal(null).flags).toEqual(['the answer: not an object']);
     expect(readMeal({ dishes: 'x' }).meal.dishes).toEqual([]);
@@ -79,11 +88,11 @@ describe('questions', () => {
   const guess = product();
   const cottage = product({
     name: 'Вареники с творогом',
-    per_100: { kcal: 180, protein: 10, carbs: 24, fat: 5, water: 59 },
+    per_100: { kcal: 180, protein: 10, carbs: 24, fat: 5, water: 0 },
   });
   const cherry = product({
     name: 'Вареники с вишней',
-    per_100: { kcal: 120, protein: 3, carbs: 26, fat: 1, water: 69 },
+    per_100: { kcal: 120, protein: 3, carbs: 26, fat: 1, water: 0 },
   });
 
   it('tells what an alternative changes', () => {
@@ -162,12 +171,12 @@ describe('amounts', () => {
     const text = textView(process(readMeal(meal(raw({ alternatives: [{ count: 14 }] }))).meal));
     expect(text).toBe(
       [
-        '# Обед: 675kcal, 18p, 13.5f, 117c, 288w',
-        '## Вареники: 675kcal, 18p, 13.5f, 117c, 288w',
-        '- Вареники с картошкой — 10 шт. × 45 г: 450g, 675kcal, 18p, 13.5f, 117c, 288w',
+        '# Обед: 675kcal, 18p, 13.5f, 117c, 0w',
+        '## Вареники: 675kcal, 18p, 13.5f, 117c, 0w',
+        '- Вареники с картошкой — 10 шт. × 45 г: 450g, 675kcal, 18p, 13.5f, 117c, 0w',
         '  ? сколько',
         '    * 10',
-        '    ~ 14: +180g, +270kcal, +7.2p, +5.4f, +46.8c, +115.2w',
+        '    ~ 14: +180g, +270kcal, +7.2p, +5.4f, +46.8c',
       ].join('\n'),
     );
   });

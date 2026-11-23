@@ -10,6 +10,7 @@ export interface Per100 {
   protein: number;
   fat: number;
   carbs: number;
+  /** Water to drink (ml): from drinks and soups; 0 for food. The app's water nutrient. */
   water: number;
 }
 
@@ -81,7 +82,7 @@ export function readMeal(raw: unknown): { meal: Meal; flags: string[] } {
       protein: value('protein_g', 'protein'),
       fat: value('fat_g', 'fat'),
       carbs: value('carbs_g', 'carbs'),
-      water: value('water_g', 'water'),
+      water: value('hydration_ml', 'water'),
     };
   }
 

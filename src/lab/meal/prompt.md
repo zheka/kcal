@@ -19,6 +19,9 @@ the user; never judge whether a doubt is worth asking.
   (vareniki of a filling in doubt: "Вареники").
 - A product is one food or drink in a dish: its `name`, `basis_unit` (g, or ml for drinks and
   soups), its amount, its values per 100 g or ml as eaten (`per_100`), and its `alternatives`.
+- `hydration_ml` is the water a drink or a soup gives to drink, ml per 100. Food is 0: a soup's
+  sour cream, bread, fruit, a porridge; so is a food or drink cooked into a food (milk in an
+  omelette).
 
 **The amount.** Pieces are counted: `count` pieces of `unit_amount` each. Anything else is one
 `unit_amount`, with `count` null. Pick the line that fits:
@@ -152,7 +155,7 @@ The vareniki in full JSON (every alternative complete, with the per_100 of its o
       "unit_name": "шт.",
       "amount_alias": null,
       "unit_amount": 45,
-      "per_100": { "calories": 150, "protein_g": 4, "carbs_g": 26, "fat_g": 3, "water_g": 64 },
+      "per_100": { "calories": 150, "protein_g": 4, "carbs_g": 26, "fat_g": 3, "hydration_ml": 0 },
       "alternatives": [
         {
           "name": "Вареники с творогом",
@@ -161,7 +164,13 @@ The vareniki in full JSON (every alternative complete, with the per_100 of its o
           "unit_name": "шт.",
           "amount_alias": null,
           "unit_amount": 45,
-          "per_100": { "calories": 180, "protein_g": 10, "carbs_g": 24, "fat_g": 5, "water_g": 59 }
+          "per_100": {
+            "calories": 180,
+            "protein_g": 10,
+            "carbs_g": 24,
+            "fat_g": 5,
+            "hydration_ml": 0
+          }
         },
         {
           "name": "Вареники с вишней",
@@ -170,7 +179,13 @@ The vareniki in full JSON (every alternative complete, with the per_100 of its o
           "unit_name": "шт.",
           "amount_alias": null,
           "unit_amount": 45,
-          "per_100": { "calories": 160, "protein_g": 4, "carbs_g": 32, "fat_g": 1.5, "water_g": 61 }
+          "per_100": {
+            "calories": 160,
+            "protein_g": 4,
+            "carbs_g": 32,
+            "fat_g": 1.5,
+            "hydration_ml": 0
+          }
         },
         {
           "name": "Вареники с картошкой",
@@ -179,7 +194,13 @@ The vareniki in full JSON (every alternative complete, with the per_100 of its o
           "unit_name": "шт.",
           "amount_alias": null,
           "unit_amount": 45,
-          "per_100": { "calories": 150, "protein_g": 4, "carbs_g": 26, "fat_g": 3, "water_g": 64 }
+          "per_100": {
+            "calories": 150,
+            "protein_g": 4,
+            "carbs_g": 26,
+            "fat_g": 3,
+            "hydration_ml": 0
+          }
         }
       ]
     }

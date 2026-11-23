@@ -206,12 +206,13 @@ Agreed:
 
 Agreed:
 
-- **Water is counted by the water content of drinks**, as hydration and kidney-health guidance
-  count it: total fluid matters, coffee and tea included (their diuretic effect is small),
-  while sugary sodas are a matter of sugar, not fluid. Food is left out (its water, about 20%
-  of total intake, is covered by the margin in fluid targets).
-- **Water is a nutrient** (ml). Drink products carry a water value by their content: water
-  1 ml per ml, coffee and tea about 0.99, milk about 0.88.
+- **Water is counted by the water content of drinks and soups**, as hydration and
+  kidney-health guidance count it: total fluid matters, coffee and tea included (their diuretic
+  effect is small), while sugary sodas are a matter of sugar, not fluid; a soup's liquid is
+  drunk. Other food is left out (its water, about 20% of total intake, is covered by the margin
+  in fluid targets).
+- **Water is a nutrient** (ml). Drinks and soups carry a water value by their content: water
+  1 ml per ml, coffee and tea about 0.99, milk about 0.88, broth soups about 0.85–0.9.
 - **The water goal** is a target like the others (e.g. 2000 ml), and water has its own bar in
   the day chart, on its own scale (ml).
 - **No built-in foods** (agreed). Water is an ordinary product that a fresh start creates

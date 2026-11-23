@@ -31,7 +31,10 @@ const PER_100 = object(
     protein_g: number('protein, g per 100 basis_unit'),
     carbs_g: number('carbohydrates, g per 100 basis_unit'),
     fat_g: number('fat, g per 100 basis_unit'),
-    water_g: number('water, g per 100 basis_unit'),
+    hydration_ml: number(
+      'Water a drink or a soup gives to drink, ml per 100 basis_unit; 0 for food, and for a ' +
+        'food or drink cooked into a food (milk in an omelette).',
+    ),
   },
   { description: 'Values per 100 g or 100 ml of the product as eaten.' },
 );
