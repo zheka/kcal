@@ -14,16 +14,13 @@ export interface MealContext {
   now: Date;
   /** The meal as last answered, with the user's choices; null for a new meal. */
   meal: Meal | null;
-  /** Names of rows the user removed (×), so they don't come back. */
-  removed: readonly string[];
 }
 
-export function contextText({ language, now, meal, removed }: MealContext): string {
+export function contextText({ language, now, meal }: MealContext): string {
   return [
     `answer language: ${language}`,
     `time: ${now.toTimeString().slice(0, 5)}`,
     `meal so far: ${meal && meal.items.length > 0 ? JSON.stringify(meal) : 'none (a new meal)'}`,
-    `removed by the user: ${removed.length > 0 ? removed.map((r) => `"${r}"`).join(', ') : 'none'}`,
     '',
     'The input follows as separate parts, in the order given: texts, photos, and scanned ' +
       'products as JSON (Open Food Facts data, with their published values).',
@@ -32,9 +29,12 @@ export function contextText({ language, now, meal, removed }: MealContext): stri
 
 /** The last part of every request: what to check before answering. */
 export const CHECKLIST = `Before answering, check your answer against the rules:
-- Only the meal in focus; table condiments (bottles, dispensers) left out.
+- Only the meal in focus; table condiments (bottles, dispensers) left out; all of it eaten by the
+  user alone, no questions about leftovers or sharing.
 - Each kind of piece its own row; a plate or tray of separate foods is not a dish.
-- A kind question where a look-alike (meat, fish, filling) changes 80+ kcal or 10+ g protein; no
-  question under that, and none about what the input states.
+- Unsure what a food is: a kind question whose options are different foods (cod / chicken / pork).
+- No question under 80 kcal or 10 g protein, and none about what the input states: a stated
+  kind or amount has one option.
+- Loose food portions named (маленькая / обычная / большая), never grams the user can't know.
 - Amount = count × size: a weight in one place only; a dish's parts per serving.
 - Every question with options has a short why; chosen is one of its labels.`;

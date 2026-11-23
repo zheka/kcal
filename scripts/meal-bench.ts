@@ -35,8 +35,8 @@ const { values: args } = parseArgs({
     parallel: { type: 'string', default: '4' },
     'per-minute': { type: 'string' },
     out: { type: 'string', default: 'test-results/meal-bench' },
-    /** minimal (Flash-Lite's default), low, medium, high; none sent by default. */
-    thinking: { type: 'string' },
+    /** minimal (Flash-Lite's own default), low (ours: fast, thinks when it needs to), medium, high. */
+    thinking: { type: 'string', default: 'low' },
     /** Thinking as a token budget (the Gemini 2.5 way), for a model that ignores the level. */
     'thinking-budget': { type: 'string' },
   },
@@ -220,22 +220,10 @@ async function run(c: Case): Promise<void> {
   };
   const parts: Json[] = [];
   let meal: Meal | null = null;
-  const removed: string[] = [];
   for (const [i, step] of c.steps.entries()) {
     const label = c.steps.length > 1 ? `step ${i + 1}: ` : '';
     if (i > 0) out.push(`=== ${c.id}, step ${i + 1}`);
-    // the user's changes to the meal so far: rows removed, answers chosen
-    if (meal && step.remove) {
-      for (const name of step.remove) {
-        const index = meal.items.findIndex((r) => rowName(r).toLowerCase().includes(name));
-        if (index < 0) {
-          out.push(`  (no row "${name}" to remove)`);
-          continue;
-        }
-        removed.push(rowName(meal.items[index]!));
-        meal.items.splice(index, 1);
-      }
-    }
+    // the user's changes to the meal so far: answers chosen
     if (meal && step.choose) {
       for (const { row, question, pick } of step.choose) {
         const q = findQuestion(meal, row, question);
@@ -248,7 +236,6 @@ async function run(c: Case): Promise<void> {
     const given = [
       ...(step.texts ?? []).map((t) => `“${t}”`),
       ...(step.photos ?? []).map((p) => `[${p}]`),
-      ...(step.remove ?? []).map((r) => `× ${r}`),
       ...(step.choose ?? []).map((x) => `${x.row}: ${x.question} → ${x.pick}`),
     ];
     out.push(`--- ${label}${given.join(' ')}`);
@@ -257,7 +244,7 @@ async function run(c: Case): Promise<void> {
       const data = readFileSync(`${args.photos}/${p}`).toString('base64');
       parts.push({ inlineData: { mimeType: 'image/jpeg', data } });
     }
-    const context = contextText({ language: LANGUAGE, now: NOW, meal, removed });
+    const context = contextText({ language: LANGUAGE, now: NOW, meal });
     let response: Response;
     let body: string;
     let ms: number; // the answering try's, without waiting for a slot or retries

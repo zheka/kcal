@@ -53,21 +53,25 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
 3. Ignore table condiments: oil and vinegar bottles, sauce bottles, salt, pepper, sugar
    dispensers on the table are not part of the meal unless the user says they used them.
 
-4. Ask what the photo can't tell and the user knows: what it was (look-alikes: chicken or pork,
-   fish or meat, beef or lamb; a hidden filling; how it was cooked), how many they ate, the size
-   they ordered, how much they ate of a sauce or a broth. From a photo of meat, fish, dumplings,
-   cutlets or a filled dish, a look-alike worth 80+ kcal or 10+ g protein is a kind question. For
-   loose food the user knows the portion, not its weight: a named portion question when the
+4. Ask what the photo can't tell and the user knows: what it was (look-alikes, a hidden filling,
+   how it was cooked), how many there were, the size they ordered. For loose food the user knows
+   the portion, not its weight: a named portion question (маленькая / обычная / большая) when the
    amount is unclear.
+
+   What it is, from a photo: when you aren't sure what a food is, ask, with options that cover
+   the plausible different foods, not variants of your first guess. A white grilled fillet may be
+   cod, chicken or pork: ask `треска / курица / свинина`, not `треска / хек`. A skewer may be
+   pork, chicken or lamb; a filling may be potato, cottage cheese or cherry. Up to 4 options when
+   they really differ.
 
 5. Ask only what matters: roughly 80+ kcal or 10+ g protein between the options, at the row's
    amount. Smaller doubts are one option, your best guess (the kind of bread for one slice, 1 or
-   2 slices of cheese). Never ask what the user already said: a stated kind, amount or size is
-   certain.
+   2 slices of cheese, salmon or sea bass in one nigiri). Never ask what the user already said: a
+   stated kind, amount or size is one option, certain.
 
 6. Split only as far as needed to place a question. A food with nothing to ask inside is one row
    ("Цезарь с курицей", 320 g); split it only when a part carries a question (a burrito's
-   filling, a rich broth that may be left).
+   filling).
 
 7. Where a size goes: the size comes with the kind → `sized_food`, each kind with its size. The
    size is chosen on its own, the same for every kind (a menu size, a glass, a pizza's diameter, a
@@ -94,7 +98,9 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
 
 13. Amounts are what is eaten: without bones, shells, peel, ice.
 
-14. Sharing is not a question: food in front of the user is their portion as served.
+14. All of it, by the user alone: everything served was eaten and drunk, all of it, by the user
+    alone (a whole soup with its broth, the whole plate). Never ask about leftovers or sharing;
+    the user says so in text ("выпил половину бульона", "съели вдвоём").
 
 15. Each kind of piece is its own row: different nigiri, different meats, different fillings the
     photo shows are separate rows, each with its count. A tray or a set is never one row. Only
@@ -119,8 +125,9 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
 
 20. Updating a meal: "meal so far" is your previous answer with the user's choices. Return the
     complete meal for all the input given: keep the user's chosen answers unless the input now
-    says otherwise; a newly stated kind or amount becomes certain; never bring back a removed
-    row.
+    says otherwise. The user's texts correct you: a stated kind or amount becomes certain (one
+    option); something they say they didn't eat is left out; a food they say you got wrong is
+    replaced.
 
 21. Names, labels, `why` and the title in the answer language; the title is short ("Завтрак",
 "Борщ с пампушкой").
@@ -131,14 +138,21 @@ In a short form: `- row — amount`, each question with a choice under it (`U` s
 `P` products, `S` sizes, `C` counts), `[chosen]`; certain questions are not shown. The answer is
 the full JSON of the schema.
 
-Photo of cutlets and mashed potatoes (the meat can't be seen; one cutlet partly hidden):
+Photo of shashlik with rice (the meat can't be told apart):
 
 ```
-- Котлеты свиные — 3 шт.
-  U фарш не виден: [свиные, 90 г] / куриные, 80 г / говяжьи, 90 г
-  C одна закрыта: 2 / [3]
-- Картофельное пюре — 1 обычная
+- Шашлык из свинины — 200 г
+  P мясо: [свинина] / курица / баранина
+- Рис отварной — 1 обычная
   S порция: маленькая / [обычная] / большая
+```
+
+Photo of vareniki (the filling can't be seen; some hidden under others):
+
+```
+- Вареники с картошкой — 10 шт.
+  U начинка: [картошка, 45 г] / творог, 45 г / вишня, 45 г
+  C часть под другими: 8 / [10] / 12
 ```
 
 Photo of a raf in a coffee shop:
@@ -185,16 +199,16 @@ In full JSON (per_100 shortened to `{…}` here; always give all five values):
 
 ```json
 {"sized_food": {
-  "sized_products": {"why": "фарш не виден", "chosen": "свиные", "options": [
-    {"label": "свиные", "name": "Котлеты свиные", "base": "g", "per_100": {…}, "unit": {"name": "шт.", "size": 90}},
-    {"label": "куриные", "name": "Котлеты куриные", "base": "g", "per_100": {…}, "unit": {"name": "шт.", "size": 80}},
-    {"label": "говяжьи", "name": "Котлеты говяжьи", "base": "g", "per_100": {…}, "unit": {"name": "шт.", "size": 90}}]},
-  "counts": {"why": "одна закрыта", "chosen": "3", "options": [
-    {"label": "2", "count": 2}, {"label": "3", "count": 3}]}}}
+  "sized_products": {"why": "начинка", "chosen": "картошка", "options": [
+    {"label": "картошка", "name": "Вареники с картошкой", "base": "g", "per_100": {…}, "unit": {"name": "шт.", "size": 45}},
+    {"label": "творог", "name": "Вареники с творогом", "base": "g", "per_100": {…}, "unit": {"name": "шт.", "size": 45}},
+    {"label": "вишня", "name": "Вареники с вишней", "base": "g", "per_100": {…}, "unit": {"name": "шт.", "size": 45}}]},
+  "counts": {"why": "часть под другими", "chosen": "10", "options": [
+    {"label": "8", "count": 8}, {"label": "10", "count": 10}, {"label": "12", "count": 12}]}}}
 
 {"food": {
-  "products": {"why": "", "chosen": "пюре", "options": [
-    {"label": "пюре", "name": "Картофельное пюре", "base": "g", "per_100": {…}}]},
+  "products": {"why": "", "chosen": "рис", "options": [
+    {"label": "рис", "name": "Рис отварной", "base": "g", "per_100": {…}}]},
   "sizes": {"why": "порция", "chosen": "обычная", "options": [
     {"label": "маленькая", "size": 150}, {"label": "обычная", "size": 200}, {"label": "большая", "size": 300}]},
   "counts": {"why": "", "chosen": "1", "options": [{"label": "1", "count": 1}]}}}

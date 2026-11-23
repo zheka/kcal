@@ -8,8 +8,6 @@
 export interface Step {
   texts?: string[];
   photos?: string[];
-  /** Before this step: rows the user removed (×), by a part of the name, lower case. */
-  remove?: string[];
   /**
    * Before this step: answers the user picked, by a part of the row's name (lower case), the
    * question (`amount`: its sizes or counts, whichever is a choice), the first or last option.
@@ -98,7 +96,7 @@ export const CASES: Case[] = [
     id: 'p8',
     title: 'borscht with salo, pampushka, sour cream; a dark drink at the edge',
     expect:
-      'Борщ с мясом, сало ~5 ломтиков, пампушка, сметана (сколько съел?). Напиток у края не включён.',
+      'Борщ с мясом (вид мяса?), сало ~5 ломтиков, пампушка, сметана — всё съедено. Напиток у края не включён.',
     steps: [{ photos: ['food8.jpg'] }],
   },
   {
@@ -145,10 +143,10 @@ export const CASES: Case[] = [
   },
   {
     id: 't6',
-    title: 'pelmeni with sour cream, then "20 of them", sour cream removed',
+    title: 'pelmeni with sour cream, then "20 of them, no sour cream"',
     expect:
-      'Шаг 1: пельмени (вид? число — вопрос), сметана (сколько). Шаг 2: 20 шт. уверенно; сметана не вернулась.',
-    steps: [{ texts: ['пельмени со сметаной'] }, { remove: ['сметан'], texts: ['съел 20 штук'] }],
+      'Шаг 1: пельмени (вид? порция или число), сметана. Шаг 2: 20 шт. уверенно, сметаны нет.',
+    steps: [{ texts: ['пельмени со сметаной'] }, { texts: ['съел 20 штук, сметану не ел'] }],
   },
   {
     id: 't8',
@@ -166,7 +164,8 @@ export const CASES: Case[] = [
   {
     id: 't7',
     title: 'tonkotsu ramen',
-    expect: 'Блюдо: лапша (порция?), чашу, яйцо, бульон с вопросом «выпил».',
+    expect:
+      'Рамен целиком, как подан (всё съедено и выпито по умолчанию); вопрос разве что о размере порции.',
     steps: [{ texts: ['рамен тонкоцу'] }],
   },
 ];
