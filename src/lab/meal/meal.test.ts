@@ -215,8 +215,8 @@ describe('questions', () => {
     expect(at({ sizes: { 'Круассан миндальный': '130' } }).product.size).toBe(130);
   });
 
-  it('has a budget of 8 % of the meal’s kcal, at least 15, at most 80', () => {
-    expect([budget(5), budget(500), budget(2000)]).toEqual([15, 40, 80]);
+  it('has a budget of 12 % of the meal’s kcal, at least 15, at most 120', () => {
+    expect([budget(5), budget(500), budget(2000)]).toEqual([15, 60, 120]);
   });
 
   it('asks the largest first until what is left fits the budget, however many that is', () => {
@@ -239,18 +239,18 @@ describe('questions', () => {
       shown(meal(...changes.map((c, i) => p(`f${i}`, c)))).dishes[0]!.items.map(
         (i) => i.questions[0]!.asked,
       );
-    // 500 kcal: a budget of 40; the rest as independent errors: √(30² + 25²) = 39
-    expect(asked(30, 25, 3, 2, 0)).toEqual([false, false, false, false, false]);
-    expect(asked(35, 25, 3, 2, 0)).toEqual([true, false, false, false, false]); // 43, then 25
-    // many small ones: √(5 × 20²) = 45 over 40, the 20s asked until the rest fits (√(4 × 20²) = 40)
-    expect(asked(20, 20, 20, 20, 20)).toEqual([true, false, false, false, false]);
+    // 500 kcal: a budget of 60; the rest as independent errors: √(45² + 35²) = 57
+    expect(asked(45, 35, 3, 2, 0)).toEqual([false, false, false, false, false]);
+    expect(asked(50, 40, 3, 2, 0)).toEqual([true, false, false, false, false]); // 64, then 40
+    // many small ones: √(5 × 30²) = 67 over 60, the 30s asked until the rest fits (√(4 × 30²) = 60)
+    expect(asked(30, 30, 30, 30, 30)).toEqual([true, false, false, false, false]);
     // never under the minimum (15), however many: 10 snacks of 10 kcal, each ±14 (√ = 44 over 15)
     const snacks = shown(meal(...Array.from({ length: 10 }, (_, i) => p(`s${i}`, 140, 10))));
     expect(snacks.dishes[0]!.items.map((i) => i.questions[0]!.asked)).toEqual(
       Array(10).fill(false),
     );
-    // no cap: 6 large ones (600 kcal, a budget of 48), all asked
-    expect(asked(200, 150, 100, 90, 80, 60)).toEqual([true, true, true, true, true, true]);
+    // no cap: 6 large ones (600 kcal, a budget of 72), asked until the last (60) fits
+    expect(asked(200, 150, 100, 90, 80, 60)).toEqual([true, true, true, true, true, false]);
   });
 
   it('asks about a coffee alone with milk or not, and a size of what may not be there', () => {

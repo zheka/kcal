@@ -40,9 +40,10 @@ export interface Values {
  * at least `min` (a coffee alone: a splash of milk, 18 kcal, or a teaspoon of sugar, 20, is
  * asked), at most `max` (asked in any meal). `min` is also the smallest change ever asked. Kcal
  * only: what changes protein a lot changes kcal too. Why these: a day can't be counted better
- * than about 5–10 % (docs/lab-meal-format.md).
+ * than about 5–10 %, and a day's meals are independent errors too, so a meal may be off about
+ * twice that (docs/lab-meal-format.md).
  */
-export const BUDGET = { share: 0.08, min: 15, max: 80 };
+export const BUDGET = { share: 0.12, min: 15, max: 120 };
 
 /** The meal's budget, by its kcal at the model's guesses. */
 export const budget = (mealKcal: number): number =>

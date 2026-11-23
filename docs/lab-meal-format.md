@@ -155,8 +155,8 @@ questions.
 - **A question's change** is its largest at the model's guesses; for the size, the largest of
   any of the products' (whichever is chosen, its size question is the one shown).
 - **Asked: the largest first, until what is left fits the meal's budget**, the budget being
-  **8 % of its kcal, at least 15 and at most 80** (at the model's guesses: 40 kcal in a 500-kcal
-  lunch, 15 for a coffee alone, 80 from 1,000 kcal up). Each question counts its largest change;
+  **12 % of its kcal, at least 15 and at most 120** (at the model's guesses: 60 kcal in a 500-kcal
+  lunch, 15 for a coffee alone, 120 from 1,000 kcal up). Each question counts its largest change;
   what is left counts as independent errors do, the root of the sum of squares (some guesses are
   over, some under). A change under 15 kcal is never asked. No cap on the number. Why:
   - **The budget, not a threshold per question.** A day can't be counted better than about 5–10
@@ -167,6 +167,14 @@ questions.
     alternatives being one step either way (S/M/L, ±2 dumplings, ±50 g: 40–70 kcal); and two
     doubts each just under it (the p8 borscht's meat, 60, and its sour cream, 64) were never
     asked though together 15 % of the meal.
+  - **12 % a meal for 5–10 % a day.** A day's meals are independent errors too: with about four,
+    the day is off about half as much as each meal (√4). At 8 % and at most 80, run 8 (v6, every
+    guessed amount with its range) asked 56 questions in 20 meals, 6 in the busiest, leaving
+    ±3.4 % a meal unasked, about ±2 % a day: finer than counting can be. At 12 % and at most 120:
+    38, at most 4 a meal, ±7.7 % a meal, about ±4 % a day. The maximum matters as much as the
+    share: meals of 1,000 kcal and more were at it. Set aside: at most one amount question a
+    product (size or count): the doubt left unasked made the budget ask more of the others (57
+    questions, 7 in one meal) and left 8 meals over it.
   - **As independent errors**, not a plain sum: a plain sum assumes every guess wrong the same
     way, and a set of ten sushi, each ±15 kcal, would ask five questions of 15 kcal.
   - **The minimum** lets a coffee alone ask about its milk (30 ml, 18 kcal) or sugar (a teaspoon,
@@ -174,8 +182,8 @@ questions.
   - **Kcal only:** what changes protein a lot changes kcal too.
   - **No cap:** the budget bounds the questions by itself; a cap of 3 never bit on the bench.
 
-  On runs 5–6: 19 questions in 20 meals, at most 3 in one, 6 meals asking nothing (4 with no
-  alternatives at all).
+  On runs 5–6 (v5, at 8 %): 19 questions in 20 meals, at most 3 in one, 6 meals asking nothing
+  (4 with no alternatives at all). On run 8 (v6, at 12 %): 38, at most 4, 2 asking nothing.
 
 - **Labels** come from the difference: the words names share are dropped ("Вареники с
   картошкой" / "Вареники с творогом" → "с картошкой" / "с творогом"; a preposition stays with
@@ -269,7 +277,7 @@ Decisions in order, with what was set aside:
     way. Considered first: lists of other counts and sizes (an empty list was an easy way out,
     and "every likely one" lists every gram), an error in % (symmetric, but it leaves the code to
     invent the sizes and drops the menu's names), min and max of every value (nutrient ranges
-    the user can't answer). The budget (8 % of the meal, as independent errors) decides what is
+    the user can't answer). The budget (12 % of the meal, as independent errors) decides what is
     asked.
 
 ## Open questions
