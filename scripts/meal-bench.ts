@@ -5,7 +5,7 @@
  * reading. Answers and the whole output (run.log) are kept in test-results/meal-bench/.
  *
  *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--model lite|flash|<id>] [--only p7,t3]
- *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute 9] [--out <dir>]
+ *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute <n>] [--out <dir>]
  *
  * Photo cases are skipped without --photos (the photos are personal, not in the repo).
  */
@@ -32,7 +32,7 @@ const { values: args } = parseArgs({
     only: { type: 'string' },
     photos: { type: 'string' },
     parallel: { type: 'string', default: '4' },
-    'per-minute': { type: 'string', default: '9' },
+    'per-minute': { type: 'string' },
     out: { type: 'string', default: 'test-results/meal-bench' },
   },
 });
@@ -86,9 +86,12 @@ function why(err: unknown): string {
 
 /**
  * At most PER_MINUTE requests in any 60 s, retries included, across the cases run in parallel:
- * the free tier's quota is per minute, and going over it only earns 429s.
+ * the free tier's quota is per minute and per model, and going over it only earns 429s.
  */
-const PER_MINUTE = Number(args['per-minute']);
+let PER_MINUTE = 2; // until the model is known
+/** Under the free tier's quotas: Flash-Lite 15 a minute, Flash 5; others as Flash. */
+const perMinute = (model: string) =>
+  args['per-minute'] ? Number(args['per-minute']) : model.includes('flash-lite') ? 9 : 2;
 const sent: number[] = [];
 let turn = Promise.resolve();
 function slot(): Promise<void> {
@@ -108,13 +111,14 @@ function call(url: string, init: RequestInit = {}, label = '') {
   return withRetries(
     async () => {
       await slot();
+      const sentAt = Date.now();
       const response = await fetch(url, {
         ...init,
         headers: { 'content-type': 'application/json', 'x-goog-api-key': key! },
       });
       const body = await response.text();
       if (BUSY.includes(response.status)) throw new Busy(response.status, body);
-      return { response, body };
+      return { response, body, ms: Date.now() - sentAt };
     },
     {
       delays: RETRY_DELAYS_MS,
@@ -161,6 +165,7 @@ if (!model || !models.includes(model)) {
   log(`No model ${model ?? args.model}; this key has:\n  ${models.join('\n  ')}`);
   process.exit(1);
 }
+PER_MINUTE = perMinute(model);
 log(`model: ${model}`);
 
 // The cases -------------------------------------------------------------------------------------
@@ -196,14 +201,20 @@ const stats: Stats = {
   notes: 0,
 };
 
-/** Runs a case, step by step, and returns its report (printed whole, so cases don't mix). */
-async function run(c: Case): Promise<string> {
+/** Runs a case, step by step, logging each step's report as soon as it has its answer. */
+async function run(c: Case): Promise<void> {
   const out = [`=== ${c.id}: ${c.title}`, `expect: ${c.expect}`];
+  // a step's lines, logged together so that cases running at once don't mix
+  const flush = () => {
+    log(`${out.join('\n')}\n`);
+    out.length = 0;
+  };
   const parts: Json[] = [];
   let meal: Meal | null = null;
   const removed: string[] = [];
   for (const [i, step] of c.steps.entries()) {
     const label = c.steps.length > 1 ? `step ${i + 1}: ` : '';
+    if (i > 0) out.push(`=== ${c.id}, step ${i + 1}`);
     // the user's changes to the meal so far: rows removed, answers chosen
     if (meal && step.remove) {
       for (const name of step.remove) {
@@ -238,11 +249,11 @@ async function run(c: Case): Promise<string> {
       parts.push({ inlineData: { mimeType: 'image/jpeg', data } });
     }
     const context = contextText({ language: LANGUAGE, now: NOW, meal, removed });
-    const started = Date.now();
     let response: Response;
     let body: string;
+    let ms: number; // the answering try's, without waiting for a slot or retries
     try {
-      ({ response, body } = await call(
+      ({ response, body, ms } = await call(
         `${API}/models/${model}:generateContent`,
         {
           method: 'POST',
@@ -261,13 +272,12 @@ async function run(c: Case): Promise<string> {
     } catch (err) {
       stats.problems++;
       out.push(`gave up: ${why(err)}`);
-      return out.join('\n');
+      return flush();
     }
-    const ms = Date.now() - started;
     if (!response.ok) {
       stats.problems++;
       out.push(`FAILED: ${why(new Busy(response.status, body))}`);
-      return out.join('\n');
+      return flush();
     }
     const reply = JSON.parse(body);
     const candidate = reply.candidates?.[0];
@@ -292,7 +302,7 @@ async function run(c: Case): Promise<string> {
     } catch {
       stats.problems++;
       out.push(`NOT JSON: ${text.slice(0, 500)}`);
-      return out.join('\n');
+      return flush();
     }
     const read = readMeal(raw);
     stats.notes += read.notes.length;
@@ -300,12 +310,12 @@ async function run(c: Case): Promise<string> {
     if (read.problems.length) {
       stats.problems++;
       out.push(`PROBLEMS (the lab would reject it): ${read.problems.join('; ')}`);
-      return out.join('\n');
+      return flush();
     }
     meal = read.meal;
     out.push(screenForm(meal));
+    flush();
   }
-  return out.join('\n');
 }
 
 /**
@@ -331,7 +341,7 @@ const queue = [...cases];
 const started = Date.now();
 await Promise.all(
   Array.from({ length: Number(args.parallel) }, async () => {
-    for (let c = queue.shift(); c; c = queue.shift()) log(`${await run(c)}\n`);
+    for (let c = queue.shift(); c; c = queue.shift()) await run(c);
   }),
 );
 log(
