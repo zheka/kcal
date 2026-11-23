@@ -53,8 +53,8 @@ export function contextText(language: string, now: Date): string {
 /** The last part of every request: what to check before answering. */
 export const CHECKLIST = `Before answering, check:
 - Only the meal in focus; table condiments left out; all of it eaten by the user alone.
-- Dishes named as a menu or a food diary would, the same each time; never a plate, cup or
-  board, the meal, an amount or a doubt; bread, a drink, a dessert are dishes of their own.
+- Dishes named as a menu or a food diary would, by their plainest usual name; never a plate,
+  cup or board, the meal, an amount or a doubt; bread, a drink, a dessert are dishes of their own.
 - Each kind of piece its own product; pieces counted (3 eggs: piece_count 3, base_units_in_piece
   50).
 - base_units_in_piece is one piece, or the whole amount when piece_count is null: never a total

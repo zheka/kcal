@@ -44,9 +44,11 @@ lab's meal screen runs on it.** `src/lab/meal/`: `schema.ts` (what the model ans
 meal    = { title, dishes: [dish] }
 dish    = { name, products: [product] }
 product = { name, base_unit,
-            piece_count, fewer_piece_count, more_piece_count, piece_name,
+            piece_count, fewer_piece_count, more_piece_count,
             size, values, alternative_products: [{ name, size, values }] }
-size    = base_units_in_piece, smaller_base_units_in_piece, larger_base_units_in_piece
+size    = piece_size_name, base_units_in_piece,
+          smaller_piece_size_name, smaller_base_units_in_piece,
+          larger_piece_size_name, larger_base_units_in_piece
 values  = kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100_base_units,
           fat_g_per_100_base_units, hydration_ml_per_100_base_units
 ```
@@ -68,19 +70,21 @@ values  = kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100
   says `_per_100_base_units` as it is written; the code still keeps them as `per_100`.
 - **The amount** is `piece_count` × `base_units_in_piece` for pieces (eggs, slices, dumplings,
   drinks), else `base_units_in_piece` alone with `piece_count` null (loose food, a stated weight:
-  one piece). `piece_name` is the piece's usual short name (шт., ломт., стакан), or null.
-  `base_unit` (g or ml) comes before the amount, so it is decided before the number. Why: what
-  the model writes anyway; `piece_count` null for loose food leaves no slot to fill with a
-  weight twice. The three
-  are named after the piece so they read as one thing, apart from `base_unit` (they were `count`,
-  `unit_name`, `amount_alias`, `unit_amount`: "unit" meant both).
+  one piece). `piece_size_name` is a size's name from a menu or a package (M, grande, 0,5), or
+  null. `base_unit` (g or ml) comes before the amount, so it is decided before the number. Why:
+  what the model writes anyway; `piece_count` null for loose food leaves no slot to fill with a
+  weight twice. The fields are named after the piece so they read as one thing, apart from
+  `base_unit` (they were `count`, `unit_name`, `amount_alias`, `unit_amount`: "unit" meant
+  both). A piece has no name (it had `piece_name`: шт., ломт., стакан): next to the count and
+  the size it often read wrong ("1 стакан M"), and the count alone says it (`2 × 50г`).
 - **Values in 100 base units as eaten**, and the water to drink in them
   (`hydration_ml_per_100_base_units`): from drinks and soups, 0 for food, at most 100. Why: the
   app's water nutrient is hydration (design.md, Water); as `water_g` the model gave every food
   its water content (squid 75, waffles 22), which would have filled the water bar with food.
 - **How sure, next to each number:** the fewest and the most pieces (`fewer_piece_count`,
   `more_piece_count`), when pieces are hidden or hard to count; the smallest and the largest a
-  piece likely is (`smaller_…`, `larger_…`), or the next sizes on the menu; 0 as the smallest or fewest for an add-on that may not be there. null when stated,
+  piece likely is (`smaller_…`, `larger_…`, with their size names), or the next sizes on the
+  menu; 0 as the smallest or fewest for an add-on that may not be there. null when stated,
   weighed, a package or in plain view. Why: as whole alternative products (v5), amounts got few
   alternatives and those one way: 15 of 62 products on runs 5–6, 28 of 150+ kcal with none
   (salo, bacon, meatballs, a croissant guessed from a photo), and steak 200 → 250 g only, never
@@ -92,15 +96,14 @@ values  = kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100
   of their own (rule 10: one per product). Why: "it could be X" is how the model thinks about
   what a food is; with sizes and counts in their own fields, an alternative product is only
   that, and the code no longer has to work out what each one changed.
-- **Examples in English, the answer in the answer language.** Why: the model copied example words: Russian portions ("большая") came out
+- **Examples in English, the answer in the answer language**; a size name as on the menu (S, M,
+  grande). Why: the model copied example words: Russian portions ("большая") came out
   uninflected next to masculine names; and the lab asks in other languages too.
-- **No words to copy for piece names; no size names.** A piece has its usual short name, or
-  null, and the amount is then the count alone (`2 × 50г`); no examples of it. A size has no
-  name: the code labels it by its amount (`45 г`). Why: with English examples (pc., cup, small,
-  large, portion) the first v6 runs answered "1 cup M × 250 мл", "20 pc. × 10 г" and sizes
-  "small" / "large" in a Russian answer; and an amount tells a size apart better than "small"
-  does. Size names were kept for a menu's or a package's (M, grande, 0,5) until they too read
-  wrong next to the piece's name and count (`1 стакан M`), so they went too.
+- **No words to copy for sizes, and no piece names.** A size has a name only from a menu or a
+  package; any other is null, and the code labels it by its amount (`45 г`). A piece has no
+  name: the amount is the count alone (`2 × 50г`). No examples of size names. Why: with English examples (pc., cup, small, large, portion) the first v6 runs answered
+  "1 cup M × 250 мл", "20 pc. × 10 г" and sizes "small" / "large" in a Russian answer; and an
+  amount tells a size apart better than "small" does.
 - **Nothing about what matters.** The schema and the prompt say what the model perceives, never
   that something decides after it. Why: the model has no use for knowing; v5's "the app decides
   what to ask" was there to stop it filtering its doubts, which the bounds' own slots now do.
@@ -125,7 +128,7 @@ slip in one product shouldn't cost a meal.
   none.
 - **Dropped:** a product with no `base_units_in_piece`, a dish left empty, an alternative
   product named as one before it, a bound on the wrong side of its guess (a smaller over it),
-  a count's bounds when there is no count.
+  a size name with no size, a count's bounds when there is no count.
 - **Kept but flagged:** kcal that don't match the macros (4·P + 4·C + 9·F, off by more than 30
   %), more than 105 g in 100 g, a product over 3 kg or 3,000 kcal (the model multiplying twice: a
   weight as both count and size), a count of 0.
@@ -184,7 +187,7 @@ questions.
 
 - **Labels** come from the difference: the words names share are dropped ("Вареники с
   картошкой" / "Вареники с творогом" → "с картошкой" / "с творогом"; a preposition stays with
-  its word), a size's grams, a count's number; amounts are added when labels would
+  its word), a size's name or grams, a count's number; amounts are added when labels would
   repeat.
 - **Order:** sizes and counts small to large; products as the model gave them, most likely
   first.
@@ -196,7 +199,7 @@ How the tool and the bench show a meal (`view.ts`), for judging by reading:
 ```
 # Обед: 736kcal, 18.8p, 19.5f, 118c, 309.6w
 ## Вареники: 736kcal, 18.8p, 19.5f, 118c, 309.6w
-- Вареники с картошкой — 10 шт. × 45г: 450g, 675kcal, 18p, 13.5f, 117c, 288w
+- Вареники с картошкой — 10 × 45г: 450g, 675kcal, 18p, 13.5f, 117c, 288w
   ? что
     * с картошкой
     ~ с творогом: +135kcal, +27p, +4.5f, -3c, -20w

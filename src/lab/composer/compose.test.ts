@@ -41,7 +41,7 @@ describe('the update request', () => {
     const request = updateRequest(m, NOW, 'ru');
     expect(request).toMatchObject({
       model: SETTINGS.model,
-      instructions: expect.stringContaining('You are the food-recognition step'),
+      instructions: expect.stringContaining('You recognize what was eaten'),
       config: { schema: MEAL_SCHEMA, thinking: SETTINGS.thinking },
     });
     const [context, ...rest] = request.content;

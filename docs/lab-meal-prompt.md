@@ -67,17 +67,23 @@ entry records them with the request.
 ## The rules, and why
 
 Prompt v6 is about perceiving only. The `<role>` says what the model does (what was eaten, how
-much, how far off, what else it may be) and nothing of what comes after it. Why: v5's role said
-"the app decides which alternatives matter", to stop the model filtering its doubts; the
-model has no use for knowing, and the bounds' own slots now ask for every doubt.
+much, how far off, what else it may be) and what for (the user's nutrition tracking), and
+nothing of what comes after it: not a step of something, not what the app does with the answer.
+Why: v5's role said "the app decides which alternatives matter", to stop the model filtering
+its doubts; the model has no use for knowing, and the bounds' own slots now ask for every
+doubt. The whole prompt, the checklist and the schema were audited for this (2026-11-23): what
+the model can't perceive or check was taken out (see the dish names below, and the examples).
 
 **The format section:**
 
-- **Dishes are named foods**, as a menu or a food diary names them, the same each time, without
-  containers, the meal, amounts or doubts; a food of its own is a dish of its own. Why: the
-  names are for matching against history (see the format doc).
-- **The amount, as a table**: pieces counted (`piece_count` × one piece), menu sizes and
-  packages as pieces, loose food and stated weights as one `base_units_in_piece` with
+- **Dishes are named foods**, as a menu or a food diary names them, by their plainest usual
+  name, without containers, the meal, amounts or doubts; a food of its own is a dish of its own.
+  Why: the names are for matching against history later (see the format doc). The prompt said so
+  and asked for "the same name each time", but the model never sees its earlier answers, so it
+  can't keep names the same; the plainest usual name is what it can do that makes names match
+  most often. Matching itself is for the code, or for past names sent as input.
+- **The amount, as a table**: pieces counted (`piece_count` × one piece), menu sizes
+  (`piece_size_name`), loose food and stated weights as one `base_units_in_piece` with
   `piece_count` null. Never a weight in two
   places. Why: a table of plain cases worked in v4 where prose was mixed up (eggs weighed, "3
   г"); the 72,000 kcal omelette was a weight written twice.
@@ -88,9 +94,9 @@ model has no use for knowing, and the bounds' own slots now ask for every doubt.
 - **Alternative products** are other foods only, at the same count, with their own size, range
   and values. Why: amounts have their own fields.
 - **Examples and the schema's examples in English**, names in the answer language, a size name
-  as on the menu; no words at all for piece names and sizes (the table says "its usual name, or
-  null"). Why: Russian example words were copied uninflected ("большая" next to a masculine
-  name), and English ones untranslated ("cup", "pc.", "small"): see the format doc.
+  as on the menu; no words at all for sizes, and no piece names. Why: Russian example words
+  were copied uninflected ("большая" next to a masculine name), and English ones untranslated
+  ("cup", "pc.", "small"): see the format doc.
 - **`hydration_ml_per_100_base_units`: the water to drink**, from drinks and soups; food 0, a
   soup's sour cream included, and so is a food or drink cooked into a food. Only what it means,
   no values: how much water a drink gives is the model's to find, as kcal are. Why: the field was
@@ -130,8 +136,8 @@ model has no use for knowing, and the bounds' own slots now ask for every doubt.
 9. **Amounts are what is eaten** (no bones, shells, peel, ice); cooking fat is part of the food.
 10. **One `base_unit` per product, its alternative products included**, g when they'd differ (#40,
     #502). Why: the code compares their values.
-11. **Names in full** (an alternative product's too), piece names short, in the answer
-    language. Why: a chip's label is computed from the names' difference.
+11. **Names in full** (an alternative product's too), size names short, in
+    the answer language. Why: a chip's label is computed from the names' difference.
 
 **What v4's rules became:** the threshold (now a share of the meal's kcal), "at most 3 questions",
 labels in words, the order of options, independent questions and "none" as an answer are now
@@ -140,14 +146,30 @@ wrappers and `г` only of 1 are gone with the shapes.
 
 ## Examples
 
-Short examples in a short form (`## dish`, `- product — amount (smaller – larger)`, a count
-as `(fewest – most)`, alternative products under it with `|`), then one dish in full JSON, all in
-English. Why: Google recommends always including examples; Flash-Lite
+Examples of how fields are filled for common inputs, each only the fields its input decides,
+as JSON fragments; one of how a meal splits into dishes, products by name only; then one dish
+in full JSON, all in English. Why: Google recommends always including examples; Flash-Lite
 follows examples more than rules (in v4 a stated-milk rule failed in every run until an example
 showed it).
 
-**The examples are foods the tests don't have** (shashlik with rice, vareniki, a cappuccino on
-almond milk with a muffin, boiled eggs and toasts with butter, cottage cheese). Why: Flash-Lite
+**In the schema's own terms, not a short form.** The examples were in a short text form
+(`- product — amount (smaller – larger)`), cheaper than JSON but the app's text view's
+notation: the model had to map it back to fields, and display choices leaked into the input (`1
+M × 300 ml`, from before size names and amounts were shown as they are now). Fragments say which
+field gets what, need no notation of their own, and don't change when the display does; the
+schema makes every field required, so fragments don't invite partial answers. A few hundred
+tokens more than the short form.
+
+**The cappuccino has no size names.** It said `1 M × 300 ml (S, 200 ml – L, 400 ml)` for the
+text "almond milk cappuccino", where no menu names a size: against the rule that a size has a
+name only from a menu or a package. In p3 (a tool run, 2026-11-23) a café cappuccino photo
+got M, S and L, likely from it. It stays for what it shows (a stated kind: no alternative
+products; an unstated size: a range), now with no names, and **"grande hot chocolate"** shows
+a size named by the input: stated, so no range.
+
+**The examples are foods the tests don't have** (a hot chocolate, a cappuccino on almond
+milk, boiled eggs, rice, shashlik, oatmeal with honey, toasts with butter, cottage cheese,
+vareniki). A latte (t1, t8) and tea with sugar (t3) are in the tests, so they aren't here. Why: Flash-Lite
 copies examples: in v4 a meatball example gave a photo's meatballs the example's words and
 sizes, and a cutlet example turned meatballs into "котлеты".
 
