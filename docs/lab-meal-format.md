@@ -123,25 +123,36 @@ by what it changes:
 How the tool and the bench show a meal (`view.ts`), for judging by reading:
 
 ```
-gemini-3.5-flash-lite, 3.4 s, tokens in 2100 out 900 thinking 0, stop end
-# Обед
-## Вареники — 736 kcal
-- Вареники с картошкой — 10 шт. × 45 г (450: 675 kcal · 18 P · 13.5 F · 117 C)
-  ? что: [с картошкой] / с творогом (+135, +27 P)
-  ? сколько: [10] / 12 (+135)
-- Сметана 20 % — обычно, 30 г (30: 61 kcal · 0.8 P · 6 F · 1 C)
-= 736 kcal · 18.8 P · 19.5 F · 118 C
+# Обед: 736kcal, 18.8p, 19.5f, 118c, 309.6w
+## Вареники: 736kcal, 18.8p, 19.5f, 118c, 309.6w
+- Вареники с картошкой — 10 шт. × 45 г: 450g, 675kcal, 18p, 13.5f, 117c, 288w
+  ? что
+    * с картошкой
+    ~ с творогом: +135kcal, +27p, +4.5f, -3c, -20w
+  ? сколько
+    * 10
+    ~ 12: +90g, +135kcal, +3.6p, +2.7f, +23.4c, +57.6w
+- Сметана 20 % — обычно, 30 г: 30g, 61kcal, 0.8p, 6f, 1c, 21.6w
 ! dishes[0].products[1]: …
 ```
 
-- A product: its name, the amount as said, then in brackets its total g or ml and its values.
-- A question: `?` asked, `·` not (under the threshold, or over the meal's 3); the axis (`что`,
-  `размер`, `сколько`, `или`); the model's guess in brackets, each other option with what it
-  changes (kcal, and protein when 10 g or more).
-- `=` the meal's total at the model's guesses; `!` the reader's flags.
+- A line's kind by its first mark: `#` the meal, `##` a dish, `-` a product, `?` a question,
+  `*` the model's guess, `~` another answer, `!` a note (the reader's flags).
+- A line is words, then after `: ` its numbers, if it has any: what stays words on the phone
+  (names, the amount as said, chip labels) apart from what would be a chart. The numbers never
+  hold a `:`, so a line splits at its last `: `.
+- Numbers in one form, each with its unit:
+  `<amount>g|ml, <kcal>kcal, <protein>p, <fat>f, <carbs>c, <water>w`; kcal, g and ml whole, the
+  rest to a tenth. The amount for a product only: a dish's or a meal's would add g to ml.
+- A question: its axis (`что`, `размер`, `сколько`, `или`), then its answers in order (sizes and
+  counts small to large). Another answer shows what it changes against the guess in the same
+  form, signed, with only what changes, aligned within the question.
+- Only the questions asked are shown: the rest aren't worth asking (under the threshold, or over
+  the meal's 3).
 
-On the phone only the asked questions will be chips, and the values update on a tap instead of
-deltas.
+With `--verbose` the tool's and the bench's stats on stderr: the model, time, tokens, and how
+many questions there were and were asked. On the phone the values update on a tap instead of
+changes.
 
 ## The log entry
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { amountText, axisOf, distinctNames, process, questions, values } from './process.ts';
 import { type Product, readMeal } from './read.ts';
-import { textView } from './view.ts';
+import { changeText, textView } from './view.ts';
 
 const PER = { calories: 150, protein_g: 4, carbs_g: 26, fat_g: 3, water_g: 64 };
 const raw = (over: Record<string, unknown> = {}) => ({
@@ -150,15 +150,24 @@ describe('amounts', () => {
     expect(distinctNames(['Рис', 'Рис'])).toEqual(['Рис', 'Рис']);
   });
 
+  it('shows a change by what changes, rounded as values are', () => {
+    const d = { amount: 0, kcal: 40.4, protein: -0.75, fat: 0.04, carbs: 0, water: 0 };
+    expect(changeText(d, 'g')).toBe('+40kcal, -0.8p');
+    expect(changeText({ ...d, amount: -70 }, 'ml')).toBe('-70ml, +40kcal, -0.8p');
+    expect(changeText({ ...d, amount: -70 })).toBe('+40kcal, -0.8p');
+    expect(changeText({ ...d, kcal: 0.2, protein: 0 })).toBe('');
+  });
+
   it('shows a meal as text', () => {
     const text = textView(process(readMeal(meal(raw({ alternatives: [{ count: 14 }] }))).meal));
     expect(text).toBe(
       [
-        '# Обед',
-        '## Вареники — 675 kcal',
-        '- Вареники с картошкой — 10 шт. × 45 г (450: 675 kcal · 18 P · 13.5 F · 117 C)',
-        '  ? сколько: [10] / 14 (+270)',
-        '= 675 kcal · 18 P · 13.5 F · 117 C',
+        '# Обед: 675kcal, 18p, 13.5f, 117c, 288w',
+        '## Вареники: 675kcal, 18p, 13.5f, 117c, 288w',
+        '- Вареники с картошкой — 10 шт. × 45 г: 450g, 675kcal, 18p, 13.5f, 117c, 288w',
+        '  ? сколько',
+        '    * 10',
+        '    ~ 14: +180g, +270kcal, +7.2p, +5.4f, +46.8c, +115.2w',
       ].join('\n'),
     );
   });

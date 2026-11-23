@@ -30,7 +30,7 @@ export interface Option {
   product: Product;
   values: Values;
   /** Against the model's guess. */
-  delta: { kcal: number; protein: number };
+  delta: Values;
   /** The model's guess. */
   chosen: boolean;
 }
@@ -75,6 +75,17 @@ export function add(a: Values, b: Values): Values {
     fat: a.fat + b.fat,
     carbs: a.carbs + b.carbs,
     water: a.water + b.water,
+  };
+}
+
+export function subtract(a: Values, b: Values): Values {
+  return {
+    amount: a.amount - b.amount,
+    kcal: a.kcal - b.kcal,
+    protein: a.protein - b.protein,
+    fat: a.fat - b.fat,
+    carbs: a.carbs - b.carbs,
+    water: a.water - b.water,
   };
 }
 
@@ -179,7 +190,7 @@ function question(
       label: labels[i]!,
       product: p,
       values: v,
-      delta: { kcal: v.kcal - base.kcal, protein: v.protein - base.protein },
+      delta: subtract(v, base),
       chosen: i === 0,
     };
   });
