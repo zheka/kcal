@@ -71,14 +71,17 @@ entries as a JSON array, oldest first. No key, no image data, no meals.
 
 ## Next steps
 
-- **The meal format** with choices, replacing prompt v3's `parameters`: agreed in discussion, in
-  [lab-meal-format.md](lab-meal-format.md); 1,000 example meals in it in
-  [lab-meal-examples.md](lab-meal-examples.md); what the prompt must say in
-  [lab-meal-prompt.md](lab-meal-prompt.md). Next: implement it, with a new prompt.
-- **The prompt for whole-context updates.** Prompt v3 was written for "meal so far + new input".
-  Now the whole context is sent with the meal so far as it is, so an item from removed context
-  (a removed photo of bread) likely stays. Try sending only the user's choices (amounts, variants,
-  by item name), so what the context no longer supports disappears; or rework the prompt.
+- **The meal format with choices, and prompt v4**: in code and tested on the bench
+  (`scripts/meal-bench.ts`), not yet on the meal screen. The format and why each part is so:
+  [lab-meal-format.md](lab-meal-format.md); the model's settings, the prompt's rules and why, the
+  bench and its results: [lab-meal-prompt.md](lab-meal-prompt.md). Next: the meal screen on the
+  new format (rows with chips and their kcal and macros, updated on a tap), requests with prompt
+  v4 at low thinking and no temperature, the old `parameters` (types.ts, answer.ts, recompute.ts,
+  prompt-v3.txt) removed.
+- **What still breaks without thinking** (see lab-meal-prompt.md, What's left): a stated kind
+  in an update, kinds invented for vague input, a weighed plate split. An example of each, or
+  `medium` thinking for updates only.
+- **History in the prompt**: prompt v3 sent "history matches"; prompt v4 sends none yet.
 - **The day chart** on the meal screen, as in the app's: today's meals and this one against the
   goals (read-only from the app's data).
 - **Requests in the background.** Model requests and Open Food Facts lookups (with their retries)

@@ -1,340 +1,157 @@
-# The lab: what the model must be told
+# The lab: what the model is told
 
-What the model's instructions (the prompt and its examples) must say for the format of
-[lab-meal-format.md](lab-meal-format.md) to be used well: what we learned writing 1,000 meals in it
-([lab-meal-examples.md](lab-meal-examples.md), referred to as #N) and discussing their problems.
-The format makes a wrong shape impossible or rejected; these rules are about choosing the right
-shape and the right questions, which the format can't check.
+How the meal composer asks the model for a meal in the format of
+[lab-meal-format.md](lab-meal-format.md): the model and its settings, what a request holds, the
+rules of prompt v4 and why each is there, and the bench that tests them. The rules come from
+1,000 example meals ([lab-meal-examples.md](lab-meal-examples.md), #N) and seven bench runs on my
+own photos (v1–v7, 2026-11-23).
 
-Status (2026-11-22): **agreed in discussion; the prompt itself is not written yet.** Prompt v3
-(`src/lab/composer/prompt-v3.txt`) has some of these rules for the old `parameters`.
+Status (2026-11-23): **prompt v4 written and tested on the bench, not yet used by the lab's
+screen.** `src/lab/composer/prompt-v4.md` (the system instruction), `request.ts` (the context and
+the checklist), `schema.ts` (the schema's descriptions), `scripts/meal-bench.ts` (the bench).
 
-Examples are in the screen form (see lab-meal-format.md, The screen form): `U` a kind with its own
-size, `P` a kind, `S` a size, `C` a count; `[chosen]`; certain questions aren't shown.
+## The model and its settings
 
-## Rules
+- **Gemini Flash-Lite, the newest stable one** (`gemini-3.5-flash-lite` now). Why: the cheapest
+  and fastest modern model with the most generous free quota (15 requests and 250k tokens a
+  minute, 500 a day; Flash allows 5 a minute and far fewer a day); about 3–5 s per answer. Flash
+  was set aside: slower, a low daily quota, and its quality on rules wasn't the problem to solve.
+- **Thinking `low`.** Why: Flash-Lite's own default is `minimal` (near off). At `low` it thinks
+  only when it judges a request hard (3 of 22 in one run, 1 of 44 in another), at almost no cost
+  in time; at `medium` it thought on every request and followed the rules more consistently,
+  but at 7.3 s per answer against 3.7 s. Speed matters more; `medium` is kept in mind for updates.
+- **No temperature.** Why: Google's guide says Gemini 3 models reason worse away from their
+  default; prompt v3 sent 0.2.
+- **The answer as JSON in the schema** (`responseJsonSchema`, see the format doc). The schema
+  guarantees the shape; the prompt is about choosing well within it.
 
-### 1. Make a best guess, always
+## What a request holds
 
-Every answer is a complete meal: every row has its products (or parts), its size and its count, each
-with the model's best guess chosen. A doubt never leaves a gap, and the model never asks in prose.
-Vague input gets a best guess from the context: a matching past meal first, otherwise a typical
-dish; if that isn't precise enough, I add text and the next update replaces the guess.
+1. **The system instruction: `prompt-v4.md`**, the constant part, in XML sections: `<role>`,
+   `<format>`, `<rules>`, `<examples>`. Why: Google's guide puts standing rules in the system
+   instruction and asks for one consistent kind of delimiter.
+2. **The context** (`contextText`): the answer language, the time, the meal so far (JSON, with my
+   current answers) or "a new meal".
+3. **The input**, each a part of its own, in the order attached: texts, photos, scanned products
+   (Open Food Facts' data as JSON).
+4. **The checklist** (`CHECKLIST`), last: the rules broken most, restated. Why: the guide says
+   instructions after a large input are heeded best ("place your specific instructions at the very
+   end").
+5. **The schema's descriptions**: the same rules again, on the fields they govern (`options`:
+   one option when certain or stated, 2–4 only for a material doubt, kinds that are different
+   foods, pieces counted; a size's `label`: `г` only for 1). Why: without thinking, Flash-Lite
+   writes the JSON field by field; the description is in front of it as it writes the field. This
+   fixed stated facts in updates and invented kinds (v6) where the prompt and checklist hadn't.
 
-```
-"business lunch, set B" (no photo, no history):
-- Business lunch, average — 1
-```
+## The rules, and why
 
-Not: questions invented to cover missing information ("set: soup + main + salad / soup + main +
-dessert") when nothing tells which set B is. With a past meal named that way, its rows are
-reused.
+In prompt v4's order (the numbers are the prompt's).
 
-### 2. Ask only what I know better than the photo
+1. **Always a complete best guess**; vague input gets a typical meal with no kind questions
+   invented. Why: a gap or a question in prose can't be shown as chips; "business lunch, set B"
+   with invented "soup or salad" options is noise I can't answer better than the model (#529).
+   Still broken without thinking (v7: 0 of 2).
+2. **Only the meal in focus**; several plates in focus are all included. Why: other people's
+   cups and plates were the commonest wrong rows; I remove a whole plate with one word ("я ел
+   только кальмара"), which the bench shows works.
+3. **Table condiments are ignored** unless I say I used them. Why: "0 oil" rows for the bottle
+   on the table (asked in the examples) were never produced by the model in two runs, and would be
+   clutter I'd mostly ignore; I say "полил маслом".
+4. **Ask what the photo can't tell**: look-alikes, hidden fillings, how it was cooked, how many
+   when some are hidden, the size ordered; never what the photo shows clearly; named portions
+   for loose food. **Unsure what a food is: options that are different foods** (cod / chicken /
+   pork), up to 4. Why: questions on plainly visible counts (2 eggs, 3 rösti) were noise (v6);
+   the model's alternatives were variants of its wrong guess (beef / horse for tuna, squid /
+   cuttlefish), so the right answer wasn't a chip.
+5. **Only what matters**: about 80+ kcal or 10+ g protein between the options; **never what I
+   said** (a stated kind or amount has one option); **at most 3 questions in a meal**. Why: the
+   examples' threshold (#49, #128); the model asked the bread kind for one slice and oat milk
+   after "на овсяном" in every run until examples showed a stated kind with no question (v7); a
+   number is easy for a small model to follow, and keeps the chips few.
+6. **Split only as far as needed to place a question.** Why: a dish kept whole is one row to read
+   and its values are the model's best (#371: pho split for an immaterial broth question).
+7. **Where a size goes**: see the format's size-and-count table; a menu size that is a number of
+   pieces is a count; in home cooking the number of pieces is a question when unclear. Why: the
+   table (four cases, plainly) replaced prose the model mixed up (eggs weighed, "3 г").
+8. **One base per row**, g when kinds differ (#40, #502).
+9. **Questions are independent**: any combination of answers is valid.
+10. **"None" is an answer**: a "none" kind, a count of 0.
+11. **Labels are what I'd say**: short, the difference only; menu names or named portions;
+    small amounts in words (`немного / обычно / много`). Why: grams in labels (15 / 30 / 50 g of
+    sour cream) are what I can't answer; words I can.
+12. **Names**: full product names, never composed; a dish's name is what's certain.
+13. **Amounts are what is eaten**: no bones, shells, peel, ice.
+14. **All of it, by me alone**: no questions about leftovers or sharing. Why: see the format's
+    principles; "how much broth did you drink" was asked of every ramen.
+15. **Each kind of piece is its own row**; a tray or set is never one row; only garnish under
+    the threshold is dropped. Why: a sushi tray became one row "Набор суши" after a "lump small
+    things" rule (v4b); with this rule it's a row per kind in every run since.
+16. **Stated amounts are certain**; a stated total weight is one row, never split. Why: the
+    model split "гречка с котлетой, 350 г" into rows (v6), and once wrote 350 g of cutlet alone,
+    losing the buckwheat (v7). Still unreliable.
+17. **Add-ons are rows**, 0 an option: sugar, syrup, butter on toast.
+18. **Cooking fat is part of the food**; a kind question only when material.
+19. **A dish is something I think of as one thing** (a sandwich, a burger, tacos ×3, toasts ×2
+    with butter); a plate or tray of separate foods is not a dish; home cooking whose pieces I
+    know is a dish of its parts. Why: the model wrapped whole plates (eggs, bacon, rösti) as a
+    dish ×1; a sandwich, though, reads better wrapped than as bread, cheese and sausage rows.
+20. **Updating a meal**: keep my answers unless the input says otherwise; my texts correct it
+    (a stated kind becomes certain, what I didn't eat is left out, a wrong food replaced). Why:
+    removed rows are no longer sent (see the format); text is the one way to correct.
+21. **The answer language** for names, labels, `why` and the title.
 
-A question is for a doubt I can settle with a tap: what I ordered, cooked or tasted; what was
-inside; how many I ate; the size I ordered; what I added; how much I ate of a shared or served
-thing. Not grams I can't know either.
+## Examples
 
-```
-- Pork-beef pelmeni — 20 pcs
-  P filling: [pork-beef] / chicken          ← I know what I bought
-  C count: 15 / [20] / 25                    ← I counted while eating
-```
+Short examples in the screen form, then four rows in full JSON (a sized food, a named portion,
+grams, a dish). Why: Google recommends always including examples; Flash-Lite follows examples
+more than rules (a stated-milk rule failed in every run until an example showed it).
 
-Not: "potatoes: 180 / 200 / 220 g" — I don't know grams. For loose food I know the portion, not
-its weight, so the labels say it: "маленькая / обычная / большая" (#128).
+**The examples are other foods than the bench's** (shashlik, vareniki, a raf, nigiri,
+toasts with butter, cappuccino on almond milk, boiled eggs). Why: Flash-Lite copies examples:
+with a meatball example the bench's meatballs got the example's words and sizes ("фарш не
+виден", 35 g); a cutlet example turned meatballs into "котлеты". An example of a test meal only
+shows that the model learned the answer.
 
-From a photo the model's doubts are of three kinds, and so are the questions:
+## The bench
 
-| Doubt                                                      | Question             |
-| ---------------------------------------------------------- | -------------------- |
-| what it is: look-alikes, a hidden filling, how it was made | `P` or `U` (a kind)  |
-| how big: a menu size, a portion with no names              | `S`, or `C` in grams |
-| how many: counting pieces                                  | `C`                  |
-
-### 3. Ask only what matters
-
-A doubt worth a question changes the meal by roughly 80+ kcal or 10+ g protein between its
-options. Anything smaller is one option, the best guess, with no question. The threshold is
-measured at the row's amount: 150 g of grilled vegetables "with or without oil" is about 70 kcal,
-not worth asking (#49); 10 g of parmesan neither (#128).
-
-### 4. The threshold applies to splitting too
-
-Split a dish into parts only as far as needed to place material questions; a dish kept whole keeps
-its kind and its parts together.
-
-```
-- Pho bo tái — 1 bowl
-  P pho: [bo tái (rare beef)] / bo chín (brisket) / bo viên (meatballs) / ga (chicken)
-  S bowl: small / [regular] / large
-```
-
-Not: pho split into noodles, meat and broth to ask "how much broth did you drink": pho broth is
-light, half a bowl is ~30 kcal. Split, the kind "bo / ga" would have to change the meat and the
-broth at once, which no question can (#371). A rich broth is different: tonkotsu ramen's broth is
-~300 kcal, so "drank: a little / half / all" is worth a part (#327).
-
-### 5. The size comes with the kind, or it is a choice of its own
-
-Decide first, before writing options:
-
-- **The size comes with the kind** (a café has one croissant of each kind; an almond one is
-  bigger): `U`, each kind with its size; no size question.
-- **The size is chosen on its own** (a menu's sizes, a glass, a pizza's diameter), the same for
-  every kind: `P` without sizes, and `S`.
-- **Loose food** (rice, soup, salad): `P`, no size; the count is the amount in g or ml.
-
-```
-- Croissant — 1
-  U kind: [plain, 60 g] / almond, 90 g / pain au chocolat, 70 g
-
-- Latte — 1
-  P milk: [2 %] / whole / oat / skim
-  S size: tall / [grande] / venti
-```
-
-`U` is easy to miss when a kind comes in its own pour or portion:
-
-```
-- Red wine toasts — 3
-  U drink: [red wine, 100 ml] / brandy, 30 ml        (#531)
-- Fröccs — 2
-  U mix: [kisfröccs, 200 ml] / nagyfröccs, 300 ml    (#537)
-- French onion soup — 1
-  U starter: [onion soup, 350 g] / escargots, 6 pcs, 120 g / terrine, 100 g   (#502)
-```
-
-A kind with its own size and also an independent size choice doesn't happen: where a size choice
-exists for some kinds only, it is one `U` question of the real combinations ("эспрессо / латте M /
-латте L"; po'boy "shrimp full / shrimp half / roast beef full / roast beef half", #774).
-
-### 6. One base per row: in g when in doubt
-
-All products of a row share a base. When kinds would differ (soup in ml, fried lagman in g; a
-set-menu starter that is soup or escargots), everything is in g: a soup's ml ≈ g (#40, #502).
-
-### 7. Questions are independent
-
-Any combination of answers must be valid and mean what its labels say:
-
-- **count** is always independent: 8 meatballs stay 8 whether chicken or pork;
-- **size** is either part of the kind (`U`) or its own question (`S`), never both;
-- **two doubts about the kind of one food**: when they depend on each other, one question of the
-  real combinations; when they are independent, split the food into parts, one kind on each.
+`scripts/meal-bench.ts` runs test meals (`scripts/meal-bench-cases.ts`) through Gemini with the
+real prompt, schema, context and reader, and prints each answer in the screen form next to what a
+good answer would be, for judging by reading.
 
 ```
-- Fried pirozhok with meat — 2 pcs
-  U kind: [fried, meat, 80 g] / fried, cabbage, 80 g / baked, meat, 70 g / baked, cabbage, 70 g   (#15)
-
-- Döner ×1                                                                              (#61)
-  - Bread — 1
-    U kind: [bread, 120 g] / dürüm wrap, 90 g / box (no bread), 0 g
-  - Döner meat — 120 g
-    P meat: [veal] / chicken
+GEMINI_API_KEY=… node scripts/meal-bench.ts --photos <dir with food1.jpg …> \
+  [--only p7,t3] [--repeat 2] [--thinking low] [--model lite|flash|<id>] [--out <dir>]
 ```
 
-### 8. A size question goes where the size changes
+- **Cases:** 9 of my photos (not in the repo: `--photos`) with what I know about them, 8 texts;
+  some in two steps (my pick of an answer, then a text): keeping a pick (t8, p7u), a stated kind
+  in an update (p7u), "сметану не ел" (t6), "я ел только кальмара" (p2t).
+- **Quotas:** at most 9 requests a minute for Flash-Lite (2 for Flash), retries included; a busy
+  Gemini (429, 5xx) is tried again after 5, 15, 30, 60, 120 s. A run is 22 requests (44 with
+  `--repeat 2`), about 100k tokens.
+- **Output:** each step logged as it's answered (`run.log`, readable while it runs), the raw
+  answers as JSON, tokens and time per answer.
 
-A dish's size (`S` on a dish row) multiplies every part, so it fits only dishes whose parts all
-grow together: a sub 6″ / 12″, bunny chow ¼ / ½ loaf, a poke bowl regular / large.
+### Results
 
-- When "large" means more of one part, the size is on that part: a large ramen is more noodles,
-  not two eggs (#327).
-- A dish with nothing to ask inside stays whole, a product whose sizes are its own grams: gyudon
-  nami 380 g / ōmori 500 g / tokumori 650 g (#329).
-- A combo is not a dish: fries and a drink keep their own size questions, as they're usually
-  chosen separately (#406, #565).
+| Run | What changed                                                                   | Main findings                                                                                       |
+| --- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| v1  | prompt v4 draft, JSON example of one row kind                                  | all fit the schema; amounts multiplied twice (72,000 kcal omelette, 9 tacos); plates as dishes      |
+| v2  | no dish size, named portions, a JSON example per row kind, the 3 kg check      | amounts all plausible; few kind questions, sushi as one row, plates as dishes                       |
+| v3  | sections, checklist, no temperature; thinking minimal / low / medium           | structure fixed (rows per kind, no plates as dishes); thinking helps rules, not recognition         |
+| v5  | all of it eaten; no removed rows; options that are different foods             | no leftover questions; real alternatives (chicken / pork); stated facts still asked                 |
+| v6  | the rules in the schema's descriptions; pieces counted; size-and-count table   | eggs counted, stated facts in updates certain, no invented kinds; t1 milk still asked               |
+| v7  | examples of stated and plainly visible things; at most 3 questions; ×2 samples | t1, p1, eggs, bread fixed (2/2); updates' stated kind (0/2), vague lunch (0/2), weighed plate (1/2) |
 
-```
-- Tonkotsu ramen ×1
-  - Noodles — 150 g
-    S portion: [regular 150 g] / large 225 g
-  - Chashu — 2 slices
-  - Ajitama egg — 1
-  - Broth — 400 ml
-    C drank: a little / [half] / all
-```
+In every run: the answer fits the schema (154 of 154 answers read without problems since v1),
+picks are kept, texts are followed, the background and condiments are left out.
 
-### 9. A menu size that is a number of pieces is a count
+### What's left
 
-"6 or 12 escargots", IKEA's 10 / 15 / 20 meatballs, "mala / velika porcija" of ćevapi (5 / 10)
-are counts, not sizes: the number is the answer (#96, #880, #214).
-
-```
-- Köttbullar — 15
-  C plate: 10 / [15] / 20
-```
-
-### 10. "None" is an answer
-
-- **A kind can be "none"**: a product with all values 0 (water included), named so ("Без
-  молока"), labelled "нет"; in `U`, with size 0. One question, the way I'd answer it (#885,
-  #175, #431, #566):
-
-  ```
-  - Milk — 30 ml
-    P milk: none / [whole] / oat / skim
-    C milk: splash 15 ml / [usual 30 ml] / a lot 60 ml
-  ```
-
-  When "none" is chosen, the phone hides the row's other questions.
-
-- **A count can be 0**: "no bun", "cup or cone", "burrito or bowl" are a 0 for that part (#407,
-  #416). A row whose likely answer is "none" but which is worth asking has 0 chosen: the oil
-  bottle on the table, the bread basket (#90, #898).
-- **Never a confident 0**: a row that certainly isn't there isn't a row.
-
-### 11. Labels are what I'd say
-
-- Every option has a short label, the chip; `chosen` copies one.
-- For a count, the number when that's how I'd say it ("8"), words when they say it better:
-  "нет", "½", "всё", "немного / порция / много" (my share, a sauce), "маленькая / обычная /
-  большая" (loose food).
-- For a size, the menu's name ("grande", "0.5", "30 см", "nami"); with no names, relative words
-  ("обычный / большой").
-- For a kind, the difference only ("куриные", not "куриные тефтели").
-- In the answer language.
-- Order: natural where there is one (sizes small → large, counts ascending, sugar 0 → 100 %),
-  otherwise most likely first.
-- Usually 2–3 options; more only when they really exist (a menu's sizes, a dish's usual fillings),
-  up to 5–6. A long list is the model hedging.
-
-### 12. Names: what's certain, in full
-
-- A product's `name` is its full name ("Куриные тефтели"); picking another kind swaps the name too.
-- A dish's name is what's certain about it: "Тако" when its filling is a question, and the part
-  shows the rest ("Мясо аль пастор"); "Тако с карнитас" when nothing is in doubt.
-- A dish whose identity is in doubt stays whole: a product with kinds, not a dish.
-
-### 13. Amounts are what is eaten
-
-The amount excludes what isn't eaten: bones, shells, peel, pits, husks and leaves, khinkali tops,
-ice. A whole fish, ribs, wings, mussels in shells: the edible part (#86, #55, #410). A drink with
-ice: the liquid; with water (rakı, iced coffee), the drink, not the glass (#519).
-
-A weight I give with the inedible part is a product named that way, with values as weighed: "T-bone,
-raw with bone, 250 g" (#497).
-
-### 14. Shared food: my share
-
-A shared dish is a row of my share, never "⅓ of the platter of dishes". A count question asks it
-when it's in doubt (#28, #49, #141, #229).
-
-```
-- Pork neck khorovats — 250 g
-  C my share: a little 150 g / [portion 250 g] / a lot 350 g
-```
-
-### 15. Lump or drop small things
-
-Many small things of similar weight in the meal are one row: banchan, mezze, garnish, a tasting
-menu's courses, conveyor-belt sushi plates, dim sum baskets (#524, #572, #594, #821). Garnish and
-condiments under the threshold are dropped (salsa, lime, herbs; #451).
-
-### 16. Stated amounts are certain
-
-An amount I state ("150 g chicken", "2 scoops") or a label gives (a scanned product, a receipt's
-weight) has no question (#19, #113, #443). The model may still ask what I didn't say: which part of a
-scanned pack I ate (#887).
-
-### 17. Partly eaten or drunk: a row of its own
-
-Something I may have left, drunk partly or eaten from a shared bowl is a row or part of its own,
-so its count can ask how much: a rich broth, a dip, syrup in the bowl, leche de tigre, the chocolate
-for churros (#144, #266, #392, #465).
-
-```
-- Gulab jamun — 2
-- Syrup from the bowl — 15 g
-  C syrup: none / [a little] / all
-```
-
-Food left on the plate is a count with fractions ("½ / ¾ / всё", #83, #134).
-
-### 18. Add-ons are rows
-
-An add-on is a row of its own, with 0 as an option: syrup in a latte, sugar in tea, an extra shot,
-a sauce cup, whipped cream (#341, #433, #886). A count on the drink's row would count drinks.
-
-When the drink or dish comes several times, the add-on goes with it in a dish, so it is per
-serving:
-
-```
-- Tea with sugar ×3                                                  (#211)
-  C glasses: 2 / [3] / 5
-  - Tea — 100 ml
-  - Sugar cubes — 1
-    C cubes: none / [1] / 2
-```
-
-### 19. Cooking fat is part of the dish; how much of it is a kind
-
-Frying oil, butter in the mash, coconut milk in a curry are folded into the dish's values. When the
-amount is in doubt and material, it's a kind: "мало масла / обычно / жирно" (#6, #92, #115). Fat or
-sauce I add myself is a row (oil from the table bottle, butter on bread; #116, #122).
-
-### 20. An invisible influence is a row, asked in terms I know
-
-When something changes many rows at once and I know it by name, it becomes one row with a kind
-question in my terms, instead of a question on every row:
-
-```
-- Broth picked up with the food — 1 portion                         (#296, #527)
-  P broth: [mala] / yuanyang (half and half) / clear
-```
-
-I know which broth I ordered, not how many grams of oil came out with the food; the kinds carry
-the oil. When the photo shows the broth, no question.
-
-### 21. Separate what can be told apart
-
-Different pieces, meats or fillings that the photo (or I) can tell apart are separate rows: a
-carvery plate with two meats, mixed chicken pieces, dumplings of two fillings, different drinks
-over an evening (#423, #595, #915, #640). One row with a kind question only when they can't be told
-apart.
-
-### 22. "Seconds" and refills are the same count
-
-More of the same is the count, not a second question: "порция / с добавкой" (#543, #876). Refills
-(rice, sambar, soda, kaedama) are counts in servings, asked only where they matter, not on every
-bowl of a thali (#530).
-
-### 23. A weighed total stays exact
-
-A total weight I give (a weighed plate, a per-kilo buffet, a box by weight) stays exact. When how it
-splits matters to the values, the weighed thing is one product with a kind question on the
-proportion; otherwise rows that divide the total, or one product with no question (#8, #470,
-#762).
-
-```
-- Buckwheat with a pork cutlet — 350 g
-  P proportion: mostly buckwheat / [half and half] / mostly cutlet
-```
-
-### 24. A dish only where it helps
-
-Most meals are rows of foods (916 of 1,000 had no dish). A dish is for:
-
-- a repeated assembly with questions inside: toasts ×2, tacos ×4, tea with sugar ×3;
-- a food whose parts carry material questions: a burrito's fillings, a shawarma's sauce, a rich
-  ramen's broth;
-- a meal described part by part in text ("omelette: 3 eggs, 50 ml milk, 10 g butter").
-
-Not for trays, thalis, bentos or buffet plates: those are the meal itself. Never a dish in a dish.
-
-## Examples for the prompt
-
-Short examples teach more than rules; one for each typical case, in the answer language:
-
-1. a kind (meatballs: pork-beef / chicken) with a count;
-2. a kind with its own size (`U`: croissant plain / almond);
-3. a menu size with a kind (latte: milk, tall / grande / venti);
-4. "none" as a kind (milk: none / whole / oat);
-5. a count with 0 (oil from the table: none / 10 / 20 ml);
-6. a dish with a part partly eaten (ramen: noodles with a size, broth "drank");
-7. a repeated assembly (tea with sugar ×3);
-8. shared food (my share of a platter);
-9. a certain meal from text (no questions);
-10. vague input (a best guess, no questions).
+- **Without thinking, some rules break at random:** a stated kind in an update still asked,
+  kinds invented for vague input, the weighed plate split or a food lost. Next: an example of
+  each (as stated milk was fixed), or `medium` thinking for updates only (rarer, and where these
+  break).
+- **Recognition:** grilled tuna is "beef" in every run, shrimp often "fish"; dropped foods
+  (whipped cream, a Cola can). Prompts can't fix it; I correct it in text.
+- **Runs vary:** a single run can't tell a fix from chance; judge on `--repeat 2` or more.
