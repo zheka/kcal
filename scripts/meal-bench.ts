@@ -1,188 +1,136 @@
 /**
- * The meal composer's bench: runs the test meals (scripts/meal-bench-cases.ts) through the local
- * tool (scripts/meal-tool.ts: the lab's prompt, schema, reader and processing) and prints each
- * answer's text view next to what a good answer would be, for judging by reading. Each case's
- * entry.json and view.txt go to <out>/<case>/, the whole output to <out>/run.log (replay.log on a replay).
+ * The meal composer's bench: runs tests (see readTest in scripts/meal-tool.ts) through the local
+ * tool's code, one after another, and reports which failed. A test passes when a meal comes back;
+ * expectations come later.
  *
- *   GEMINI_API_KEY=… node scripts/meal-bench.ts --photos <dir with food1.jpg …>
- *     [--only p7,t3] [--repeat 2] [--parallel 4] [--out <dir>] [--verbose]
+ *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
+ *     <test>     a test file, or a folder of them (its *.json, not its subfolders)
+ *     --repeat   each test N times (p7t-1, p7t-2, …), to tell a rule from chance
+ *     --out      writes each test's everything (as scripts/meal.ts --out) to <dir>/<test>.json;
+ *                nothing is written without it
+ *     --verbose  each test's meal as text on stdout; on stderr the settings, brief notes as it
+ *                goes, and each test's stats
  *
- * The model and its settings are src/lab/meal/settings.ts. --verbose: brief hints on stderr on
- * what each case is waiting for; run.log has the results only.
- *
- *   node scripts/meal-bench.ts --replay <a run's dir>
- *     reprocesses every answer of that run with the code as it is now: no model calls
- *
- * Photo cases are skipped without --photos (the photos are personal, not in the repo).
+ * On stdout: each failed test and why, and a summary. Exit code 1 when any test failed.
  */
-import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { SETTINGS } from '../src/lab/meal/settings.ts';
-import { CASES, type Case } from './meal-bench-cases.ts';
 import {
   ask,
   type Entry,
   geminiSend,
-  type Given,
   givenText,
   limited,
-  processEntry,
-  readEntry,
-  view,
-  writeEntry,
+  mealText,
+  noMeal,
+  readTest,
+  settingsText,
+  statsText,
+  writeJson,
 } from './meal-tool.ts';
 
-const { values: args } = parseArgs({
-  options: {
-    only: { type: 'string' },
-    photos: { type: 'string' },
-    parallel: { type: 'string', default: '4' },
-    out: { type: 'string', default: 'test-results/meal-bench' },
-    /** Each case this many times (as p7#1, p7#2), to tell a rule from chance. */
-    repeat: { type: 'string', default: '1' },
-    replay: { type: 'string' },
-    verbose: { type: 'boolean', default: false },
-  },
-});
 const LANGUAGE = 'ru';
 /** A fixed time, so runs differ only by the model. */
 const NOW = new Date('2026-11-22T13:00:00');
 
-const OUT = args.replay ?? args.out;
-mkdirSync(OUT, { recursive: true });
-const LOG = `${OUT}/${args.replay ? 'replay' : 'run'}.log`;
-writeFileSync(LOG, '');
-const log = (text: string) => {
-  console.log(text);
-  appendFileSync(LOG, `${text}\n`);
-};
+const { values: args, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    verbose: { type: 'boolean', default: false },
+    repeat: { type: 'string', default: '1' },
+    out: { type: 'string' },
+  },
+});
+const note = args.verbose ? (text: string) => console.error(text) : undefined;
 
-const caseOf = (id: string) => CASES.find((c) => c.id === id.replace(/#\d+$/, ''));
-
-function report(id: string, entry: Entry): string {
-  const c = caseOf(id);
-  return [
-    `=== ${id}: ${c?.title ?? '?'}`,
-    `expect: ${c?.expect ?? '?'}`,
-    `--- ${entry.given.map(givenText).join(' ')}`,
-    view(entry),
-  ].join('\n');
+const files = positionals.flatMap((p) =>
+  statSync(p).isDirectory()
+    ? readdirSync(p, { withFileTypes: true })
+        .filter((d) => d.isFile() && d.name.endsWith('.json'))
+        .map((d) => join(p, d.name))
+        .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+    : [p],
+);
+if (files.length === 0) {
+  console.error('Give tests: test files, or folders of them.');
+  process.exit(1);
 }
-
-interface Stats {
-  answers: number;
-  failed: number;
-  flags: number;
-  asked: number;
-  input: number;
-  output: number;
-  thinking: number;
-  ms: number;
+const idOf = (file: string) => basename(file, '.json');
+const ids = files.map(idOf);
+const twice = ids.filter((id, i) => ids.indexOf(id) !== i);
+if (twice.length) {
+  console.error(`Tests of the same name: ${[...new Set(twice)].join(', ')}.`);
+  process.exit(1);
 }
-const stats: Stats = {
-  answers: 0,
-  failed: 0,
-  flags: 0,
-  asked: 0,
-  input: 0,
-  output: 0,
-  thinking: 0,
-  ms: 0,
-};
-function count(entry: Entry) {
-  const r = entry.response;
-  if (!entry.processed) stats.failed++;
-  else stats.answers++;
-  stats.flags += entry.read?.flags.length ?? 0;
-  stats.asked +=
-    entry.processed?.dishes
-      .flatMap((d) => d.items.flatMap((i) => i.questions))
-      .filter((q) => q.asked).length ?? 0;
-  stats.input += r?.tokens?.input ?? 0;
-  stats.output += r?.tokens?.output ?? 0;
-  stats.thinking += r?.tokens?.thinking ?? 0;
-  stats.ms += r?.ms ?? 0;
-}
-const summary = (cases: number, extra = '') =>
-  `${cases} cases: ${stats.answers} meals, ${stats.failed} failed, ${stats.flags} flags, ` +
-  `${stats.asked} questions asked; tokens in ${stats.input}, out ${stats.output}, ` +
-  `thinking ${stats.thinking}; ` +
-  `${stats.answers ? (stats.ms / (stats.answers + stats.failed) / 1000).toFixed(1) : '–'} s per answer${extra}. ` +
-  `In ${OUT}/`;
-
-// Replay: the run's answers, processed again -----------------------------------------------------
-
-if (args.replay) {
-  const ids = readdirSync(OUT, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && existsSync(`${OUT}/${d.name}/entry.json`))
-    .map((d) => d.name)
-    .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
-  for (const id of ids) {
-    const entry = processEntry(readEntry(`${OUT}/${id}/entry.json`));
-    writeEntry(`${OUT}/${id}`, entry);
-    count(entry);
-    log(`${report(id, entry)}\n`);
-  }
-  log(summary(ids.length, ', replayed'));
-  process.exit(0);
-}
-
-// A run ------------------------------------------------------------------------------------------
-
 const key = process.env.GEMINI_API_KEY;
 if (!key) {
   console.error('Set GEMINI_API_KEY.');
   process.exit(1);
 }
-const send = limited(geminiSend(key));
-log(`model: ${SETTINGS.model}, thinking: ${SETTINGS.thinking}`);
-
-const only = args.only?.split(',');
-const cases = CASES.filter((c) => !only || only.includes(c.id)).filter((c) => {
-  const photos = c.inputs.flatMap((i) => ('photo' in i ? [i.photo] : []));
-  if (photos.length === 0) return true;
-  if (!args.photos) return false;
-  const missing = photos.filter((p) => !existsSync(`${args.photos}/${p}`));
-  if (missing.length) log(`${c.id}: skipped, no ${missing.join(', ')}`);
-  return missing.length === 0;
-});
-if (!args.photos) log('Photo cases skipped: no --photos.');
-log(
-  `${cases.length} cases, ${args.parallel} at a time, at most ${SETTINGS.perMinute} requests a minute\n`,
-);
-
-const given = (c: Case): Given[] =>
-  c.inputs.map((i) => ('photo' in i ? { photo: `${args.photos}/${i.photo}` } : i));
 
 const repeat = Number(args.repeat);
-const queue = cases.flatMap((c) =>
+const runs = files.flatMap((file) =>
   repeat > 1
-    ? Array.from({ length: repeat }, (_, i) => ({ c, id: `${c.id}#${i + 1}` }))
-    : [{ c, id: c.id }],
+    ? Array.from({ length: repeat }, (_, i) => ({ file, id: `${idOf(file)}-${i + 1}` }))
+    : [{ file, id: idOf(file) }],
 );
+
+note?.(settingsText(LANGUAGE, NOW));
+note?.(`${files.length} tests${repeat > 1 ? ` × ${repeat}` : ''}, one at a time\n`);
+
+const send = limited(geminiSend(key));
+const failed: string[] = [];
+const total = { flags: 0, asked: 0, input: 0, output: 0, thinking: 0 };
 const started = Date.now();
-await Promise.all(
-  Array.from({ length: Number(args.parallel) }, async () => {
-    for (let q = queue.shift(); q; q = queue.shift()) {
-      const { c, id } = q;
-      let entry: Entry;
-      try {
-        entry = await ask({
-          send,
-          language: LANGUAGE,
-          now: NOW,
-          given: given(c),
-          ...(args.verbose && { hint: (text: string) => console.error(`  ${id}: ${text}`) }),
-        });
-      } catch (err) {
-        stats.failed++;
-        log(`=== ${id}: FAILED before sending: ${String(err)}\n`);
-        continue;
-      }
-      writeEntry(`${OUT}/${id}`, entry);
-      count(entry);
-      log(`${report(id, entry)}\n`);
-    }
-  }),
+
+for (const { file, id } of runs) {
+  let entry: Entry;
+  try {
+    const test = readTest(file);
+    note?.(`=== ${id}${test.description ? `: ${test.description}` : ''}`);
+    note?.(`inputs ${test.given.map(givenText).join(' ')}`);
+    entry = await ask({
+      send,
+      language: LANGUAGE,
+      now: NOW,
+      given: test.given,
+      ...(note && { hint: note }),
+    });
+  } catch (err) {
+    fail(id, err instanceof Error ? err.message : String(err));
+    continue;
+  }
+  if (args.out) writeJson(join(args.out, `${id}.json`), entry);
+  count(entry);
+  note?.(statsText(entry));
+  const why = noMeal(entry);
+  if (why) fail(id, why);
+  else if (args.verbose) console.log(`=== ${id}\n${mealText(entry)}\n`);
+}
+
+const s = (Date.now() - started) / 1000;
+console.log(
+  `${runs.length} runs: ${runs.length - failed.length} passed, ${failed.length} failed` +
+    (failed.length ? ` (${failed.join(', ')})` : '') +
+    `; ${total.flags} flags, ${total.asked} questions asked; tokens in ${total.input}, ` +
+    `out ${total.output}, thinking ${total.thinking}; ${s.toFixed(0)} s` +
+    (args.out ? `; in ${args.out}` : ''),
 );
-log(summary(cases.length, `, ${((Date.now() - started) / 1000).toFixed(0)} s in all`));
+process.exit(failed.length ? 1 : 0);
+
+function fail(id: string, why: string) {
+  failed.push(id);
+  console.log(`=== ${id}: FAILED: ${why}${args.verbose ? '\n' : ''}`);
+}
+
+function count(e: Entry) {
+  const r = e.response;
+  total.flags += e.read?.flags.length ?? 0;
+  total.asked +=
+    e.processed?.dishes.flatMap((d) => d.items.flatMap((i) => i.questions)).filter((q) => q.asked)
+      .length ?? 0;
+  total.input += r?.tokens?.input ?? 0;
+  total.output += r?.tokens?.output ?? 0;
+  total.thinking += r?.tokens?.thinking ?? 0;
+}

@@ -6,10 +6,11 @@ rules of prompt v5 and why each is there, and the local tool and the bench that 
 rules come from 1,000 example meals ([lab-meal-examples.md](lab-meal-examples.md), #N) and seven
 bench runs of prompt v4 on my own photos (v1–v7, 2026-11-23).
 
-Status (2026-11-23): **prompt v5 written, not yet run on the bench, not used by the lab's
+Status (2026-11-23): **prompt v5 run once on the bench (see Results), not used by the lab's
 screen.** `src/lab/meal/prompt.md` (the system instruction), `settings.ts` (the model and its
 settings), `request.ts` (the context and the checklist), `schema.ts` (the schema's descriptions);
-`scripts/meal.ts` (the tool), `scripts/meal-bench.ts` (the bench). Prompt v4 (the model wrote the
+`scripts/meal.ts` (the tool), `scripts/meal-bench.ts` (the bench); the tests are out of the
+repo, in `../kcal-tests` (a git repo of its own). Prompt v4 (the model wrote the
 questions) is in git history up to commit 381aee4.
 
 ## The model and its settings
@@ -126,49 +127,76 @@ schema, request, reader and processing; Gemini through `src/lab/ai/gemini.ts`), 
 what the browser would: shrinks photos, looks up barcodes, keeps to the quota.
 
 ```
-GEMINI_API_KEY=… node scripts/meal.ts [--language ru] [--time 13:00] [--out <dir>] [--verbose] <input>…
-node scripts/meal.ts --replay <dir>
+GEMINI_API_KEY=… node scripts/meal.ts [--verbose] [--test=<file>] [--out=<file>] [<input>…]
 ```
+
+Kept to the minimum: what's needed to run a meal and keep what came of it; no tuning from the
+command line (the model and its settings are `settings.ts`, the language `ru`, the time now).
 
 - **Inputs**, sent in the order given: a photo file, a product JSON file (Open Food Facts data),
   a barcode (looked up), else a text.
-- **Output:** the text view on stdout; `entry.json` (the log entry, see the format doc) and
-  `view.txt` in `test-results/meal/<time>/` (or `--out`). Everything analysable is in the files.
-- **`--verbose`:** brief hints on stderr on what it's waiting for (a lookup, the quota, the
-  answer, a busy retry). Why: a request may wait minutes on a busy Gemini; the hints say why,
-  and nothing else is printed.
-- **`--replay`** reads and processes the stored answer again with the code as it is now, with no
-  model call. Why: most changes to the code's side (the reader, the threshold, splitting
-  alternatives, labels) can be tried on stored answers in milliseconds, at no quota.
+- **`--test=<file>`:** a test's inputs, sent before any on the command line. Tests are kept out
+  of the repo (my photos): a JSON file each, `{ "description": "…", "inputs": [...] }`, the
+  description saying what's hard about it; texts (`text`) and barcodes (`barcode`) inline, files
+  (`photo`, `product`, `textFile`) as paths relative to the test file, kept together in a `data/`
+  folder beside the tests, named by what they show (`data/meatballs.jpg`) and shared between
+  tests.
+- **Output:** the meal as text on stdout, and nothing else; no meal, why on stderr and exit code 1.
+- **`--out=<file>`:** everything as one JSON file: the inputs, the request, the answer, the
+  reader's meal and flags, the processed meal. Nothing is written without it.
+- **`--verbose`:** on stderr, the settings first, brief notes on what it's waiting for (a lookup,
+  the quota, the answer, a busy retry), and the stats at the end (time, tokens, dishes, items,
+  questions, flags). Why: a request may wait minutes on a busy Gemini; the notes say why.
 - **Busy Gemini** (429, 5xx) is tried again after 5, 15, 30, 60, 120 s; each try times out after
   120 s.
 
 ## The bench
 
-`scripts/meal-bench.ts` runs the test meals (`scripts/meal-bench-cases.ts`) through the tool's
-code and writes each answer's text view next to what a good answer would be, for judging by
-reading.
+`scripts/meal-bench.ts` runs tests (the tool's `--test` files) through the tool's code, one after
+another, and reports which failed. A test passes when a meal comes back; expectations come later.
 
 ```
-GEMINI_API_KEY=… node scripts/meal-bench.ts --photos <dir with food1.jpg …> \
-  [--only p7,t3] [--repeat 2] [--parallel 4] [--out <dir>] [--verbose]
-node scripts/meal-bench.ts --replay <a run's dir>
+GEMINI_API_KEY=… node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
 ```
 
-- **Cases:** 9 of my photos (not in the repo: `--photos`) with what I know about them, and texts;
-  a correction is more input in the same case (p2t "я ел только кальмара", p7t "тефтели
-  куриные", t6t "съел 20 штук, сметану не ел", t8 "круассан был миндальный"). Why: no meal is
-  sent back, so there are no steps; v4's cases with picks (p7u, t8) lost them.
-- **Output** in `test-results/meal-bench/` (or `--out`): `<case>/entry.json` and `view.txt` per
-  case (`p7#2` with `--repeat`), `run.log` with every view and its expectation and a summary
-  (meals, failures, flags, questions asked, tokens, time). `--replay` reprocesses a whole run
-  and writes `replay.log`.
-- **Quotas:** the settings' 9 requests a minute, across the cases run in parallel. A run is about
-  22 requests (44 with `--repeat 2`).
+- **Tests:** test files, or folders of them (their `*.json`, not subfolders, so `data/`'s product
+  files aren't taken for tests); a test's id is its file name. Mine are in `../kcal-tests` (9
+  photos with what I know about them, and texts); a correction is more input in the same test
+  (p2t "я ел только кальмара", p7t "тефтели куриные", t6t "съел 20 штук, сметану не ел", t8
+  "круассан был миндальный"). Why: no meal is sent back, so there are no steps.
+- **One at a time,** at a fixed time (13:00), so runs differ only by the model, the output is in
+  order, and the quota (the settings' 9 requests a minute) is no worse off: a run of 20 tests is
+  some 2–4 minutes.
+- **Output:** each failed test and why, and a summary (passed, failed, flags, questions asked,
+  tokens, time); exit code 1 when any failed. `--verbose` adds each test's meal as text on
+  stdout, and on stderr the settings, notes as it goes and each test's stats.
+- **`--out=<dir>`:** each test's everything, as the tool's `--out`, in `<dir>/<test>.json`;
+  nothing is written without it. I run it to `/tmp/kcal-test-results-<N>/`, N one more than the
+  last run's; a run worth keeping is copied out.
+- **`--repeat=N`:** each test N times (`p7t-1`, `p7t-2`, …), to tell a rule from chance.
 
 ### Results
 
-Prompt v5 has no runs yet. Prompt v4's runs, for what they taught (the rules above cite them):
+**Prompt v5, run 1** (2026-11-23, 20 tests, Flash-Lite, thinking low): every test answered (no
+failures, no flags), 2–9 s each, no thinking tokens. Judged by reading: 9 good, 6 partly, 5 wrong.
+
+- **Alternatives for what the input states,** against the rule, in 3 of the 4 tests that state a
+  fact: p7t "тефтели куриные" still offers pork, t6t "съел 20 штук" offers 15 / 25, t3 "два
+  стакана" offers 1; the first two are asked. The clearest prompt problem.
+- **Photos misread:** the tuna as a beef steak, no fish among the alternatives (p2); tostadas as
+  tacos with fish, shrimp only an alternative (p5); folded toasts as lavash, the bread bowl's
+  cheese missed (p6); the meatballs "мясные" with no alternative of kind (p7); borscht without
+  meat (p8). Counts a little low (p7 meatballs 7 of 8–9, p8 salo 3 of ~5).
+- **"0 g" as "maybe none"** for toppings (p3, p8, p9), and for plainly visible salo (p8), asked
+  at −359 kcal.
+- **Good:** sizes as alternatives of drinks and bowls (t1, t8, p3); a correction narrowing the
+  meal (p2t) or settling a kind (t8); stated parts (t2's double tortilla, t5's omelette); nothing
+  invented for a bare "бизнес-ланч" (t4).
+
+Next: the rule on stated things; then `--repeat` on the misread photos, to tell the model's
+limit from chance.
+
+Prompt v4's runs, for what they taught (the rules above cite them):
 
 | Run | What changed                                                                   | Main findings                                                                                       |
 | --- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |

@@ -6,7 +6,7 @@ is in [lab-meal-prompt.md](lab-meal-prompt.md). 1,000 example meals written in t
 version (questions written by the model), with the problems they raised, are in
 [lab-meal-examples.md](lab-meal-examples.md).
 
-Status (2026-11-23): **in code with the local tool and the bench, not yet run on the bench, not
+Status (2026-11-23): **in code with the local tool and the bench, run once on the bench, not
 in the lab's UI.** `src/lab/meal/`: `schema.ts` (what the model answers), `read.ts` (the
 forgiving reader), `process.ts` (amounts, totals, questions), `view.ts` (the text view),
 `request.ts` and `settings.ts` (what is sent, see the prompt doc). The lab's meal screen still
@@ -145,10 +145,10 @@ deltas.
 
 ## The log entry
 
-What the tool writes for each request (`entry.json`, see the prompt doc): the lab's log entry
-(time, build, the request, the response with the raw answer) plus the inputs as given, the
-answer as read with its flags (`read`), and the processed meal (`processed`). `--replay`
-recomputes `read` and `processed` from the stored answer with the code as it is now.
+What the tool and the bench write for each request with `--out` (one JSON file, see the prompt
+doc): the lab's log entry (time, build, the request, the response with the raw answer) plus the
+inputs as given, the answer as read with its flags (`read`), and the processed meal
+(`processed`).
 
 ## How we got here
 

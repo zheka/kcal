@@ -1,55 +1,49 @@
 /**
- * One meal through the model, locally (see scripts/meal-tool.ts): prints the text view and
- * writes entry.json and view.txt.
+ * One meal through the model, locally (the lab's own code, see scripts/meal-tool.ts): prints the
+ * meal as text, and nothing else.
  *
- *   GEMINI_API_KEY=… node scripts/meal.ts [options] <input>…
- *     an input is a photo file, a product JSON file (Open Food Facts data), a barcode, or a text;
- *     sent in the order given
- *     --language ru   --time 13:00   --out <dir>   (test-results/meal/<time>)
- *     --verbose   brief hints on stderr on what it's waiting for
+ *   GEMINI_API_KEY=… node scripts/meal.ts [--verbose] [--test=<file>] [--out=<file>] [<input>…]
+ *     <input>    a photo file, a product JSON file (Open Food Facts data), a barcode, else a text;
+ *                sent in the order given, after the test's
+ *     --test     a test file (see readTest in meal-tool.ts): its inputs first
+ *     --out      writes everything (inputs, request, answer, what the code made of it) to this
+ *                JSON file; nothing is written without it
+ *     --verbose  on stderr: the settings, brief notes as it goes, the stats at the end
  *
- *   node scripts/meal.ts --replay <dir or entry.json>
- *     reads and processes the stored answer again with the code as it is now (no model call),
- *     and rewrites entry.json and view.txt
+ * No meal (the model failed or answered nothing usable): why on stderr, exit code 1.
  */
-import { statSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   ask,
   geminiSend,
-  limited,
   given,
-  processEntry,
-  readEntry,
-  view,
-  writeEntry,
+  type Given,
+  givenText,
+  limited,
+  mealText,
+  noMeal,
+  readTest,
+  settingsText,
+  statsText,
+  writeJson,
 } from './meal-tool.ts';
+
+const LANGUAGE = 'ru';
 
 const { values: args, positionals } = parseArgs({
   allowPositionals: true,
   options: {
-    language: { type: 'string', default: 'ru' },
-    time: { type: 'string' },
-    out: { type: 'string' },
-    replay: { type: 'string' },
     verbose: { type: 'boolean', default: false },
+    test: { type: 'string' },
+    out: { type: 'string' },
   },
 });
+const note = args.verbose ? (text: string) => console.error(text) : undefined;
 
-if (args.replay) {
-  const dir = statSync(args.replay).isDirectory()
-    ? args.replay
-    : args.replay.replace(/\/[^/]*$/, '');
-  const entry = processEntry(readEntry(`${dir}/entry.json`));
-  writeEntry(dir, entry);
-  console.log(view(entry));
-  process.exit(0);
-}
-
-if (positionals.length === 0) {
-  console.error(
-    'Give the meal: photos, texts, barcodes, product JSON files. See the top of this file.',
-  );
+const test = args.test ? readTest(args.test) : undefined;
+const inputs: Given[] = [...(test?.given ?? []), ...positionals.map(given)];
+if (inputs.length === 0) {
+  console.error('Give the meal: photos, texts, barcodes, product JSON files, or --test=<file>.');
   process.exit(1);
 }
 const key = process.env.GEMINI_API_KEY;
@@ -59,18 +53,26 @@ if (!key) {
 }
 
 const now = new Date();
-if (args.time) {
-  const [h, m] = args.time.split(':').map(Number);
-  now.setHours(h!, m ?? 0, 0, 0);
+if (note) {
+  note(settingsText(LANGUAGE, now));
+  if (args.test) note(`test ${args.test}${test?.description ? `: ${test.description}` : ''}`);
+  note(`inputs ${inputs.map(givenText).join(' ')}`);
 }
+
 const entry = await ask({
   send: limited(geminiSend(key)),
-  language: args.language,
+  language: LANGUAGE,
   now,
-  given: positionals.map(given),
-  ...(args.verbose && { hint: (text: string) => console.error(text) }),
+  given: inputs,
+  ...(note && { hint: note }),
 });
-const dir = args.out ?? `test-results/meal/${entry.time.replace(/[:.]/g, '-')}`;
-writeEntry(dir, entry);
-console.log(view(entry));
-console.log(`\n${dir}/`);
+
+if (args.out) writeJson(args.out, entry);
+note?.(`${statsText(entry)}${args.out ? `; written to ${args.out}` : ''}`);
+
+const why = noMeal(entry);
+if (why) {
+  console.error(`No meal: ${why}`);
+  process.exit(1);
+}
+console.log(mealText(entry));

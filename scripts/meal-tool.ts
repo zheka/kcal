@@ -1,12 +1,13 @@
 /**
  * The meal composer's request, run locally: inputs (photos, texts, barcodes, product JSON) in,
- * the model's answer and what the code makes of it out, as a log entry (entry.json) and a text
- * view (view.txt). The lab's own code does the work (src/lab/meal, src/lab/ai); this file only
- * does what the browser would: shrink photos (sharp), look up barcodes, keep to the quota. Used
- * by scripts/meal.ts (one meal) and scripts/meal-bench.ts (the test meals).
+ * the model's answer and what the code makes of it out, as one entry (the lab's log entry, with
+ * the code's side added). The lab's own code does the work (src/lab/meal, src/lab/ai); this file
+ * only does what the browser would: shrink photos (sharp), look up barcodes, keep to the quota.
+ * Used by scripts/meal.ts (one meal) and scripts/meal-bench.ts (tests).
  */
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import sharp from 'sharp';
 import { lookUpBarcode } from '../src/data/openFoodFacts.ts';
 import { gemini } from '../src/lab/ai/gemini.ts';
@@ -22,7 +23,7 @@ Object.defineProperty(globalThis.navigator, 'onLine', { value: true, configurabl
 
 export const PROMPT_FILE = 'src/lab/meal/prompt.md';
 
-/** An input as given on the command line or in a bench case. */
+/** An input as given on the command line or in a test. */
 export type Given =
   { text: string } | { photo: string } | { barcode: string } | { productFile: string };
 
@@ -36,6 +37,47 @@ export function given(arg: string): Given {
   }
   if (/^\d{8,14}$/.test(arg)) return { barcode: arg };
   return { text: arg };
+}
+
+/**
+ * A test (a JSON file, kept out of the repo): what is hard about it, and the inputs in order.
+ * Texts and barcodes are inline; files (photos, product JSON, text files) are paths relative to
+ * the test file, or absolute.
+ *
+ *   { "description": "…", "inputs": [{ "photo": "data/meatballs.jpg" }, { "text": "…" }] }
+ */
+export interface Test {
+  description?: string;
+  given: Given[];
+}
+
+type TestInput =
+  | { text: string }
+  | { barcode: string }
+  | { photo: string }
+  | { product: string }
+  | { textFile: string };
+
+export function readTest(file: string): Test {
+  const json = JSON.parse(readFileSync(file, 'utf8')) as {
+    description?: string;
+    inputs?: TestInput[];
+  };
+  if (!Array.isArray(json.inputs)) throw new Error(`${file}: no "inputs" list`);
+  const path = (p: string) => {
+    const full = resolve(dirname(file), p);
+    if (!existsSync(full)) throw new Error(`${file}: no ${p}`);
+    return full;
+  };
+  const given = json.inputs.map((i): Given => {
+    if ('text' in i) return { text: i.text };
+    if ('barcode' in i) return { barcode: i.barcode };
+    if ('photo' in i) return { photo: path(i.photo) };
+    if ('product' in i) return { productFile: path(i.product) };
+    if ('textFile' in i) return { text: readFileSync(path(i.textFile), 'utf8').trim() };
+    throw new Error(`${file}: an input of no known kind: ${JSON.stringify(i)}`);
+  });
+  return { ...(json.description && { description: json.description }), given };
 }
 
 /** A brief note on what's going on, so a long wait has a reason (--verbose). */
@@ -148,7 +190,13 @@ export async function ask(a: Ask): Promise<Entry> {
     delays: RETRY_DELAYS_MS,
     onRetry: (attempt, of, ms) => a.hint?.(`busy; try ${attempt} of ${of} in ${ms / 1000} s…`),
   });
-  a.hint?.(response ? `answered in ${(response.ms / 1000).toFixed(1)} s` : 'not sent');
+  a.hint?.(
+    !response
+      ? 'not sent'
+      : response.error
+        ? `failed in ${(response.ms / 1000).toFixed(1)} s`
+        : `answered in ${(response.ms / 1000).toFixed(1)} s`,
+  );
   return processEntry({
     time: new Date().toISOString(),
     build: build(),
@@ -170,33 +218,56 @@ export function processEntry(entry: Entry): Entry {
   return { ...rest, read, processed: processMeal(read.meal, entry.language) };
 }
 
-/** The entry's text view: the meal, or why there is none. */
-export function view(entry: Entry): string {
+/** What came back, in a line: the model, the time, the tokens, the retries; or `not sent`. */
+export function about(entry: Entry): string {
   const r = entry.response;
-  const about = r
-    ? [
-        r.model,
-        `${(r.ms / 1000).toFixed(1)} s`,
-        r.tokens &&
-          `tokens in ${r.tokens.input} out ${r.tokens.output} thinking ${r.tokens.thinking ?? 0}`,
-        r.stop && `stop ${r.stop}`,
-        r.retried && `${r.retried.length} retried`,
-      ]
-        .filter(Boolean)
-        .join(', ')
-    : 'not sent';
-  if (!entry.processed) return `${about}\nNO MEAL: ${r?.error ?? 'not sent'}`;
-  return `${about}\n${textView(entry.processed, entry.read?.flags)}`;
+  if (!r) return 'not sent';
+  return [
+    r.model,
+    `${(r.ms / 1000).toFixed(1)} s`,
+    r.tokens &&
+      `tokens in ${r.tokens.input} out ${r.tokens.output} thinking ${r.tokens.thinking ?? 0}`,
+    r.stop && `stop ${r.stop}`,
+    r.retried && `${r.retried.length} retried`,
+  ]
+    .filter(Boolean)
+    .join(', ');
 }
 
-export function writeEntry(dir: string, entry: Entry): void {
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(`${dir}/entry.json`, `${JSON.stringify(entry, null, 2)}\n`);
-  writeFileSync(`${dir}/view.txt`, `${view(entry)}\n`);
+/** Why the entry has no meal, when it has none. */
+export const noMeal = (entry: Entry): string | undefined =>
+  entry.processed ? undefined : (entry.response?.error ?? 'not sent');
+
+/** The meal as text, with the reader's flags; empty when there is none. */
+export const mealText = (entry: Entry): string =>
+  entry.processed ? textView(entry.processed, entry.read?.flags) : '';
+
+/** The settings a request is sent with, for --verbose. */
+export const settingsText = (language: string, now: Date): string =>
+  `model ${SETTINGS.model}, thinking ${SETTINGS.thinking}, ` +
+  `temperature ${SETTINGS.temperature ?? 'default'}; ${SETTINGS.perMinute} requests a minute; ` +
+  `photos ${SETTINGS.photo.maxSide} px, quality ${SETTINGS.photo.quality}\n` +
+  `prompt ${PROMPT_FILE}, language ${language}, time ${now.toTimeString().slice(0, 5)}`;
+
+/** The answer's numbers, in a line, for --verbose. */
+export function statsText(e: Entry): string {
+  const items = e.processed?.dishes.flatMap((d) => d.items) ?? [];
+  const questions = items.flatMap((i) => i.questions);
+  return [
+    about(e),
+    e.processed &&
+      `${e.processed.dishes.length} dishes, ${items.length} items, ` +
+        `${questions.filter((q) => q.asked).length} of ${questions.length} questions asked, ` +
+        `${e.read?.flags.length ?? 0} flags`,
+  ]
+    .filter(Boolean)
+    .join('; ');
 }
 
-export function readEntry(path: string): Entry {
-  return JSON.parse(readFileSync(path, 'utf8')) as Entry;
+/** Writes the entry as one JSON file. */
+export function writeJson(file: string, entry: Entry): void {
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(entry, null, 2)}\n`);
 }
 
 /** The commit, `+` when the working tree has changes. */

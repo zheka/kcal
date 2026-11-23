@@ -74,10 +74,11 @@ entries as a JSON array, oldest first. No key, no image data, no meals.
 - **The model perceives, the code decides: prompt v5** (`src/lab/meal/`): the model returns
   dishes and products with whole alternatives; the code adds up, turns alternatives into
   questions and asks only those that matter. In code with a local tool (`scripts/meal.ts`) and
-  the bench on it (`scripts/meal-bench.ts`), not yet run on the bench. The format and why:
-  [lab-meal-format.md](lab-meal-format.md); the settings, the prompt's rules and why, the tool
-  and the bench: [lab-meal-prompt.md](lab-meal-prompt.md). Next: bench runs; then the meal
-  screen on the new format (dishes, asked questions as chips, values updated on a tap), with
+  the bench on it (`scripts/meal-bench.ts`), run once on the bench (tests out of the repo, in
+  `../kcal-tests`). The format and why: [lab-meal-format.md](lab-meal-format.md); the settings,
+  the prompt's rules and why, the tool and the bench: [lab-meal-prompt.md](lab-meal-prompt.md).
+  Next: the prompt's rule on stated things, more bench runs; then the meal screen on the new
+  format (dishes, asked questions as chips, values updated on a tap), with
   `src/lab/meal/settings.ts` instead of the menu's model, thinking and temperature, and the old
   `parameters` (types.ts, answer.ts, recompute.ts, prompt-v3.txt) removed.
 - **Choices and a new request**: with no meal sent back, a tap may become a small text in the
