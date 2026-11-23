@@ -49,7 +49,7 @@ In prompt v4's order (the numbers are the prompt's).
 
 1. **Always a complete best guess**; vague input gets a typical meal with no kind questions
    invented. Why: a gap or a question in prose can't be shown as chips; "business lunch, set B"
-   with invented "soup or salad" options is noise I can't answer better than the model (#529).
+   with invented "soup or salad" options is noise I can't answer better than the model (raised in discussing the examples).
    Still broken without thinking (v7: 0 of 2).
 2. **Only the meal in focus**; several plates in focus are all included. Why: other people's
    cups and plates were the commonest wrong rows; I remove a whole plate with one word ("я ел
