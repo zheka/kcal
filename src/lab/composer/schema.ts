@@ -55,7 +55,10 @@ const SIZED_PRODUCT = object({
 });
 
 const SIZE = object({
-  label: string('The menu’s name for the size, also the unit in the amount (1 grande).'),
+  label: string(
+    'The unit in the amount: a menu size (grande), a named portion (обычная), a piece (шт.); ' +
+      '"г" or "мл" only for a size of 1.',
+  ),
   size: amount('In the product’s base.'),
 });
 
@@ -64,28 +67,59 @@ const COUNT = object({
   count: amount(),
 });
 
-/** A question: the doubt, the guess, the options; one option and an empty why when certain. */
-const question = (option: Schema): Schema =>
+/**
+ * A question: the doubt, the guess, the options; one option and an empty why when certain. The
+ * rules the model breaks most when it writes without thinking are here, where it writes them.
+ */
+const OPTIONS =
+  'One option when certain, and always when the input states it (a stated kind, amount or ' +
+  'size). 2–4 only for a doubt the user can settle with a tap that changes 80+ kcal or 10+ g ' +
+  'protein; never for what nobody said or showed.';
+const question = (option: Schema, options = OPTIONS): Schema =>
   object({
-    why: string('The doubt, shown as the hint; empty when there is one option.'),
+    why: string('The doubt in a few words, shown as the hint; empty when there is one option.'),
     chosen: string('The label of the best guess, copied from an option.'),
-    options: { type: 'array', items: option },
+    options: { type: 'array', items: option, description: options },
   });
 
+const KINDS =
+  OPTIONS +
+  ' Unsure what a food is: options that are different foods (cod / chicken / pork), not ' +
+  'variants of the first guess.';
+const COUNTS =
+  OPTIONS +
+  ' Pieces (eggs, slices, cutlets, dumplings) are counted, also in a dish; a stated number ' +
+  'of pieces is one option.';
+
 const SIZED_FOOD = object(
-  { sized_food: object({ sized_products: question(SIZED_PRODUCT), counts: question(COUNT) }) },
-  { title: 'SizedFood', description: 'A food whose size comes with its kind.' },
+  {
+    sized_food: object({
+      sized_products: question(SIZED_PRODUCT, KINDS),
+      counts: question(COUNT, COUNTS),
+    }),
+  },
+  {
+    title: 'SizedFood',
+    description:
+      'A food whose size comes with its kind, and anything that comes in pieces (an egg, a ' +
+      'slice, a cutlet): counted in its units.',
+  },
 );
 
 const FOOD = object(
   {
     food: object({
-      products: question(object(PRODUCT)),
+      products: question(object(PRODUCT), KINDS),
       sizes: question(SIZE),
-      counts: question(COUNT),
+      counts: question(COUNT, COUNTS),
     }),
   },
-  { title: 'Food', description: 'A food whose size is chosen on its own, or a loose food.' },
+  {
+    title: 'Food',
+    description:
+      'A food whose size is chosen on its own (a menu size), or loose food: a named portion ' +
+      'counted 1, or grams (a size "г" of 1) when the weight is stated or small.',
+  },
 );
 
 const DISH = object(

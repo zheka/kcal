@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amounts, isNone, type Meal, readMeal, screenForm, total } from './meal';
+import { amounts, amountText, isNone, type Meal, readMeal, screenForm, total } from './meal';
 
 const per = (kcal: number, protein = 0) => ({ kcal, protein, fat: 0, carbs: 0, water: 0 });
 const one = <T extends { label: string }>(option: T) => ({
@@ -110,6 +110,28 @@ describe('readMeal', () => {
     expect(read.problems).toEqual([]);
     expect(read.notes).toEqual(['items[1].counts: a why on a certain question, dropped']);
     expect((read.meal.items[1] as typeof milk).food.counts.why).toBe('');
+  });
+});
+
+describe('readMeal, a piece labelled as the unit', () => {
+  it('is relabelled шт., the amount unchanged', () => {
+    const eggs = {
+      title: 'Омлет',
+      items: [
+        {
+          food: {
+            products: one({ label: 'яйцо', name: 'Яйцо', base: 'g', per_100: per(155) }),
+            sizes: one({ label: 'г', size: 50 }),
+            counts: count(3),
+          },
+        },
+      ],
+    };
+    const read = readMeal(eggs);
+    expect(read.problems).toEqual([]);
+    expect(read.notes).toEqual(['items[0].sizes: a size of 50 labelled as the unit, as шт.']);
+    expect(amountText(read.meal.items[0]!)).toBe('3 шт.');
+    expect(amounts(read.meal.items[0]!).amount).toBe(150);
   });
 });
 

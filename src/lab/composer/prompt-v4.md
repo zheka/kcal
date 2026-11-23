@@ -78,6 +78,11 @@ Every question (`sized_products`, `products`, `sizes`, `counts`) has `why`, `cho
    portion of loose food) → `food` with `sizes`. A menu size that is a number of pieces (6 or 12
    escargots) is a count.
 
+   Pieces are counted, never weighed: eggs, slices, cutlets, dumplings, sausages, cookies are a
+   count of pieces with the piece's size (`sized_food` with unit `шт.`), also as parts of a dish.
+   "3 яйца" is 3 шт., not 150 g; in home cooking the user knows the number, so a count question
+   when it's unclear (1 / 2 eggs). Grams only for loose food.
+
 8. One base per row: when kinds would differ (soup in ml, a main in g), use g for all.
 
 9. Questions are independent: any combination of answers must be valid. The count is separate

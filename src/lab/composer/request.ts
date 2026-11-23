@@ -35,6 +35,7 @@ export const CHECKLIST = `Before answering, check your answer against the rules:
 - Unsure what a food is: a kind question whose options are different foods (cod / chicken / pork).
 - No question under 80 kcal or 10 g protein, and none about what the input states: a stated
   kind or amount has one option.
-- Loose food portions named (маленькая / обычная / большая), never grams the user can't know.
+- Pieces counted (3 яйца = 3 шт., also in a dish); loose food portions named (маленькая /
+  обычная / большая), never grams the user can't know; a size labelled "г" is 1 g.
 - Amount = count × size: a weight in one place only; a dish's parts per serving.
 - Every question with options has a short why; chosen is one of its labels.`;

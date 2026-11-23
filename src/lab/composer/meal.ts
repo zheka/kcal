@@ -78,6 +78,9 @@ export interface Meal {
 
 // Reading --------------------------------------------------------------------------------------
 
+/** Size labels that are the base unit itself: such a size is 1. */
+const BASE_UNITS = ['г', 'g', 'мл', 'ml'];
+
 /** More options than this is the model hedging, not a choice. */
 export const MAX_OPTIONS = 8;
 
@@ -163,6 +166,20 @@ export function readMeal(raw: unknown): { meal: Meal; problems: string[]; notes:
     label: label(o.label, `${at}.label`),
     count: amount(o.count, `${at}.count`),
   });
+  /**
+   * A size labelled as the base unit itself ("г") must be 1 g: one of 50 g is a piece the model
+   * mislabelled (an egg shown as "3 г"), relabelled шт. The amounts were right already.
+   */
+  const pieces = (q: Question<Size>, at: string): Question<Size> => {
+    const wrong = (o: Size) => BASE_UNITS.includes(o.label.toLowerCase()) && o.size !== 1;
+    if (!q.options.some(wrong)) return q;
+    notes.push(`${at}: a size of ${q.options.find(wrong)!.size} labelled as the unit, as шт.`);
+    const taken = new Set(q.options.map((o) => o.label));
+    const relabel = (o: Size) => (taken.has('шт.') ? `шт. ${num(o.size)}` : 'шт.');
+    const options = q.options.map((o) => (wrong(o) ? { ...o, label: relabel(o) } : o));
+    const was = q.options.findIndex((o) => o.label === q.chosen);
+    return { ...q, options, chosen: options[was]!.label };
+  };
   const oneBase = (products: Product[], at: string) => {
     if (new Set(products.map((p) => p.base)).size > 1) fail(at, 'products of different bases');
   };
@@ -184,7 +201,7 @@ export function readMeal(raw: unknown): { meal: Meal; problems: string[]; notes:
       return {
         food: {
           products,
-          sizes: question(f.sizes, `${at}.sizes`, size),
+          sizes: pieces(question(f.sizes, `${at}.sizes`, size), `${at}.sizes`),
           counts: question(f.counts, `${at}.counts`, count),
         },
       };
