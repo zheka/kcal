@@ -135,12 +135,12 @@ describe('clearLab', () => {
       kcal: '{"real":"data"}',
       'kcal-proto-gemini-key': 'k',
       'kcal-composer-options': '{}',
-      'clog-settings': 'x',
+      'other-project-settings': 'x',
     });
     const a = await open('one');
     await a.data.set({ x: 1 });
     await open('two'); // left open: clearLab closes it
-    for (const name of ['kcal-composer', 'kcal', 'kcal-labrador', 'clog'])
+    for (const name of ['kcal-composer', 'kcal', 'kcal-labrador', 'other-project'])
       (await rawOpen(name)).close();
 
     expect(await labTraces()).toEqual({
@@ -150,11 +150,11 @@ describe('clearLab', () => {
     await clearLab();
     expect(await labTraces()).toEqual({ databases: [], keys: [] });
     expect((await indexedDB.databases()).map((d) => d.name).sort()).toEqual([
-      'clog',
       'kcal',
       'kcal-labrador',
+      'other-project',
     ]);
-    expect(Object.keys(localStorage).sort()).toEqual(['clog-settings', 'kcal']);
+    expect(Object.keys(localStorage).sort()).toEqual(['kcal', 'other-project-settings']);
     expect(localStorage.getItem('kcal')).toBe('{"real":"data"}');
   });
 

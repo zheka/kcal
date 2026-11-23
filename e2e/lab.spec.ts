@@ -29,14 +29,14 @@ test('the app’s service worker leaves navigations to /kcal/lab/ to the network
 test('the lab clears its own data and the prototype’s, and leaves everything else', async ({
   page,
 }) => {
-  // Another project's data and the app's, the prototype's leftovers, and another experiment's.
+  // Another project's data on the shared origin, the app's, the prototype's leftovers, and another experiment's.
   await page.goto('lab/');
   await page.evaluate(async () => {
     localStorage.setItem('kcal', '{"real":"data"}');
-    localStorage.setItem('clog', 'x');
+    localStorage.setItem('other-project', 'x');
     localStorage.setItem('kcal-proto-gemini-key', 'k');
     localStorage.setItem('kcal-composer-options', '{}');
-    for (const name of ['kcal-composer', 'kcal-lab-other', 'kcal-other', 'clog']) {
+    for (const name of ['kcal-composer', 'kcal-lab-other', 'kcal-other', 'other-project']) {
       await new Promise((resolve) => {
         const request = indexedDB.open(name);
         request.onsuccess = () => (request.result.close(), resolve(null));
@@ -59,8 +59,8 @@ test('the lab clears its own data and the prototype’s, and leaves everything e
     databases: (await indexedDB.databases()).map((d) => d.name).sort(),
   }));
   expect(left).toEqual({
-    keys: ['clog', 'kcal'],
+    keys: ['kcal', 'other-project'],
     kcal: '{"real":"data"}',
-    databases: ['clog', 'kcal-other'],
+    databases: ['kcal-other', 'other-project'],
   });
 });
