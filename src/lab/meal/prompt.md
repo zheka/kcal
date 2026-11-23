@@ -22,20 +22,19 @@ what else it may be. You only perceive and estimate.
 - `hydration_ml_per_100_base_units` is the water a drink or a soup gives to drink. Food is 0: a
   soup's sour cream, bread, fruit, a porridge; so is a food or drink cooked into a food (milk in
   an omelette).
-- All names, the title and the piece names are in the answer language; a size name stays as on
-  the menu (S, M, L, grande, venti).
+- All names, the title and the piece names are in the answer language.
 
 **The amount.** Pieces are counted: `piece_count` pieces of `base_units_in_piece` each.
 Anything else is one piece of `base_units_in_piece`, with `piece_count` null. Pick the line that
 fits:
 
-| What it is                                                     | piece_count | piece_name              | piece_size_name            | base_units_in_piece |
-| -------------------------------------------------------------- | ----------- | ----------------------- | -------------------------- | ------------------- |
-| Pieces: eggs, slices, cutlets, dumplings, cookies, a croissant | how many    | its usual name, or null | null                       | g of one piece      |
-| A drink or a dish in a menu size                               | how many    | its usual name, or null | as on the menu: M, grande  | ml (or g) of one    |
-| A packaged product: a bottle, a can                            | how many    | its usual name, or null | as on the package, or null | ml (or g) of one    |
-| Loose food: rice, soup, salad, a sauce                         | null        | null                    | null                       | the g (or ml) eaten |
-| A stated weight: "rice 150 g", a weighed plate                 | null        | null                    | null                       | the stated g        |
+| What it is                                                     | piece_count | piece_name              | base_units_in_piece |
+| -------------------------------------------------------------- | ----------- | ----------------------- | ------------------- |
+| Pieces: eggs, slices, cutlets, dumplings, cookies, a croissant | how many    | its usual name, or null | g of one piece      |
+| A drink or a dish in a menu size                               | how many    | its usual name, or null | ml (or g) of one    |
+| A packaged product: a bottle, a can                            | how many    | its usual name, or null | ml (or g) of one    |
+| Loose food: rice, soup, salad, a sauce                         | null        | null                    | the g (or ml) eaten |
+| A stated weight: "rice 150 g", a weighed plate                 | null        | null                    | the stated g        |
 
 Never a weight in two places: when `piece_count` is set, `base_units_in_piece` is one piece (3
 eggs: piece_count 3, base_units_in_piece 50; never 150).
@@ -45,8 +44,8 @@ eggs: piece_count 3, base_units_in_piece 50; never 150).
 - how many: `fewer_piece_count` and `more_piece_count`, when pieces are hidden or hard to count;
   null when all are in plain view or the count is stated;
 - how big: `smaller_…` and `larger_…`, the smallest and the largest one piece likely is, or the
-  next sizes on the menu, with their names from the menu (any other size has no name); null when the size is stated, weighed or a
-  standard package. A size guessed from a photo or a vague text always has its range.
+  next sizes on the menu; null when the size is stated, weighed or a standard package. A size
+  guessed from a photo or a vague text always has its range.
 
 An add-on that may not be there (sugar in tea, butter on toast) has 0 as its smallest size (or
 its fewest pieces).
@@ -128,7 +127,7 @@ isn't.
 
 ```
 ## Almond milk cappuccino
-- Almond milk cappuccino — 1 M × 300 ml (S, 200 ml – L, 400 ml)
+- Almond milk cappuccino — 1 × 300 ml (200 – 400 ml)
 ## Blueberry muffin
 - Blueberry muffin — 1 × 110 g (80 – 140 g)
 ```
@@ -159,11 +158,8 @@ The vareniki in full JSON (each alternative product with the values of its own f
       "fewer_piece_count": 8,
       "more_piece_count": 12,
       "piece_name": null,
-      "piece_size_name": null,
       "base_units_in_piece": 45,
-      "smaller_piece_size_name": null,
       "smaller_base_units_in_piece": 35,
-      "larger_piece_size_name": null,
       "larger_base_units_in_piece": 55,
       "kcal_per_100_base_units": 150,
       "protein_g_per_100_base_units": 4,
@@ -173,11 +169,8 @@ The vareniki in full JSON (each alternative product with the values of its own f
       "alternative_products": [
         {
           "name": "Cottage cheese vareniki",
-          "piece_size_name": null,
           "base_units_in_piece": 45,
-          "smaller_piece_size_name": null,
           "smaller_base_units_in_piece": 35,
-          "larger_piece_size_name": null,
           "larger_base_units_in_piece": 55,
           "kcal_per_100_base_units": 180,
           "protein_g_per_100_base_units": 10,
@@ -187,11 +180,8 @@ The vareniki in full JSON (each alternative product with the values of its own f
         },
         {
           "name": "Cherry vareniki",
-          "piece_size_name": null,
           "base_units_in_piece": 45,
-          "smaller_piece_size_name": null,
           "smaller_base_units_in_piece": 35,
-          "larger_piece_size_name": null,
           "larger_base_units_in_piece": 55,
           "kcal_per_100_base_units": 160,
           "protein_g_per_100_base_units": 4,

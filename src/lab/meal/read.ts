@@ -14,20 +14,15 @@ export interface Per100 {
   water: number;
 }
 
-/** A size: one piece (or the whole amount, as one piece), with its name if it has one. */
-export interface Size {
-  /** A menu size, a portion (M, grande, large). */
-  name: string | null;
-  /** In the item's base. */
-  amount: number;
-}
-
-/** A food or drink an item may be: its size, the smallest and largest it likely is, its values. */
+/**
+ * A food or drink an item may be: its size (one piece, or the whole amount as one piece, in the
+ * item's base), the smallest and largest it likely is, its values.
+ */
 export interface Food {
   name: string;
-  size: Size;
-  smaller: Size | null;
-  larger: Size | null;
+  size: number;
+  smaller: number | null;
+  larger: number | null;
   per_100: Per100;
 }
 
@@ -117,18 +112,6 @@ export function readMeal(raw: unknown): { meal: Meal; flags: string[] } {
     return v;
   }
 
-  /** A size bound with its name: a name with no size is dropped, flagged. */
-  function sizeBound(x: Obj, side: 'smaller' | 'larger', guess: number, at: string): Size | null {
-    const amount = bound(x, `${side}_base_units_in_piece`, guess, side === 'smaller' ? -1 : 1, at);
-    const name = textOrNull(x[`${side}_piece_size_name`]);
-    if (amount === null) {
-      if (name && x[`${side}_base_units_in_piece`] === null)
-        flag(`${at}.${side}_piece_size_name`, `"${name}" with no size, dropped`);
-      return null;
-    }
-    return { name, amount };
-  }
-
   /** A food: the product's own or an alternative product. Null when it has no size. */
   function food(x: Obj, at: string): Food | null {
     const name = textOrNull(x.name);
@@ -140,9 +123,9 @@ export function readMeal(raw: unknown): { meal: Meal; flags: string[] } {
     }
     return {
       name: name ?? '?',
-      size: { name: textOrNull(x.piece_size_name), amount },
-      smaller: sizeBound(x, 'smaller', amount, at),
-      larger: sizeBound(x, 'larger', amount, at),
+      size: amount,
+      smaller: bound(x, 'smaller_base_units_in_piece', amount, -1, at),
+      larger: bound(x, 'larger_base_units_in_piece', amount, 1, at),
       per_100: per100(x, at),
     };
   }
@@ -159,7 +142,7 @@ export function readMeal(raw: unknown): { meal: Meal; flags: string[] } {
     }
     const mass = v.protein + v.fat + v.carbs + v.water;
     if (item.base === 'g' && mass > 105) flag(at, `"${f.name}": ${Math.round(mass)} g of 100 g`);
-    const amount = (item.count ?? 1) * f.size.amount;
+    const amount = (item.count ?? 1) * f.size;
     const kcal = (amount * v.kcal) / 100;
     if (amount > MAX_AMOUNT || kcal > MAX_KCAL) {
       flag(at, `"${f.name}": ${Math.round(amount)} ${item.base}, ${Math.round(kcal)} kcal`);

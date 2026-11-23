@@ -10,8 +10,8 @@
  * closely than the prompt (`hydration_ml` alone was read as the ml drunk, see
  * docs/lab-meal-format.md). Examples are in English, of form only (never values to copy), and
  * the answer is in the answer language: copied Russian words came out uninflected, and copied
- * English ones untranslated ("cup", "small"), so piece names have no examples, and a size is named
- * only when it has a real name (a menu's, a package's); the code shows the rest by amount.
+ * English ones untranslated ("cup", "small"), so piece names have no examples. Sizes have no names
+ * (a menu's M, grande, 0,5 read wrong next to the piece's name): the code shows them by amount.
  */
 
 type Schema = Record<string, unknown>;
@@ -32,32 +32,17 @@ const orNull = (type: string, description: string): Schema => ({
 // No minimum or item counts: Gemini rejects a schema with many of them ("too many states").
 const number = (description: string): Schema => ({ type: 'number', description });
 
-/** A size's name: only a real one, as printed; anything else is shown by its amount. */
-const SIZE_NAME = 'as named on a menu or a package (S, M, L, grande, venti, 0,5)';
-
 /** A product's size and its likely range: the product's own, or an alternative product's. */
 const SIZE = {
-  piece_size_name: orNull(
-    'string',
-    `The piece's size ${SIZE_NAME}; null when it has no such name.`,
-  ),
   base_units_in_piece: number(
     'In base_unit: one piece (an egg: 50); for loose food and stated weights, the whole amount ' +
       'eaten, as one piece (rice: 200). Never the total of all pieces.',
-  ),
-  smaller_piece_size_name: orNull(
-    'string',
-    `The size of smaller_base_units_in_piece ${SIZE_NAME}; null when it has no such name.`,
   ),
   smaller_base_units_in_piece: orNull(
     'number',
     'The smallest one piece likely is, or the next smaller size on the menu, in base_unit; 0 ' +
       'when it may not be there at all. null when the size is stated, weighed or a standard ' +
       'package.',
-  ),
-  larger_piece_size_name: orNull(
-    'string',
-    `The size of larger_base_units_in_piece ${SIZE_NAME}; null when it has no such name.`,
   ),
   larger_base_units_in_piece: orNull(
     'number',

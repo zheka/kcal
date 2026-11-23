@@ -21,15 +21,12 @@ const PER = {
   hydration_ml_per_100_base_units: 0,
 };
 const NO_RANGE = {
-  smaller_piece_size_name: null,
   smaller_base_units_in_piece: null,
-  larger_piece_size_name: null,
   larger_base_units_in_piece: null,
 };
 /** A food as the model answers it: an alternative product, or a product's own part. */
 const food = (over: Record<string, unknown> = {}) => ({
   name: 'Вареники с картошкой',
-  piece_size_name: null,
   base_units_in_piece: 45,
   ...NO_RANGE,
   ...PER,
@@ -54,7 +51,6 @@ const product = (over: Partial<Product> = {}): Product => ({
   base: 'g',
   count: 10,
   unit: 'шт.',
-  alias: null,
   size: 45,
   per_100: { kcal: 150, protein: 4, carbs: 26, fat: 3, water: 0 },
   ...over,
@@ -73,7 +69,7 @@ describe('readMeal', () => {
       fewer: null,
       more: null,
       unit: 'шт.',
-      foods: [{ name: 'Вареники с картошкой', size: { name: null, amount: 45 }, smaller: null }],
+      foods: [{ name: 'Вареники с картошкой', size: 45, smaller: null }],
     });
   });
 
@@ -83,25 +79,21 @@ describe('readMeal', () => {
         raw({
           fewer_piece_count: 8,
           more_piece_count: 10, // the guess: no bound
-          smaller_piece_size_name: 'S',
           smaller_base_units_in_piece: 50, // over the guess: dropped
-          larger_piece_size_name: 'L',
           larger_base_units_in_piece: 60,
         }),
       ),
     );
     const item = m.dishes[0]!.items[0]!;
     expect([item.fewer, item.more]).toEqual([8, null]);
-    expect(item.foods[0]).toMatchObject({ smaller: null, larger: { name: 'L', amount: 60 } });
+    expect(item.foods[0]).toMatchObject({ smaller: null, larger: 60 });
     expect(flags).toEqual([expect.stringContaining('50, not under 45: dropped')]);
   });
 
-  it('drops a size name with no size, and a count range of loose food', () => {
-    const { meal: m, flags } = readMeal(
-      meal(raw({ piece_count: null, more_piece_count: 3, larger_piece_size_name: 'large' })),
-    );
+  it('drops a count range of loose food', () => {
+    const { meal: m, flags } = readMeal(meal(raw({ piece_count: null, more_piece_count: 3 })));
     expect(m.dishes[0]!.items[0]).toMatchObject({ count: null, more: null });
-    expect(flags).toEqual([expect.stringContaining('"large" with no size, dropped')]);
+    expect(flags).toEqual([]);
   });
 
   it('drops an alternative product named as one before, and a product with no size', () => {
@@ -286,12 +278,9 @@ describe('amounts', () => {
     expect(values(product()).kcal).toBeCloseTo(675);
     expect(values(product({ count: null, size: 200 })).amount).toBe(200);
     expect(amountText(product())).toBe('10 шт. × 45г');
-    expect(amountText(product({ count: null, alias: '0,5', size: 500, base: 'ml' }))).toBe(
-      '0,5, 500мл',
-    );
+    expect(amountText(product({ count: null, size: 500, base: 'ml' }))).toBe('500мл');
     // a piece with no name: the count alone
     expect(amountText(product({ unit: null, count: 2, size: 50 }))).toBe('2 × 50г');
-    expect(amountText(product({ unit: null, count: 1, alias: 'M', size: 250 }))).toBe('1 M × 250г');
   });
 
   it('strips the words names share', () => {

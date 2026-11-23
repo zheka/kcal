@@ -8,7 +8,7 @@
  * some guesses are over, some under); none under the budget's minimum is ever asked. Whether a
  * question is asked is judged at the model's guesses, so answers never change it.
  */
-import type { Food, Item, Meal, Per100, Size } from './read.ts';
+import type { Food, Item, Meal, Per100 } from './read.ts';
 
 /** A product as eaten: its amount is (count ?? 1) × size, in its base. */
 export interface Product {
@@ -18,8 +18,6 @@ export interface Product {
   count: number | null;
   /** The piece as counted (шт., ломт.). */
   unit: string | null;
-  /** A size name: a menu size, a portion. */
-  alias: string | null;
   /** One piece when counted, else the whole amount. */
   size: number;
   per_100: Per100;
@@ -79,7 +77,7 @@ export interface Question {
 export interface ProcessedItem {
   /** The product's name, as chosen. */
   name: string;
-  /** As said: `2 шт. × 50г`, `M, 250мл`. */
+  /** As said: `2 шт. × 50г`, `250мл`. */
   amount: string;
   product: Product;
   values: Values;
@@ -216,13 +214,12 @@ function product(item: Item, food: Food, size = food.size, count = item.count): 
     base: item.base,
     count,
     unit: item.unit,
-    alias: size.name,
-    size: size.amount,
+    size,
     per_100: food.per_100,
   };
 }
 
-const sizesOf = (f: Food): Size[] => [f.smaller, f.size, f.larger].filter((s) => s !== null);
+const sizesOf = (f: Food): number[] => [f.smaller, f.size, f.larger].filter((s) => s !== null);
 const countsOf = (i: Item): number[] =>
   i.count === null ? [] : [i.fewer, i.count, i.more].filter((c) => c !== null);
 
@@ -248,7 +245,7 @@ function changes(item: Item): Partial<Record<Axis, number>> {
 /** An item as answered: the product chosen, at its size and count chosen, and its questions. */
 function view(item: Item, a: ItemAnswers, u: Units): ProcessedItem {
   const food = item.foods.find((f) => f.name === a.food) ?? item.foods[0]!;
-  const size = sizesOf(food).find((s) => String(s.amount) === a.sizes?.[food.name]) ?? food.size;
+  const size = sizesOf(food).find((s) => String(s) === a.sizes?.[food.name]) ?? food.size;
   const count = countsOf(item).find((c) => String(c) === a.count) ?? item.count;
   const current = product(item, food, size, count);
   const now = values(current);
@@ -283,10 +280,10 @@ function view(item: Item, a: ItemAnswers, u: Units): ProcessedItem {
   }
   if (sizesOf(food).length > 1) {
     const options = sizesOf(food).map((s) => ({
-      id: String(s.amount),
+      id: String(s),
       product: product(item, food, s, count),
     }));
-    questions.push(question('size', options, String(size.amount)));
+    questions.push(question('size', options, String(size)));
   }
   if (countsOf(item).length > 1) {
     const options = countsOf(item).map((c) => ({
@@ -311,7 +308,7 @@ function optionLabels(axis: Axis, all: Product[], u: Units): string[] {
   const kinds = distinctNames(all.map((p) => p.name));
   const labels = all.map((p, i) => {
     if (axis === 'kind') return kinds[i]!;
-    if (axis === 'size') return p.alias ?? `${num(p.size)}${u[p.base]}`;
+    if (axis === 'size') return `${num(p.size)}${u[p.base]}`;
     return num(p.count ?? 1);
   });
   if (new Set(labels).size === labels.length) return labels;
@@ -347,14 +344,13 @@ export function distinctNames(names: string[]): string[] {
 }
 
 /**
- * The amount as said: `2 ломт. × 30г`, `2 × 50г` (a piece with no name), `1 стакан M × 350мл`,
- * `0,5, 500мл`, `150г`; a unit right after its number, as in the values (`450g, 675kcal`).
+ * The amount as said: `2 ломт. × 30г`, `2 × 50г` (a piece with no name), `150г`; a unit right
+ * after its number, as in the values (`450g, 675kcal`).
  */
 export function amountText(p: Product, u = units('ru')): string {
   const size = `${num(p.size)}${u[p.base]}`;
-  if (p.count === null) return p.alias ? `${p.alias}, ${size}` : size;
-  const unit = [p.unit, p.alias].filter(Boolean).join(' ');
-  return `${num(p.count)}${unit ? ` ${unit}` : ''} × ${size}`;
+  if (p.count === null) return size;
+  return `${num(p.count)}${p.unit ? ` ${p.unit}` : ''} × ${size}`;
 }
 
 export const num = (x: number) => String(Math.round(x * 10) / 10);

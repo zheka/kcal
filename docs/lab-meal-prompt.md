@@ -76,8 +76,8 @@ model has no use for knowing, and the bounds' own slots now ask for every doubt.
 - **Dishes are named foods**, as a menu or a food diary names them, the same each time, without
   containers, the meal, amounts or doubts; a food of its own is a dish of its own. Why: the
   names are for matching against history (see the format doc).
-- **The amount, as a table**: pieces counted (`piece_count` × one piece), menu sizes
-  (`piece_size_name`), loose food and stated weights as one `base_units_in_piece` with
+- **The amount, as a table**: pieces counted (`piece_count` × one piece), menu sizes and
+  packages as pieces, loose food and stated weights as one `base_units_in_piece` with
   `piece_count` null. Never a weight in two
   places. Why: a table of plain cases worked in v4 where prose was mixed up (eggs weighed, "3
   г"); the 72,000 kcal omelette was a weight written twice.
@@ -130,8 +130,8 @@ model has no use for knowing, and the bounds' own slots now ask for every doubt.
 9. **Amounts are what is eaten** (no bones, shells, peel, ice); cooking fat is part of the food.
 10. **One `base_unit` per product, its alternative products included**, g when they'd differ (#40,
     #502). Why: the code compares their values.
-11. **Names in full** (an alternative product's too), piece names and size names short, in
-    the answer language. Why: a chip's label is computed from the names' difference.
+11. **Names in full** (an alternative product's too), piece names short, in the answer
+    language. Why: a chip's label is computed from the names' difference.
 
 **What v4's rules became:** the threshold (now a share of the meal's kcal), "at most 3 questions",
 labels in words, the order of options, independent questions and "none" as an answer are now
