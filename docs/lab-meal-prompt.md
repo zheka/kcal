@@ -52,7 +52,7 @@ entry records them with the request.
 4. **The checklist** (`CHECKLIST`), last: the rules broken most, restated. Why: the guide says
    instructions after a large input are heeded best.
 5. **The schema's descriptions**: the same rules again, on the fields they govern (a dish's
-   name; `count` only for pieces; `unit_amount` one piece when counted; alternatives for real
+   name; `piece_count` only for pieces; `base_units_in_piece` one piece; alternatives for real
    doubt only, different foods, one change each). Why: without thinking, Flash-Lite writes the
    JSON field by field; the description is in front of it as it writes the field. In v4 this
    fixed stated facts in updates and invented kinds where the prompt and checklist hadn't.
@@ -67,19 +67,22 @@ alternatives matter and asks; the model never judges whether a doubt is worth as
 - **Dishes are named foods**, as a menu or a food diary names them, the same each time, without
   containers, the meal, amounts or doubts; a food of its own is a dish of its own. Why: the
   names are for matching against history (see the format doc).
-- **The amount, as a table**: pieces counted (`count` × one piece), menu sizes (`amount_alias`),
-  loose food and stated weights as one `unit_amount` with `count` null. Never a weight in two
+- **The amount, as a table**: pieces counted (`piece_count` × one piece), menu sizes
+  (`piece_size_name`), loose food and stated weights as one `base_units_in_piece` with
+  `piece_count` null. Never a weight in two
   places. Why: a table of plain cases worked in v4 where prose was mixed up (eggs weighed, "3
   г"); the 72,000 kcal omelette was a weight written twice.
 - **Alternatives are complete products, one change each** (what it is, how big, or how many);
   an add-on that may not be there has an alternative of 0. Why: one change each is what lets the
   code split them into independent questions.
-- **`hydration_ml`: the water to drink**, from drinks and soups; food 0, a soup's sour cream
-  included, and so is a food or drink cooked into a food. Only what it means, no values: how much
-  water a drink gives is the model's to find, as kcal are. Why: the field was `water_g` and the
-  model gave food its water content; the app counts drinks and soups only (design.md, Water). In
-  run 3 the milk in an omelette got 44 ml (hence cooked-in), and with a list of values in the
-  prompt (coffee 99) a cappuccino got 99 where its milk makes it about 90.
+- **`hydration_ml_per_100_base_units`: the water to drink**, from drinks and soups; food 0, a
+  soup's sour cream included, and so is a food or drink cooked into a food. Only what it means,
+  no values: how much water a drink gives is the model's to find, as kcal are. Why: the field was
+  `water_g` and the model gave food its water content; the app counts drinks and soups only
+  (design.md, Water). In run 3 the milk in an omelette got 44 ml (hence cooked-in), and with a
+  list of values in the prompt (coffee 99) a cappuccino got 99 where its milk makes it about 90.
+  Without the list (run 4) the scale went instead: as `hydration_ml` it got a can's 330 ml, hence
+  the full name and "at most 100" in the schema (see the format doc, Keys say everything).
 
 **The rules** (the numbers are the prompt's):
 
@@ -107,7 +110,7 @@ alternatives matter and asks; the model never judges whether a doubt is worth as
    on plainly visible counts were noise; v4's alternatives were variants of a wrong guess
    (beef / horse for tuna), so the right answer wasn't a chip.
 9. **Amounts are what is eaten** (no bones, shells, peel, ice); cooking fat is part of the food.
-10. **One `basis_unit` per product and its alternatives**, g when they'd differ (#40, #502). Why:
+10. **One `base_unit` per product and its alternatives**, g when they'd differ (#40, #502). Why:
     the code compares their values.
 11. **Names in full** (an alternative's too), units and aliases short, all in the answer
     language. Why: a chip's label is computed from the names' difference.

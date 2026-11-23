@@ -1,10 +1,14 @@
 /**
  * What the model answers (Gemini's `responseJsonSchema`): only what it perceives. Dishes named
  * as a menu or a food diary would (for finding them in history later), their products with
- * amounts and values per 100, and, where it is unsure, alternatives: whole products it could be
- * instead. Nothing about what to ask or what
- * matters: the code decides that (process.ts). Keys are in the order the model should decide
- * them (Gemini keeps the schema's order). Read by read.ts, forgivingly.
+ * amounts and values per 100 of their unit, and, where it is unsure, alternatives: whole
+ * products it could be instead. Nothing about what to ask or what matters: the code decides
+ * that (process.ts). Keys are in the order the model should decide them (Gemini keeps the
+ * schema's order). Read by read.ts, forgivingly.
+ *
+ * Names and descriptions say everything, units and scale included: the model follows them more
+ * closely than the prompt (`hydration_ml` alone was read as the ml drunk, see
+ * docs/lab-meal-format.md).
  */
 
 type Schema = Record<string, unknown>;
@@ -25,49 +29,42 @@ const orNull = (type: string, description: string): Schema => ({
 // No minimum or item counts: Gemini rejects a schema with many of them ("too many states").
 const number = (description: string): Schema => ({ type: 'number', description });
 
-const PER_100 = object(
-  {
-    calories: number('kcal per 100 basis_unit'),
-    protein_g: number('protein, g per 100 basis_unit'),
-    carbs_g: number('carbohydrates, g per 100 basis_unit'),
-    fat_g: number('fat, g per 100 basis_unit'),
-    hydration_ml: number(
-      'Water a drink or a soup gives to drink, ml per 100 basis_unit; 0 for food, and for a ' +
-        'food or drink cooked into a food (milk in an omelette).',
-    ),
-  },
-  { description: 'Values per 100 g or 100 ml of the product as eaten.' },
-);
-
 const PRODUCT = {
   name: string(
     'The specific food or drink, with its preparation when it matters, in the answer language: ' +
       '"Яйцо жареное", "Вареники с картошкой".',
   ),
-  basis_unit: {
+  base_unit: {
     type: 'string',
     enum: ['g', 'ml'],
-    description: 'The unit of unit_amount and per_100: g, or ml for drinks and soups.',
+    description: "The unit of this product's amounts and values: g, or ml for drinks and soups.",
   },
-  count: orNull(
+  piece_count: orNull(
     'number',
     'How many pieces when it comes in pieces (eggs, slices, cutlets, dumplings, cookies, ' +
       'drinks); null for loose food and stated weights.',
   ),
-  unit_name: orNull(
+  piece_name: orNull(
     'string',
-    'The piece as counted, short: шт., ломт., стакан, бутылка; null when count is null.',
+    'The piece as counted, short: шт., ломт., стакан, бутылка; null when piece_count is null.',
   ),
-  amount_alias: orNull(
+  piece_size_name: orNull(
     'string',
-    'A size name when there is one: a menu size (S, M, L, grande, 0,5) or a portion ' +
-      '(маленькая, обычная, большая); null otherwise.',
+    "The piece's size by name when there is one: a menu size (S, M, L, grande, 0,5) or a " +
+      'portion (маленькая, обычная, большая); null otherwise.',
   ),
-  unit_amount: number(
-    'In basis_unit: one piece when count is set (an egg: 50); otherwise the whole amount eaten ' +
-      '(rice: 200). Never the total of all pieces when count is set.',
+  base_units_in_piece: number(
+    'In base_unit: one piece (an egg: 50); for loose food and stated weights, the whole amount ' +
+      'eaten, as one piece (rice: 200). Never the total of all pieces.',
   ),
-  per_100: PER_100,
+  kcal_per_100_base_units: number('kcal in 100 base_unit of the product as eaten.'),
+  protein_g_per_100_base_units: number('Protein, g in 100 base_unit of the product as eaten.'),
+  carbs_g_per_100_base_units: number('Carbohydrates, g in 100 base_unit of the product as eaten.'),
+  fat_g_per_100_base_units: number('Fat, g in 100 base_unit of the product as eaten.'),
+  hydration_ml_per_100_base_units: number(
+    'Water it gives to drink, ml in 100 base_unit of it, so at most 100: from a drink or a ' +
+      'soup; 0 for food, and for a food or drink cooked into a food (milk in an omelette).',
+  ),
 };
 
 const ALTERNATIVE = object(PRODUCT, {

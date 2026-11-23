@@ -43,8 +43,9 @@ written by the model) is in git history up to commit 381aee4. Each decision belo
 ```
 meal    = { title, dishes: [dish] }
 dish    = { name, products: [product + alternatives] }
-product = { name, basis_unit, count, unit_name, amount_alias, unit_amount, per_100 }
-per_100 = { calories, protein_g, carbs_g, fat_g, hydration_ml }
+product = { name, base_unit, piece_count, piece_name, piece_size_name, base_units_in_piece,
+            kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100_base_units,
+            fat_g_per_100_base_units, hydration_ml_per_100_base_units }
 ```
 
 - **A dish is a food as a menu or a food diary names it** ("Борщ", "Тефтели с картофелем",
@@ -55,17 +56,23 @@ per_100 = { calories, protein_g, carbs_g, fat_g, hydration_ml }
   ("Завтрак"), no amounts, no doubts (vareniki of a filling in doubt: "Вареники"). Why: dish
   names are for finding the same dish in my history later; grouping by plate (the first idea)
   named containers ("Тарелка с завтраком"), which would never match.
-- **The amount** is `count` × `unit_amount` for pieces (eggs, slices, dumplings, drinks), else
-  `unit_amount` alone with `count` null (loose food, a stated weight). `unit_name` is the piece
-  as counted (шт., ломт., стакан), `amount_alias` a size name when there is one (M, grande,
-  обычная). `basis_unit` (g or ml) comes before the amount, so it is decided before the number.
-  Why: what the model writes anyway; `count` null for loose food leaves no slot to fill with a
-  weight twice.
-- **Values per 100 g or ml as eaten**, and the water to drink in them (`hydration_ml`): from
-  drinks and soups, 0 for food. Why: the app's water nutrient is hydration (design.md, Water);
-  as `water_g` the model gave every food its water content (squid 75, waffles 22), which would
-  have filled the water bar with food. The name and the description carry the difference: the
-  field is the same number in the same place.
+- **Keys say everything**, unit and scale included, and the values are flat in the product.
+  Why: the model follows the schema's names and descriptions more closely than the prompt.
+  `hydration_ml` inside `per_100` was read as the ml drunk: a 330 ml can got 330, a 350 ml broth
+  350, each a copy of the amount written just before in the same unit (run 4). Every value now
+  says `_per_100_base_units` as it is written; the code still keeps them as `per_100`.
+- **The amount** is `piece_count` × `base_units_in_piece` for pieces (eggs, slices, dumplings,
+  drinks), else `base_units_in_piece` alone with `piece_count` null (loose food, a stated weight:
+  one piece). `piece_name` is the piece as counted (шт., ломт., стакан), `piece_size_name` its
+  size by name when there is one (M, grande, обычная). `base_unit` (g or ml) comes before the
+  amount, so it is decided before the number. Why: what the model writes anyway; `piece_count`
+  null for loose food leaves no slot to fill with a weight twice. The three are named after the
+  piece so they read as one thing, apart from `base_unit` (they were `count`, `unit_name`,
+  `amount_alias`, `unit_amount`: "unit" meant both).
+- **Values in 100 base units as eaten**, and the water to drink in them
+  (`hydration_ml_per_100_base_units`): from drinks and soups, 0 for food, at most 100. Why: the
+  app's water nutrient is hydration (design.md, Water); as `water_g` the model gave every food
+  its water content (squid 75, waffles 22), which would have filled the water bar with food.
 - **Alternatives are whole products**, each as it would be if that reading were right: another
   food (cod / chicken / pork, another filling), another size, another count when pieces are
   hidden; one change per alternative. Why: "it could be X" is how the model thinks; it doesn't
@@ -84,11 +91,13 @@ them (see the prompt doc).
 flag (kept in the log, shown in the text view). Why: in v4 any problem lost the whole answer; a
 slip in one product shouldn't cost a meal.
 
-- **Filled in:** an alternative's missing fields are its product's (an alternative of `{count:
-12}` is the product with 12); a missing value is 0; an unknown base is g; products with no
-  dishes are one dish.
-- **Dropped:** a product with no `unit_amount`, a dish left empty, an alternative that is the same
-  as the product or one before it.
+- **Filled in:** an alternative's missing fields are its product's (an alternative of
+  `{piece_count: 12}` is the product with 12); a missing value is 0; an unknown base is g;
+  products with no dishes are one dish. An answer of the schema before (nested `per_100`, the
+  old names) is read with today's names, its `water_g` (the water content) as 0.
+- **Repaired:** water to drink over 100 in 100 base units is 100.
+- **Dropped:** a product with no `base_units_in_piece`, a dish left empty, an alternative that
+  is the same as the product or one before it.
 - **Kept but flagged:** kcal that don't match the macros (4·P + 4·C + 9·F, off by more than 30
   %), more than 105 g in 100 g, a product over 3 kg or 3,000 kcal (the model multiplying twice: a
   weight as both count and size), a count of 0.
@@ -101,12 +110,12 @@ questions.
 **Questions from alternatives.** Each alternative is compared with the model's guess and sorted
 by what it changes:
 
-| Axis    | Changes                                                    | Example           |
-| ------- | ---------------------------------------------------------- | ----------------- |
-| `kind`  | what it is (name and values; may bring its own piece size) | картошка / творог |
-| `size`  | how big (`unit_amount`, `amount_alias`), the same food     | S / M / L         |
-| `count` | how many, the same food and size                           | 10 / 12           |
-| `whole` | more than one of these                                     | творог, 8 шт.     |
+| Axis    | Changes                                                           | Example           |
+| ------- | ----------------------------------------------------------------- | ----------------- |
+| `kind`  | what it is (name and values; may bring its own piece size)        | картошка / творог |
+| `size`  | how big (`base_units_in_piece`, `piece_size_name`), the same food | S / M / L         |
+| `count` | how many, the same food and size                                  | 10 / 12           |
+| `whole` | more than one of these                                            | творог, 8 шт.     |
 
 - When every alternative changes one axis, they become **independent questions** (what, how
   big, how many), as v4's were: any combination of answers is valid. Otherwise (an alternative
@@ -147,7 +156,8 @@ How the tool and the bench show a meal (`view.ts`), for judging by reading:
   hold a `:`, so a line splits at its last `: `.
 - Numbers in one form, each with its unit:
   `<amount>g|ml, <kcal>kcal, <protein>p, <fat>f, <carbs>c, <water>w`; kcal, g and ml whole, the
-  rest to a tenth. `w` is the water to drink (`hydration_ml`), ml. The amount for a product only: a dish's or a meal's would add g to ml.
+  rest to a tenth. `w` is the water to drink (`hydration_ml_per_100_base_units`), ml. The
+  amount for a product only: a dish's or a meal's would add g to ml.
 - A question: its axis (`что`, `размер`, `сколько`, `или`), then its answers in order (sizes and
   counts small to large). Another answer shows what it changes against the guess in the same
   form, signed, with only what changes, aligned within the question.

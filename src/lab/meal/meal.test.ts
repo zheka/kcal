@@ -3,15 +3,21 @@ import { amountText, axisOf, distinctNames, process, questions, values } from '.
 import { type Product, readMeal } from './read.ts';
 import { changeText, textView } from './view.ts';
 
-const PER = { calories: 150, protein_g: 4, carbs_g: 26, fat_g: 3, hydration_ml: 0 };
+const PER = {
+  kcal_per_100_base_units: 150,
+  protein_g_per_100_base_units: 4,
+  carbs_g_per_100_base_units: 26,
+  fat_g_per_100_base_units: 3,
+  hydration_ml_per_100_base_units: 0,
+};
 const raw = (over: Record<string, unknown> = {}) => ({
   name: 'Вареники с картошкой',
-  basis_unit: 'g',
-  count: 10,
-  unit_name: 'шт.',
-  amount_alias: null,
-  unit_amount: 45,
-  per_100: PER,
+  base_unit: 'g',
+  piece_count: 10,
+  piece_name: 'шт.',
+  piece_size_name: null,
+  base_units_in_piece: 45,
+  ...PER,
   alternatives: [],
   ...over,
 });
@@ -43,14 +49,14 @@ describe('readMeal', () => {
 
   it('fills an alternative’s missing fields from its product, and drops one that is the same', () => {
     const { meal: m, flags } = readMeal(
-      meal(raw({ alternatives: [{ count: 12 }, { name: 'вареники с картошкой' }] })),
+      meal(raw({ alternatives: [{ piece_count: 12 }, { name: 'вареники с картошкой' }] })),
     );
     expect(m.dishes[0]!.items[0]!.alternatives).toEqual([product({ count: 12 })]);
     expect(flags).toEqual([expect.stringContaining('the same as one before')]);
   });
 
   it('drops a product with no amount, and a dish left empty', () => {
-    const { meal: m, flags } = readMeal(meal(raw({ unit_amount: 'много' })));
+    const { meal: m, flags } = readMeal(meal(raw({ base_units_in_piece: 'много' })));
     expect(m.dishes).toEqual([]);
     expect(flags).toHaveLength(2);
   });
@@ -62,20 +68,41 @@ describe('readMeal', () => {
 
   it('flags values that don’t add up and an amount nobody eats, but keeps them', () => {
     const { meal: m, flags } = readMeal(
-      meal(raw({ count: 150, unit_amount: 150, per_100: { ...PER, calories: 400 } })),
+      meal(raw({ piece_count: 150, base_units_in_piece: 150, kcal_per_100_base_units: 400 })),
     );
     expect(m.dishes[0]!.items).toHaveLength(1);
     expect(flags.join('\n')).toMatch(/macros make 147/);
     expect(flags.join('\n')).toMatch(/22500 g/);
   });
 
-  it('reads the water to drink, and an answer without it as 0, flagged', () => {
-    const borscht = raw({ basis_unit: 'ml', per_100: { ...PER, hydration_ml: 88 } });
-    expect(readMeal(meal(borscht)).meal.dishes[0]!.items[0]!.per_100.water).toBe(88);
-    const old = { calories: 150, protein_g: 4, carbs_g: 26, fat_g: 3, water_g: 64 }; // before it
-    const { meal: m, flags } = readMeal(meal(raw({ per_100: old })));
-    expect(m.dishes[0]!.items[0]!.per_100.water).toBe(0);
-    expect(flags).toEqual([expect.stringContaining('per_100.hydration_ml')]);
+  it('reads the water to drink, at most 100', () => {
+    const water = (over: Record<string, unknown>) =>
+      readMeal(meal(raw({ base_unit: 'ml', ...over })));
+    expect(
+      water({ hydration_ml_per_100_base_units: 88 }).meal.dishes[0]!.items[0]!.per_100.water,
+    ).toBe(88);
+    const { meal: m, flags } = water({ hydration_ml_per_100_base_units: 330 }); // the can's 330 ml
+    expect(m.dishes[0]!.items[0]!.per_100.water).toBe(100);
+    expect(flags).toEqual([expect.stringContaining('330, over 100: 100 used')]);
+  });
+
+  it('reads an answer of the schema before, its water content as 0, flagged', () => {
+    const old = {
+      name: 'Вареники с картошкой',
+      basis_unit: 'g',
+      count: 10,
+      unit_name: 'шт.',
+      amount_alias: null,
+      unit_amount: 45,
+      per_100: { calories: 150, protein_g: 4, carbs_g: 26, fat_g: 3, water_g: 64 },
+      alternatives: [{ count: 12 }],
+    };
+    const { meal: m, flags } = readMeal(meal(old));
+    const item = m.dishes[0]!.items[0]!;
+    expect(item).toMatchObject({ count: 10, unit: 'шт.', size: 45, base: 'g' });
+    expect(item.per_100).toEqual({ kcal: 150, protein: 4, carbs: 26, fat: 3, water: 0 });
+    expect(item.alternatives[0]).toMatchObject({ count: 12, size: 45 });
+    expect(flags).toEqual([expect.stringContaining('hydration_ml_per_100_base_units')]);
   });
 
   it('never throws', () => {
@@ -128,13 +155,14 @@ describe('questions', () => {
   it('asks only what changes 80 kcal or 10 g protein, at most 3 in a meal, the largest first', () => {
     const p = (name: string, kcal: number) => ({
       name,
-      basis_unit: 'g',
-      count: null,
-      unit_name: null,
-      amount_alias: null,
-      unit_amount: 100,
-      per_100: { ...PER, calories: 100 },
-      alternatives: [{ name: `${name} 2`, per_100: { ...PER, calories: 100 + kcal } }],
+      base_unit: 'g',
+      piece_count: null,
+      piece_name: null,
+      piece_size_name: null,
+      base_units_in_piece: 100,
+      ...PER,
+      kcal_per_100_base_units: 100,
+      alternatives: [{ name: `${name} 2`, kcal_per_100_base_units: 100 + kcal }],
     });
     const out = process(
       readMeal(meal(p('a', 50), p('b', 90), p('c', 200), p('d', 150), p('e', 100))).meal,
@@ -168,7 +196,9 @@ describe('amounts', () => {
   });
 
   it('shows a meal as text', () => {
-    const text = textView(process(readMeal(meal(raw({ alternatives: [{ count: 14 }] }))).meal));
+    const text = textView(
+      process(readMeal(meal(raw({ alternatives: [{ piece_count: 14 }] }))).meal),
+    );
     expect(text).toBe(
       [
         '# Обед: 675kcal, 18p, 13.5f, 117c, 0w',

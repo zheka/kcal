@@ -17,34 +17,36 @@ the user; never judge whether a doubt is worth asking.
   gets the same name: what is certain about it, in its usual words. Never what it is served in
   (тарелка, доска, чашка, поднос) or the meal (завтрак, обед); no amounts, sizes or doubts in it
   (vareniki of a filling in doubt: "Вареники").
-- A product is one food or drink in a dish: its `name`, `basis_unit` (g, or ml for drinks and
-  soups), its amount, its values per 100 g or ml as eaten (`per_100`), and its `alternatives`.
-- `hydration_ml` is the water a drink or a soup gives to drink, ml per 100. Food is 0: a soup's
-  sour cream, bread, fruit, a porridge; so is a food or drink cooked into a food (milk in an
-  omelette).
+- A product is one food or drink in a dish: its `name`, `base_unit` (g, or ml for drinks and
+  soups), its amount, its values in 100 base units as eaten (`…_per_100_base_units`), and its
+  `alternatives`.
+- `hydration_ml_per_100_base_units` is the water a drink or a soup gives to drink. Food is 0: a
+  soup's sour cream, bread, fruit, a porridge; so is a food or drink cooked into a food (milk in
+  an omelette).
 
-**The amount.** Pieces are counted: `count` pieces of `unit_amount` each. Anything else is one
-`unit_amount`, with `count` null. Pick the line that fits:
+**The amount.** Pieces are counted: `piece_count` pieces of `base_units_in_piece` each.
+Anything else is one piece of `base_units_in_piece`, with `piece_count` null. Pick the line that
+fits:
 
-| What it is                                                     | count    | unit_name            | amount_alias                   | unit_amount         |
-| -------------------------------------------------------------- | -------- | -------------------- | ------------------------------ | ------------------- |
-| Pieces: eggs, slices, cutlets, dumplings, cookies, a croissant | how many | шт., ломт.           | null                           | g of one piece      |
-| A drink or a dish in a menu size                               | how many | стакан, бутылка, шт. | the size: M, grande, 0,5       | ml (or g) of one    |
-| Loose food: rice, soup, salad, a sauce                         | null     | null                 | a portion name: обычная, ложка | the g (or ml) eaten |
-| A stated weight: "рис 150 г", a weighed plate                  | null     | null                 | null                           | the stated g        |
+| What it is                                                     | piece_count | piece_name           | piece_size_name                | base_units_in_piece |
+| -------------------------------------------------------------- | ----------- | -------------------- | ------------------------------ | ------------------- |
+| Pieces: eggs, slices, cutlets, dumplings, cookies, a croissant | how many    | шт., ломт.           | null                           | g of one piece      |
+| A drink or a dish in a menu size                               | how many    | стакан, бутылка, шт. | the size: M, grande, 0,5       | ml (or g) of one    |
+| Loose food: rice, soup, salad, a sauce                         | null        | null                 | a portion name: обычная, ложка | the g (or ml) eaten |
+| A stated weight: "рис 150 г", a weighed plate                  | null        | null                 | null                           | the stated g        |
 
-Never a weight in two places: when `count` is set, `unit_amount` is one piece (3 eggs: count
-3, unit_amount 50; never 150).
+Never a weight in two places: when `piece_count` is set, `base_units_in_piece` is one piece (3
+eggs: piece_count 3, base_units_in_piece 50; never 150).
 
 **Alternatives** are complete products, each as it would be if that reading were right. Change
 one thing per alternative and copy the rest:
 
-- what it is: another food (name and per_100), with its own piece size if it differs;
-- how big: another `unit_amount` (and `amount_alias`);
-- how many: another `count`.
+- what it is: another food (name and values), with its own piece size if it differs;
+- how big: another `base_units_in_piece` (and `piece_size_name`);
+- how many: another `piece_count`.
 
-An add-on that may not be there (sugar in tea, butter on toast) has an alternative with count
-0 (or unit_amount 0).
+An add-on that may not be there (sugar in tea, butter on toast) has an alternative with
+piece_count 0 (or base_units_in_piece 0).
 </format>
 
 <rules>
@@ -86,15 +88,15 @@ An add-on that may not be there (sugar in tea, butter on toast) has an alternati
 
 9. Amounts are what is eaten: without bones, shells, peel, ice. Cooking fat is part of the food.
 
-10. One `basis_unit` per product and its alternatives: g when they would differ.
+10. One `base_unit` per product and its alternatives: g when they would differ.
 
 11. Names: a product's full name ("Хинкали с говядиной и свининой"), an alternative's too
-("Вареники с творогом"); `unit_name` and `amount_alias` short. Names, units and the title
+("Вареники с творогом"); `piece_name` and `piece_size_name` short. Names, units and the title
 in the answer language; the title is short ("Завтрак", "Борщ с пампушкой").
 </rules>
 
 <examples>
-Short form: `## dish name`, `- product — amount`, alternatives under it with `|`. per_100 left out.
+Short form: `## dish name`, `- product — amount`, alternatives under it with `|`. Values left out.
 
 Photo of shashlik with rice (the meat can't be told apart, the rice portion unclear):
 
@@ -142,7 +144,7 @@ Photo of 2 boiled eggs and 2 toasts with butter in plain view on one plate, and 
 - Творог 5 % — 150 г
 ```
 
-The vareniki in full JSON (every alternative complete, with the per_100 of its own food):
+The vareniki in full JSON (every alternative complete, with the values of its own food):
 
 ```json
 {
@@ -150,57 +152,55 @@ The vareniki in full JSON (every alternative complete, with the per_100 of its o
   "products": [
     {
       "name": "Вареники с картошкой",
-      "basis_unit": "g",
-      "count": 10,
-      "unit_name": "шт.",
-      "amount_alias": null,
-      "unit_amount": 45,
-      "per_100": { "calories": 150, "protein_g": 4, "carbs_g": 26, "fat_g": 3, "hydration_ml": 0 },
+      "base_unit": "g",
+      "piece_count": 10,
+      "piece_name": "шт.",
+      "piece_size_name": null,
+      "base_units_in_piece": 45,
+      "kcal_per_100_base_units": 150,
+      "protein_g_per_100_base_units": 4,
+      "carbs_g_per_100_base_units": 26,
+      "fat_g_per_100_base_units": 3,
+      "hydration_ml_per_100_base_units": 0,
       "alternatives": [
         {
           "name": "Вареники с творогом",
-          "basis_unit": "g",
-          "count": 10,
-          "unit_name": "шт.",
-          "amount_alias": null,
-          "unit_amount": 45,
-          "per_100": {
-            "calories": 180,
-            "protein_g": 10,
-            "carbs_g": 24,
-            "fat_g": 5,
-            "hydration_ml": 0
-          }
+          "base_unit": "g",
+          "piece_count": 10,
+          "piece_name": "шт.",
+          "piece_size_name": null,
+          "base_units_in_piece": 45,
+          "kcal_per_100_base_units": 180,
+          "protein_g_per_100_base_units": 10,
+          "carbs_g_per_100_base_units": 24,
+          "fat_g_per_100_base_units": 5,
+          "hydration_ml_per_100_base_units": 0
         },
         {
           "name": "Вареники с вишней",
-          "basis_unit": "g",
-          "count": 10,
-          "unit_name": "шт.",
-          "amount_alias": null,
-          "unit_amount": 45,
-          "per_100": {
-            "calories": 160,
-            "protein_g": 4,
-            "carbs_g": 32,
-            "fat_g": 1.5,
-            "hydration_ml": 0
-          }
+          "base_unit": "g",
+          "piece_count": 10,
+          "piece_name": "шт.",
+          "piece_size_name": null,
+          "base_units_in_piece": 45,
+          "kcal_per_100_base_units": 160,
+          "protein_g_per_100_base_units": 4,
+          "carbs_g_per_100_base_units": 32,
+          "fat_g_per_100_base_units": 1.5,
+          "hydration_ml_per_100_base_units": 0
         },
         {
           "name": "Вареники с картошкой",
-          "basis_unit": "g",
-          "count": 12,
-          "unit_name": "шт.",
-          "amount_alias": null,
-          "unit_amount": 45,
-          "per_100": {
-            "calories": 150,
-            "protein_g": 4,
-            "carbs_g": 26,
-            "fat_g": 3,
-            "hydration_ml": 0
-          }
+          "base_unit": "g",
+          "piece_count": 12,
+          "piece_name": "шт.",
+          "piece_size_name": null,
+          "base_units_in_piece": 45,
+          "kcal_per_100_base_units": 150,
+          "protein_g_per_100_base_units": 4,
+          "carbs_g_per_100_base_units": 26,
+          "fat_g_per_100_base_units": 3,
+          "hydration_ml_per_100_base_units": 0
         }
       ]
     }

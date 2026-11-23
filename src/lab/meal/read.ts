@@ -55,6 +55,33 @@ const isAmount = (x: unknown): x is number => typeof x === 'number' && Number.is
 const textOrNull = (x: unknown): string | null =>
   typeof x === 'string' && x.trim() ? x.trim() : null;
 
+/** The keys of answers before the flat schema (2026-11-23), as they are now. */
+const OLD_KEYS: Record<string, string> = {
+  basis_unit: 'base_unit',
+  count: 'piece_count',
+  unit_name: 'piece_name',
+  amount_alias: 'piece_size_name',
+  unit_amount: 'base_units_in_piece',
+};
+const OLD_PER_100: Record<string, string> = {
+  calories: 'kcal_per_100_base_units',
+  protein_g: 'protein_g_per_100_base_units',
+  carbs_g: 'carbs_g_per_100_base_units',
+  fat_g: 'fat_g_per_100_base_units',
+  hydration_ml: 'hydration_ml_per_100_base_units', // water_g was the water content: not read
+};
+
+/** An old answer's product with today's keys (saved runs and logs read again); a new one as is. */
+function upgraded(x: Obj): Obj {
+  const out: Obj = {};
+  for (const [k, v] of Object.entries(x)) {
+    if (k === 'per_100' && isObject(v)) {
+      for (const [pk, pv] of Object.entries(v)) if (OLD_PER_100[pk]) out[OLD_PER_100[pk]] = pv;
+    } else out[OLD_KEYS[k] ?? k] = v;
+  }
+  return out;
+}
+
 export function readMeal(raw: unknown): { meal: Meal; flags: string[] } {
   const flags: string[] = [];
   const flag = (at: string, what: string) => flags.push(`${at}: ${what}`);
@@ -64,66 +91,65 @@ export function readMeal(raw: unknown): { meal: Meal; flags: string[] } {
     return { meal: { title: '', dishes: [] }, flags };
   }
 
-  function per100(x: unknown, at: string, inherit?: Per100): Per100 {
-    if (!isObject(x)) {
-      if (inherit) return inherit;
-      flag(at, 'no values, 0 used');
-      return { kcal: 0, protein: 0, fat: 0, carbs: 0, water: 0 };
-    }
+  /** The values per 100 base units; an alternative's missing ones are its item's. */
+  function per100(x: Obj, at: string, inherit?: Per100): Per100 {
     const value = (key: string, name: keyof Per100) => {
-      const v = x[key] ?? x[name];
+      const v = x[key];
       if (isAmount(v)) return v;
-      if (inherit) return inherit[name];
+      if (inherit && v === undefined) return inherit[name];
       flag(`${at}.${key}`, `${JSON.stringify(v)}, 0 used`);
       return 0;
     };
+    const water = value('hydration_ml_per_100_base_units', 'water');
+    if (water > 100) flag(`${at}.hydration_ml_per_100_base_units`, `${water}, over 100: 100 used`);
     return {
-      kcal: value('calories', 'kcal'),
-      protein: value('protein_g', 'protein'),
-      fat: value('fat_g', 'fat'),
-      carbs: value('carbs_g', 'carbs'),
-      water: value('hydration_ml', 'water'),
+      kcal: value('kcal_per_100_base_units', 'kcal'),
+      protein: value('protein_g_per_100_base_units', 'protein'),
+      fat: value('fat_g_per_100_base_units', 'fat'),
+      carbs: value('carbs_g_per_100_base_units', 'carbs'),
+      water: Math.min(water, 100),
     };
   }
 
   /** A product; an alternative's missing fields are its item's. Null when it has no amount. */
-  function product(x: unknown, at: string, of?: Product): Product | null {
-    if (!isObject(x)) {
+  function product(given: unknown, at: string, of?: Product): Product | null {
+    if (!isObject(given)) {
       flag(at, 'not an object, dropped');
       return null;
     }
+    const x = upgraded(given);
     const has = (key: string) => key in x && x[key] !== undefined;
     const name = textOrNull(x.name) ?? of?.name ?? null;
     if (name === null) flag(`${at}.name`, 'missing');
     let base: 'g' | 'ml';
-    if (x.basis_unit === 'g' || x.basis_unit === 'ml') base = x.basis_unit;
+    if (x.base_unit === 'g' || x.base_unit === 'ml') base = x.base_unit;
     else {
       base = of?.base ?? 'g';
-      if (!of || has('basis_unit'))
-        flag(`${at}.basis_unit`, `${JSON.stringify(x.basis_unit)}, ${base} used`);
+      if (!of || has('base_unit'))
+        flag(`${at}.base_unit`, `${JSON.stringify(x.base_unit)}, ${base} used`);
     }
     let count: number | null;
-    if (has('count')) {
-      if (x.count === null) count = null;
-      else if (isAmount(x.count)) count = x.count;
+    if (has('piece_count')) {
+      if (x.piece_count === null) count = null;
+      else if (isAmount(x.piece_count)) count = x.piece_count;
       else {
         count = null;
-        flag(`${at}.count`, `${JSON.stringify(x.count)}, none used`);
+        flag(`${at}.piece_count`, `${JSON.stringify(x.piece_count)}, none used`);
       }
     } else count = of ? of.count : null;
-    const size = isAmount(x.unit_amount) ? x.unit_amount : (of?.size ?? null);
+    const size = isAmount(x.base_units_in_piece) ? x.base_units_in_piece : (of?.size ?? null);
     if (size === null) {
-      flag(at, `"${name ?? '?'}": no unit_amount, dropped`);
+      flag(at, `"${name ?? '?'}": no base_units_in_piece, dropped`);
       return null;
     }
     const p: Product = {
       name: name ?? '?',
       base,
       count,
-      unit: has('unit_name') ? textOrNull(x.unit_name) : (of?.unit ?? null),
-      alias: has('amount_alias') ? textOrNull(x.amount_alias) : (of?.alias ?? null),
+      unit: has('piece_name') ? textOrNull(x.piece_name) : (of?.unit ?? null),
+      alias: has('piece_size_name') ? textOrNull(x.piece_size_name) : (of?.alias ?? null),
       size,
-      per_100: per100(x.per_100, `${at}.per_100`, of?.per_100),
+      per_100: per100(x, at, of?.per_100),
     };
     check(p, at);
     return p;
