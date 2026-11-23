@@ -55,10 +55,13 @@ export const CHECKLIST = `Before answering, check:
 - Only the meal in focus; table condiments left out; all of it eaten by the user alone.
 - Dishes named as a menu or a food diary would, the same each time; never a plate, cup or
   board, the meal, an amount or a doubt; bread, a drink, a dessert are dishes of their own.
-- Each kind of piece its own product; pieces counted (3 яйца: piece_count 3, base_units_in_piece
+- Each kind of piece its own product; pieces counted (3 eggs: piece_count 3, base_units_in_piece
   50).
 - base_units_in_piece is one piece, or the whole amount when piece_count is null: never a total
   counted again.
+- A size you estimate has its smaller and larger; a count with hidden pieces its fewer and more;
+  null only for what is stated, weighed, a package or in plain view.
 - A stated total weight is one product of that weight.
-- Alternatives only for real doubt, never for what the input states or the photo shows clearly;
-  unsure what a food is: alternatives that are different foods; one change per alternative.`;
+- Alternative products only for real doubt about what it is, never for what the input states or
+  the photo shows clearly; different foods, not variants of your first guess.
+- Names in the answer language.`;

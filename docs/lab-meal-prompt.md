@@ -2,16 +2,17 @@
 
 How the meal composer asks the model for a meal in the format of
 [lab-meal-format.md](lab-meal-format.md): the model and its settings, what a request holds, the
-rules of prompt v5 and why each is there, and the command-line tool and the bench that run it.
+rules of prompt v6 and why each is there, and the command-line tool and the bench that run it.
 The rules come from 1,000 example meals ([lab-meal-examples.md](lab-meal-examples.md), #N) and
-from runs of prompt v4 on real meals.
+from runs of prompts v4 and v5 on real meals.
 
-Status (2026-11-23): **prompt v5 written and run; the lab's screen sends it too**, the same
+Status (2026-11-23): **prompt v6 written, to be run; the lab's screen sends it too**, the same
 request with the same settings, retries and timeout (the lab is a manual test, see lab.md).
 `src/lab/meal/prompt.md` (the system instruction), `settings.ts` (the model and its settings),
 `request.ts` (the context and the checklist), `schema.ts` (the schema's descriptions);
-`scripts/meal.ts` (the tool), `scripts/meal-bench.ts` (the bench). Prompt v4 (the model wrote
-the questions) is in git history up to commit 381aee4.
+`scripts/meal.ts` (the tool), `scripts/meal-bench.ts` (the bench). Prompt v5 (whole alternative
+products for every doubt, examples in Russian) is in git history up to commit 56e60c5; v4 (the
+model wrote the questions) up to 381aee4.
 
 This repo tests the code only (deterministic and quick: `npm test`, `npm run e2e`). How the
 model behaves is tested apart from it, with the tool and the bench on tests of real meals that
@@ -57,16 +58,18 @@ entry records them with the request.
    (Open Food Facts' data as JSON).
 4. **The checklist** (`CHECKLIST`), last: the rules broken most, restated. Why: the guide says
    instructions after a large input are heeded best.
-5. **The schema's descriptions**: the same rules again, on the fields they govern (a dish's
-   name; `piece_count` only for pieces; `base_units_in_piece` one piece; alternatives for real
-   doubt only, different foods, one change each). Why: without thinking, Flash-Lite writes the
-   JSON field by field; the description is in front of it as it writes the field. In v4 this
-   fixed stated facts in updates and invented kinds where the prompt and checklist hadn't.
+5. **The schema's descriptions**: the same rules again, on the fields they govern (a dish's name;
+   `piece_count` only for pieces; `base_units_in_piece` one piece; the bounds and when they're null;
+   alternative products for real doubt only, different foods). Why: without thinking, Flash-Lite
+   writes the JSON field by field; the description is in front of it as it writes the field. In v4
+   this fixed stated facts in updates and invented kinds where the prompt and checklist hadn't.
 
 ## The rules, and why
 
-Prompt v5 is about perceiving only. The `<role>` says so: the app adds up, decides which
-alternatives matter and asks; the model never judges whether a doubt is worth asking.
+Prompt v6 is about perceiving only. The `<role>` says what the model does (what was eaten, how
+much, how far off, what else it may be) and nothing of what comes after it. Why: v5's role said
+"the app decides which alternatives matter", to stop the model filtering its doubts; the
+model has no use for knowing, and the bounds' own slots now ask for every doubt.
 
 **The format section:**
 
@@ -78,9 +81,16 @@ alternatives matter and asks; the model never judges whether a doubt is worth as
   `piece_count` null. Never a weight in two
   places. Why: a table of plain cases worked in v4 where prose was mixed up (eggs weighed, "3
   г"); the 72,000 kcal omelette was a weight written twice.
-- **Alternatives are complete products, one change each** (what it is, how big, or how many);
-  an add-on that may not be there has an alternative of 0. Why: one change each is what lets the
-  code split them into independent questions.
+- **How sure**: the fewest and most pieces when hidden or hard to count; the smallest and
+  largest size, or the next on the menu, always for a size guessed from a photo or a vague text;
+  null only for what is stated, weighed, a package or in plain view; 0 as the smallest for an
+  add-on that may not be there. Why: see the format doc (How sure).
+- **Alternative products** are other foods only, at the same count, with their own size, range
+  and values. Why: amounts have their own fields.
+- **Examples and the schema's examples in English**, names in the answer language, a size name
+  as on the menu; no words at all for piece names and sizes (the table says "its usual name, or
+  null"). Why: Russian example words were copied uninflected ("большая" next to a masculine
+  name), and English ones untranslated ("cup", "pc.", "small"): see the format doc.
 - **`hydration_ml_per_100_base_units`: the water to drink**, from drinks and soups; food 0, a
   soup's sour cream included, and so is a food or drink cooked into a food. Only what it means,
   no values: how much water a drink gives is the model's to find, as kcal are. Why: the field was
@@ -92,9 +102,10 @@ alternatives matter and asks; the model never judges whether a doubt is worth as
 
 **The rules** (the numbers are the prompt's):
 
-1. **Always a complete best guess**; vague input gets a typical meal with no alternatives
-   invented. Why: a gap can't be shown; "business lunch" with invented options is noise I can't
-   answer better than the model. Broken in v4 without thinking.
+1. **Always a complete best guess**; vague input gets a typical meal with no alternative products
+   invented, its guessed amounts still with their range. Why: a gap can't be shown; "business lunch"
+   with invented options is noise I can't answer better than the model. Broken in v4 without
+   thinking.
 2. **Only the meal in focus**; several plates in focus are all included. Why: other people's cups
    and plates were the commonest wrong rows; I remove a whole plate with one sentence.
 3. **Table condiments are ignored** unless I say I used them. Why: "0 oil" rows for the bottle on
@@ -107,19 +118,20 @@ alternatives matter and asks; the model never judges whether a doubt is worth as
    when I list its parts or a part is in doubt; home cooking whose pieces I know is its parts, so
    they're counted. Why: a dish kept whole has the model's best values (#371: pho split for an
    immaterial question); a question needs its own product.
-7. **Stated is certain**: no alternatives for a stated kind, amount or size; a stated total
+7. **Stated is certain**: no range and no alternative products for a stated kind, amount or
+   size; a stated total
    weight is one product, never split. Why: in v4 the model asked about oat milk after "на
    овсяном" until an example showed it, and split "гречка с котлетой, 350 г" into rows, once
    losing the buckwheat.
-8. **Alternatives for real doubt only**, about what the photo can't tell; never for what it
-   shows clearly; **different foods, not variants** of the first guess, up to 4. Why: questions
+8. **Alternative products for real doubt only**, about what the photo can't tell; never for
+   what it shows clearly; **different foods, not variants** of the first guess. Why: questions
    on plainly visible counts were noise; v4's alternatives were variants of a wrong guess
    (beef / horse for tuna), so the right answer wasn't a chip.
 9. **Amounts are what is eaten** (no bones, shells, peel, ice); cooking fat is part of the food.
-10. **One `base_unit` per product and its alternatives**, g when they'd differ (#40, #502). Why:
-    the code compares their values.
-11. **Names in full** (an alternative's too), units and aliases short, all in the answer
-    language. Why: a chip's label is computed from the names' difference.
+10. **One `base_unit` per product, its alternative products included**, g when they'd differ (#40,
+    #502). Why: the code compares their values.
+11. **Names in full** (an alternative product's too), piece names and size names short, in
+    the answer language. Why: a chip's label is computed from the names' difference.
 
 **What v4's rules became:** the threshold (now a share of the meal's kcal), "at most 3 questions",
 labels in words, the order of options, independent questions and "none" as an answer are now
@@ -128,8 +140,9 @@ wrappers and `г` only of 1 are gone with the shapes.
 
 ## Examples
 
-Short examples in a short form (`## dish`, `- product — amount`, alternatives under it with
-`|`), then one dish in full JSON. Why: Google recommends always including examples; Flash-Lite
+Short examples in a short form (`## dish`, `- product — amount (smaller – larger)`, a count
+as `(fewest – most)`, alternative products under it with `|`), then one dish in full JSON, all in
+English. Why: Google recommends always including examples; Flash-Lite
 follows examples more than rules (in v4 a stated-milk rule failed in every run until an example
 showed it).
 

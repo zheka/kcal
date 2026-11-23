@@ -36,6 +36,19 @@ describe('composer data', () => {
     ]);
   });
 
+  it('drops an answer read in an older shape, and the user’s answers to it, to update again', () => {
+    const context = [{ id: 'a', kind: 'text' as const, text: 'lunch' }];
+    const stale = {
+      ...meal('s', 'T'),
+      context,
+      meal: { title: 'Lunch', dishes: [{ name: 'x', items: [{ name: 'x', alternatives: [] }] }] },
+      answers: { '0.0': { kind: 'y' } },
+    };
+    expect(fromStored({ meals: [stale as never] }).meals).toEqual([
+      { id: 's', title: 's', at: 'T', context, answers: {}, changed: true },
+    ]);
+  });
+
   it('keeps meals newest first, replacing one by id', () => {
     const a = meal('a', '2026-11-20T08:00:00Z');
     const b = meal('b', '2026-11-21T08:00:00Z');

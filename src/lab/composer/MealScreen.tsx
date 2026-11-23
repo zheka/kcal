@@ -5,7 +5,7 @@ import { ConfirmButton } from '../../ui/ConfirmButton';
 import { CloseIcon } from '../../ui/icons';
 import { shrinkPhoto } from '../ai/image';
 import type { Lab } from '../storage/lab';
-import { type Axis, itemKey, type ProcessedItem } from '../meal/process';
+import { type Axis, choose, itemKey, type ProcessedItem, type Question } from '../meal/process';
 import { shown, withContext } from './compose';
 import { type ComposerData, one, round } from './data';
 import { InputBar } from './InputBar';
@@ -23,7 +23,6 @@ const AXES: Record<Axis, string> = {
   kind: 'what',
   size: 'size',
   count: 'how many',
-  whole: 'which',
 };
 
 type Files = Lab<ComposerData>['files'];
@@ -49,10 +48,10 @@ export function MealScreen({ lab, meal, language, change, update, close, remove 
   const view = shown(meal, language);
   const sum = view?.total;
   /** The user's answer to one of a product's questions: kept, and shown at once. */
-  const answer = (key: string, axis: Axis, label: string) =>
+  const answer = (key: string, item: ProcessedItem, q: Question, id: string) =>
     change((m) => ({
       ...m,
-      answers: { ...m.answers, [key]: { ...m.answers[key], [axis]: label } },
+      answers: { ...m.answers, [key]: choose(m.answers[key], item, q, id) },
     }));
   const attach = (a: Attached) => change((m) => withContext(m, [...m.context, a]));
 
@@ -124,7 +123,7 @@ export function MealScreen({ lab, meal, language, change, update, close, remove 
                 <ItemRow
                   key={i}
                   item={item}
-                  answer={(axis, label) => answer(itemKey(d, i), axis, label)}
+                  answer={(q, id) => answer(itemKey(d, i), item, q, id)}
                 />
               ))}
             </ul>
@@ -179,7 +178,7 @@ function ItemRow({
   answer,
 }: {
   item: ProcessedItem;
-  answer: (axis: Axis, label: string) => void;
+  answer: (q: Question, id: string) => void;
 }) {
   const v = item.values;
   return (
@@ -195,9 +194,9 @@ function ItemRow({
           <Choices
             key={q.axis}
             label={AXES[q.axis]}
-            options={q.options.map((o) => o.label)}
-            chosen={q.options.find((o) => o.chosen)?.label ?? ''}
-            pick={(label) => answer(q.axis, label)}
+            options={q.options.map((o) => ({ id: o.id, label: o.label }))}
+            chosen={q.options.find((o) => o.chosen)?.id ?? ''}
+            pick={(id) => answer(q, id)}
           />
         ))}
     </li>
@@ -211,22 +210,22 @@ function Choices({
   pick,
 }: {
   label: string;
-  options: string[];
+  options: { id: string; label: string }[];
   chosen: string;
-  pick: (option: string) => void;
+  pick: (id: string) => void;
 }) {
   return (
     <div class="choices" role="group" aria-label={label}>
       <span class="choices-label">{label}:</span>
       {options.map((o) => (
         <button
-          key={o}
+          key={o.id}
           type="button"
           class="choice"
-          aria-pressed={o === chosen}
-          onClick={() => pick(o)}
+          aria-pressed={o.id === chosen}
+          onClick={() => pick(o.id)}
         >
-          {o}
+          {o.label}
         </button>
       ))}
     </div>

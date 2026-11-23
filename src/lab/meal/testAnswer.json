@@ -8,39 +8,33 @@
           "name": "Вареники с картошкой",
           "base_unit": "g",
           "piece_count": 10,
+          "fewer_piece_count": 8,
+          "more_piece_count": 14,
           "piece_name": "шт.",
           "piece_size_name": null,
           "base_units_in_piece": 45,
+          "smaller_piece_size_name": null,
+          "smaller_base_units_in_piece": 35,
+          "larger_piece_size_name": null,
+          "larger_base_units_in_piece": 55,
           "kcal_per_100_base_units": 150,
           "protein_g_per_100_base_units": 4,
           "carbs_g_per_100_base_units": 26,
           "fat_g_per_100_base_units": 3,
           "hydration_ml_per_100_base_units": 0,
-          "alternatives": [
+          "alternative_products": [
             {
               "name": "Вареники с творогом",
-              "base_unit": "g",
-              "piece_count": 10,
-              "piece_name": "шт.",
               "piece_size_name": null,
               "base_units_in_piece": 45,
+              "smaller_piece_size_name": null,
+              "smaller_base_units_in_piece": 35,
+              "larger_piece_size_name": null,
+              "larger_base_units_in_piece": 55,
               "kcal_per_100_base_units": 200,
               "protein_g_per_100_base_units": 10,
               "carbs_g_per_100_base_units": 24,
               "fat_g_per_100_base_units": 7,
-              "hydration_ml_per_100_base_units": 0
-            },
-            {
-              "name": "Вареники с картошкой",
-              "base_unit": "g",
-              "piece_count": 14,
-              "piece_name": "шт.",
-              "piece_size_name": null,
-              "base_units_in_piece": 45,
-              "kcal_per_100_base_units": 150,
-              "protein_g_per_100_base_units": 4,
-              "carbs_g_per_100_base_units": 26,
-              "fat_g_per_100_base_units": 3,
               "hydration_ml_per_100_base_units": 0
             }
           ]
@@ -49,15 +43,21 @@
           "name": "Сметана 20 %",
           "base_unit": "g",
           "piece_count": null,
+          "fewer_piece_count": null,
+          "more_piece_count": null,
           "piece_name": null,
           "piece_size_name": null,
           "base_units_in_piece": 30,
+          "smaller_piece_size_name": null,
+          "smaller_base_units_in_piece": 0,
+          "larger_piece_size_name": null,
+          "larger_base_units_in_piece": 50,
           "kcal_per_100_base_units": 206,
           "protein_g_per_100_base_units": 2.5,
           "carbs_g_per_100_base_units": 3.4,
           "fat_g_per_100_base_units": 20,
           "hydration_ml_per_100_base_units": 0,
-          "alternatives": []
+          "alternative_products": []
         }
       ]
     },
@@ -68,15 +68,21 @@
           "name": "Чай черный",
           "base_unit": "ml",
           "piece_count": 1,
+          "fewer_piece_count": null,
+          "more_piece_count": null,
           "piece_name": "стакан",
           "piece_size_name": null,
           "base_units_in_piece": 250,
+          "smaller_piece_size_name": null,
+          "smaller_base_units_in_piece": null,
+          "larger_piece_size_name": null,
+          "larger_base_units_in_piece": null,
           "kcal_per_100_base_units": 1,
           "protein_g_per_100_base_units": 0,
           "carbs_g_per_100_base_units": 0.2,
           "fat_g_per_100_base_units": 0,
           "hydration_ml_per_100_base_units": 100,
-          "alternatives": []
+          "alternative_products": []
         }
       ]
     }

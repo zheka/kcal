@@ -3,7 +3,7 @@
  *
  *   # Обед: 640kcal, 18p, 22f, 95c, 300w
  *   ## Вареники: 640kcal, 18p, 22f, 95c, 300w
- *   - Вареники с картошкой — 10 шт. × 45 г: 450g, 640kcal, 18p, 22f, 95c, 300w
+ *   - Вареники с картошкой — 10 шт. × 45г: 450g, 640kcal, 18p, 22f, 95c, 300w
  *     ? что
  *       * с картошкой
  *       ~ с творогом: +40kcal, +9p, +2f, -12c
@@ -23,7 +23,7 @@
  */
 import { type Processed, type Question, type Values } from './process.ts';
 
-const AXES = { kind: 'что', size: 'размер', count: 'сколько', whole: 'или' };
+const AXES = { kind: 'что', size: 'размер', count: 'сколько' };
 
 type Base = 'g' | 'ml';
 

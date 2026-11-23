@@ -1,5 +1,5 @@
 import type { ModelRequest, ModelResponse } from '../ai/model';
-import { answered, process, type Processed } from '../meal/process';
+import { process, type Processed } from '../meal/process';
 import PROMPT from '../meal/prompt.md?raw';
 import { readMeal } from '../meal/read';
 import { mealRequest } from '../meal/request';
@@ -54,7 +54,7 @@ export function applyUpdate(
 
 /** The meal as shown: the answer processed, with the user's answers; null before any. */
 export function shown(meal: ComposedMeal, language: string): Processed | null {
-  return meal.meal ? answered(process(meal.meal, language), meal.answers, language) : null;
+  return meal.meal ? process(meal.meal, language, meal.answers) : null;
 }
 
 /** The meal with a thing attached or removed: it needs an update, any failure is past. */

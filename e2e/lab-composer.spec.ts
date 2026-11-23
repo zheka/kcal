@@ -101,7 +101,7 @@ test('composes a meal from its attached context, answers it locally, updates it 
 
   // the questions as chips; an answer updates the values here (no request)
   await page.getByRole('group', { name: 'how many' }).getByRole('button', { name: '14' }).click();
-  await expect(items.first()).toContainText('14 шт. × 45 г · 945 kcal');
+  await expect(items.first()).toContainText('14 шт. × 45г · 945 kcal');
   await page
     .getByRole('group', { name: 'what' })
     .getByRole('button', { name: 'с творогом' })

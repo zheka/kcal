@@ -6,25 +6,23 @@ is in [lab-meal-prompt.md](lab-meal-prompt.md). 1,000 example meals written in t
 version (questions written by the model), with the problems they raised, are in
 [lab-meal-examples.md](lab-meal-examples.md).
 
-Status (2026-11-23): **in code with the command-line tool and the bench, and the lab's meal
-screen runs on it.**
-`src/lab/meal/`: `schema.ts` (what the model answers), `read.ts` (the forgiving reader),
-`process.ts` (amounts, totals, questions), `view.ts` (the text view), `request.ts` and
-`settings.ts` (what is sent, see the prompt doc); the user's answers on the phone: `answered` in
-`process.ts`. Prompt v3's `parameters` (the lab's screen before) are in git history up to commit
-e3deb33. The previous format (v4: questions
-written by the model) is in git history up to commit 381aee4. Each decision below says why
-("Why:").
+Status (2026-11-23): **prompt v6, in code with the command-line tool and the bench, and the
+lab's meal screen runs on it.** `src/lab/meal/`: `schema.ts` (what the model answers), `read.ts`
+(the forgiving reader), `process.ts` (amounts, totals, questions, the user's answers), `view.ts`
+(the text view), `request.ts` and `settings.ts` (what is sent, see the prompt doc). Prompt v5
+(whole alternative products for every doubt) is in git history up to commit 56e60c5; prompt v3's
+`parameters` (the lab's screen before) up to e3deb33; v4 (questions written by the model) up to
+381aee4. Each decision below says why ("Why:").
 
 ## Principles
 
-- **The model perceives, the code decides.** The model says what was eaten, how much, its values
-  per 100, and what else each food could be. The code adds up, decides which alternatives are
-  worth asking about, turns them into questions and labels the chips. Why: in v4 the model wrote
-  the questions itself (`why`, `chosen`, `options` on three axes) and had to judge "80+ kcal
-  between options, at most 3 questions in the meal", which needs arithmetic and a view of rows it
-  hadn't written yet; without thinking, Flash-Lite broke those rules at random. Code does them
-  exactly.
+- **The model perceives, the code decides.** The model says what was eaten, how much, its values per
+  100, how far the amounts may be off and what else each food could be. The code adds up, decides
+  which doubts are worth asking about, turns them into questions and labels the chips. Why: in v4
+  the model wrote the questions itself (`why`, `chosen`, `options` on three axes) and had to judge
+  "80+ kcal between options, at most 3 questions in the meal", which needs arithmetic and a view of
+  rows it hadn't written yet; without thinking, Flash-Lite broke those rules at random. Code does
+  them exactly.
 - **Flat, forgiving, natural.** A schema the model writes the way it thinks ("it's X, 2 pieces of
   50 g; it could be Y"), and a reader that uses whatever it can. Why: v4's fixed shapes (wrappers,
   `sized_food` vs `food`, a size-and-count table with `г` only of 1) existed to make the model's
@@ -44,11 +42,18 @@ written by the model) is in git history up to commit 381aee4. Each decision belo
 
 ```
 meal    = { title, dishes: [dish] }
-dish    = { name, products: [product + alternatives] }
-product = { name, base_unit, piece_count, piece_name, piece_size_name, base_units_in_piece,
-            kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100_base_units,
-            fat_g_per_100_base_units, hydration_ml_per_100_base_units }
+dish    = { name, products: [product] }
+product = { name, base_unit,
+            piece_count, fewer_piece_count, more_piece_count, piece_name,
+            size, values, alternative_products: [{ name, size, values }] }
+size    = piece_size_name, base_units_in_piece,
+          smaller_piece_size_name, smaller_base_units_in_piece,
+          larger_piece_size_name, larger_base_units_in_piece
+values  = kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100_base_units,
+          fat_g_per_100_base_units, hydration_ml_per_100_base_units
 ```
+
+(`size` and `values` are fields of the object they are in, flat, in that order.)
 
 - **A dish is a food as a menu or a food diary names it** ("Борщ", "Тефтели с картофелем",
   "Капучино"), with what it is made of or served with as its part (a side, a sauce, the sour
@@ -65,20 +70,43 @@ product = { name, base_unit, piece_count, piece_name, piece_size_name, base_unit
   says `_per_100_base_units` as it is written; the code still keeps them as `per_100`.
 - **The amount** is `piece_count` × `base_units_in_piece` for pieces (eggs, slices, dumplings,
   drinks), else `base_units_in_piece` alone with `piece_count` null (loose food, a stated weight:
-  one piece). `piece_name` is the piece as counted (шт., ломт., стакан), `piece_size_name` its
-  size by name when there is one (M, grande, обычная). `base_unit` (g or ml) comes before the
-  amount, so it is decided before the number. Why: what the model writes anyway; `piece_count`
-  null for loose food leaves no slot to fill with a weight twice. The three are named after the
-  piece so they read as one thing, apart from `base_unit` (they were `count`, `unit_name`,
-  `amount_alias`, `unit_amount`: "unit" meant both).
+  one piece). `piece_name` is the piece's usual short name (шт., ломт., стакан), or null;
+  `piece_size_name` a size's name from a menu or a package (M, grande, 0,5), or null. `base_unit` (g
+  or ml) comes before the amount, so it is decided before the number. Why: what the model writes
+  anyway; `piece_count` null for loose food leaves no slot to fill with a weight twice. The three
+  are named after the piece so they read as one thing, apart from `base_unit` (they were `count`,
+  `unit_name`, `amount_alias`, `unit_amount`: "unit" meant both).
 - **Values in 100 base units as eaten**, and the water to drink in them
   (`hydration_ml_per_100_base_units`): from drinks and soups, 0 for food, at most 100. Why: the
   app's water nutrient is hydration (design.md, Water); as `water_g` the model gave every food
   its water content (squid 75, waffles 22), which would have filled the water bar with food.
-- **Alternatives are whole products**, each as it would be if that reading were right: another
-  food (cod / chicken / pork, another filling), another size, another count when pieces are
-  hidden; one change per alternative. Why: "it could be X" is how the model thinks; it doesn't
-  judge whether a doubt matters, the code does.
+- **How sure, next to each number:** the fewest and the most pieces (`fewer_piece_count`,
+  `more_piece_count`), when pieces are hidden or hard to count; the smallest and the largest a
+  piece likely is (`smaller_…`, `larger_…`, with their size names), or the next sizes on the
+  menu; 0 as the smallest or fewest for an add-on that may not be there. null when stated,
+  weighed, a package or in plain view. Why: as whole alternative products (v5), amounts got few
+  alternatives and those one way: 15 of 62 products on runs 5–6, 28 of 150+ kcal with none
+  (salo, bacon, meatballs, a croissant guessed from a photo), and steak 200 → 250 g only, never
+  smaller. A slot for each bound, right after its number, asks for both sides every time; a
+  product's guessed size is where it is least sure (an egg 50–65 g, a meatball 20–35), its count
+  of pieces in view the surest. Two bounds, not every likely value (41, 42, 43…), not steps.
+- **Alternative products: other foods or drinks it may be**, at the same count, each with its own
+  size and range (an almond croissant 90 g, a classic one 60) and its own values; no `base_unit`
+  of their own (rule 10: one per product). Why: "it could be X" is how the model thinks about
+  what a food is; with sizes and counts in their own fields, an alternative product is only
+  that, and the code no longer has to work out what each one changed.
+- **Examples in English, the answer in the answer language**; a size name as on the menu (S, M,
+  grande). Why: the model copied example words: Russian portions ("большая") came out
+  uninflected next to masculine names; and the lab asks in other languages too.
+- **No words to copy for piece names and sizes.** A size has a name only from a menu or a
+  package; any other is null, and the code labels it by its amount (`45 г`). A piece has its
+  usual short name, or null, and the amount is then the count alone (`2 × 50г`). No examples of
+  either. Why: with English examples (pc., cup, small, large, portion) the first v6 runs answered
+  "1 cup M × 250 мл", "20 pc. × 10 г" and sizes "small" / "large" in a Russian answer; and an
+  amount tells a size apart better than "small" does.
+- **Nothing about what matters.** The schema and the prompt say what the model perceives, never
+  that something decides after it. Why: the model has no use for knowing; v5's "the app decides
+  what to ask" was there to stop it filtering its doubts, which the bounds' own slots now do.
 - **No notes.** Why: prose can't be shown as chips, and a free-text field invites questions in
   prose.
 
@@ -93,13 +121,14 @@ them (see the prompt doc).
 flag (kept in the log, shown in the text view). Why: in v4 any problem lost the whole answer; a
 slip in one product shouldn't cost a meal.
 
-- **Filled in:** an alternative's missing fields are its product's (an alternative of
-  `{piece_count: 12}` is the product with 12); a missing value is 0; an unknown base is g;
-  products with no dishes are one dish. An answer of the schema before (nested `per_100`, the
-  old names) is read with today's names, its `water_g` (the water content) as 0.
-- **Repaired:** water to drink over 100 in 100 base units is 100.
-- **Dropped:** a product with no `base_units_in_piece`, a dish left empty, an alternative that
-  is the same as the product or one before it.
+- **Filled in:** a missing value is 0; a missing bound is none; an unknown base is g. Answers
+  of earlier schemas aren't read (no backward compatibility: a bench run before is read with the
+  code of its time).
+- **Repaired:** water to drink over 100 in 100 base units is 100; a bound equal to its guess is
+  none.
+- **Dropped:** a product with no `base_units_in_piece`, a dish left empty, an alternative
+  product named as one before it, a bound on the wrong side of its guess (a smaller over it),
+  a size name with no size, a count's bounds when there is no count.
 - **Kept but flagged:** kcal that don't match the macros (4·P + 4·C + 9·F, off by more than 30
   %), more than 105 g in 100 g, a product over 3 kg or 3,000 kcal (the model multiplying twice: a
   weight as both count and size), a count of 0.
@@ -109,21 +138,22 @@ slip in one product shouldn't cost a meal.
 `process.ts`: each product's amount and values, each dish's and the meal's totals, and the
 questions.
 
-**Questions from alternatives.** Each alternative is compared with the model's guess and sorted
-by what it changes:
+**Up to three questions a product**, in this order:
 
-| Axis    | Changes                                                           | Example           |
-| ------- | ----------------------------------------------------------------- | ----------------- |
-| `kind`  | what it is (name and values; may bring its own piece size)        | картошка / творог |
-| `size`  | how big (`base_units_in_piece`, `piece_size_name`), the same food | S / M / L         |
-| `count` | how many, the same food and size                                  | 10 / 12           |
-| `whole` | more than one of these                                            | творог, 8 шт.     |
+| Axis    | Options                                                                  | Example         |
+| ------- | ------------------------------------------------------------------------ | --------------- |
+| `kind`  | the product and its alternative products, each at its own default size   | с картошкой / … |
+| `size`  | the chosen product's smaller, own and larger sizes (named or in g or ml) | S / M / L       |
+| `count` | the fewest, the guess and the most pieces                                | 8 / 10 / 12     |
 
-- When every alternative changes one axis, they become **independent questions** (what, how
-  big, how many), as v4's were: any combination of answers is valid. Otherwise (an alternative
-  changes two things, or kinds bring their own sizes while a size is also asked) the product
-  gets **one question of whole products**. Why: the model's alternatives usually change one
-  thing, as asked; when they don't, a whole-row choice still works.
+- **Independent**, as v4's were: the product chosen, at the size and the count chosen. What it
+  is comes first because another product has its own sizes: chosen, it shows at its own
+  default size and its own size question. Why: a classic croissant isn't an almond one's 130 g.
+- **The user's answers** (`ItemAnswers`): the product chosen (by name), the size chosen for each
+  product (by its amount: each product keeps its own, for when it is chosen again), the count
+  chosen. An answer no option has any more is ignored.
+- **A question's change** is its largest at the model's guesses; for the size, the largest of
+  any of the products' (whichever is chosen, its size question is the one shown).
 - **Asked: the largest first, until what is left fits the meal's budget**, the budget being
   **8 % of its kcal, at least 15 and at most 80** (at the model's guesses: 40 kcal in a 500-kcal
   lunch, 15 for a coffee alone, 80 from 1,000 kcal up). Each question counts its largest change;
@@ -149,9 +179,10 @@ by what it changes:
 
 - **Labels** come from the difference: the words names share are dropped ("Вареники с
   картошкой" / "Вареники с творогом" → "с картошкой" / "с творогом"; a preposition stays with
-  its word), a size's alias or grams, a count's number; amounts are added when labels would
+  its word), a size's name or grams, a count's number; amounts are added when labels would
   repeat.
-- **Order:** sizes and counts small to large; kinds as the model gave them, most likely first.
+- **Order:** sizes and counts small to large; products as the model gave them, most likely
+  first.
 
 ## The text view
 
@@ -160,14 +191,14 @@ How the tool and the bench show a meal (`view.ts`), for judging by reading:
 ```
 # Обед: 736kcal, 18.8p, 19.5f, 118c, 309.6w
 ## Вареники: 736kcal, 18.8p, 19.5f, 118c, 309.6w
-- Вареники с картошкой — 10 шт. × 45 г: 450g, 675kcal, 18p, 13.5f, 117c, 288w
+- Вареники с картошкой — 10 шт. × 45г: 450g, 675kcal, 18p, 13.5f, 117c, 288w
   ? что
     * с картошкой
     ~ с творогом: +135kcal, +27p, +4.5f, -3c, -20w
   ? сколько
     * 10
     ~ 12: +90g, +135kcal, +3.6p, +2.7f, +23.4c, +57.6w
-- Сметана 20 % — обычно, 30 г: 30g, 61kcal, 0.8p, 6f, 1c, 21.6w
+- Сметана 20 % — 30г: 30g, 61kcal, 0.8p, 6f, 1c, 21.6w
 ! dishes[0].products[1]: …
 ```
 
@@ -180,7 +211,7 @@ How the tool and the bench show a meal (`view.ts`), for judging by reading:
   `<amount>g|ml, <kcal>kcal, <protein>p, <fat>f, <carbs>c, <water>w`; kcal, g and ml whole, the
   rest to a tenth. `w` is the water to drink (`hydration_ml_per_100_base_units`), ml. The
   amount for a product only: a dish's or a meal's would add g to ml.
-- A question: its axis (`что`, `размер`, `сколько`, `или`), then its answers in order (sizes and
+- A question: its axis (`что`, `размер`, `сколько`), then its answers in order (sizes and
   counts small to large). Another answer shows what it changes against the guess in the same
   form, signed, with only what changes, aligned within the question.
 - Only the questions asked are shown: the rest aren't worth asking (under the threshold, or over
@@ -231,6 +262,15 @@ Decisions in order, with what was set aside:
     named foods, for matching against history (grouping by plate was considered first, and set
     aside: it names containers). v4's `sized_food`, `sizes` always present, `г` only of 1 and
     dish servings are gone with the shapes that needed them.
+13. **Keys say everything** (2026-11-23): flat values with their unit and scale in the name,
+    `hydration_ml_per_100_base_units`, the piece fields named after the piece.
+14. **How sure, next to each number; alternatives only for what it is** (2026-11-23, prompt v6):
+    the whole alternatives of v5 left most guessed amounts without a range, and the rest one
+    way. Considered first: lists of other counts and sizes (an empty list was an easy way out,
+    and "every likely one" lists every gram), an error in % (symmetric, but it leaves the code to
+    invent the sizes and drops the menu's names), min and max of every value (nutrient ranges
+    the user can't answer). The budget (8 % of the meal, as independent errors) decides what is
+    asked.
 
 ## Open questions
 
@@ -240,5 +280,3 @@ Decisions in order, with what was set aside:
 - **History:** past meals as examples for the model, matched by dish name: which, in what form.
 - **The `why`:** questions show their axis ("что"), not the model's reason ("начинка"). A short
   reason on each alternative would read better, for a few tokens.
-- **The meal screen** on this format: dishes with their products, asked questions as chips,
-  values updated on a tap.

@@ -1,12 +1,29 @@
 /**
- * What the code makes of a meal the model perceived (read.ts): each product's amount and values,
- * the meal's totals, and the questions worth asking. The model's alternatives are split into
- * independent questions where they fit (what it is, how big, how many), else kept whole (one
- * question of whole products). Questions are asked largest first until what is left unasked fits
- * the meal's budget (`budget`), combined as independent errors are (the root of the sum of
- * squares: some guesses are over, some under); none under the budget's minimum is ever asked.
+ * What the code makes of a meal the model perceived (read.ts), with the user's answers: each
+ * product's amount and values, the meal's totals, and the questions worth asking. A product has
+ * up to three questions, in this order: what it is (its alternative products), how big (the
+ * chosen product's smaller and larger sizes: another product has its own), how many (the fewest
+ * and the most pieces). Questions are asked largest first until what is left unasked fits the
+ * meal's budget (`budget`), combined as independent errors are (the root of the sum of squares:
+ * some guesses are over, some under); none under the budget's minimum is ever asked. Whether a
+ * question is asked is judged at the model's guesses, so answers never change it.
  */
-import { type Item, type Meal, type Product, sameName, samePer100 } from './read.ts';
+import type { Food, Item, Meal, Per100, Size } from './read.ts';
+
+/** A product as eaten: its amount is (count ?? 1) × size, in its base. */
+export interface Product {
+  name: string;
+  base: 'g' | 'ml';
+  /** Pieces; null for loose food and stated weights. */
+  count: number | null;
+  /** The piece as counted (шт., ломт.). */
+  unit: string | null;
+  /** A size name: a menu size, a portion. */
+  alias: string | null;
+  /** One piece when counted, else the whole amount. */
+  size: number;
+  per_100: Per100;
+}
 
 export interface Values {
   /** In the product's base (g or ml); a sum's is the sum of all. */
@@ -31,33 +48,37 @@ export const BUDGET = { share: 0.08, min: 15, max: 80 };
 export const budget = (mealKcal: number): number =>
   Math.min(BUDGET.max, Math.max(BUDGET.min, BUDGET.share * mealKcal));
 
-/** What an answer changes: `kind` what it is, `size` how big, `count` how many, `whole` all. */
-export type Axis = 'kind' | 'size' | 'count' | 'whole';
+/** What an answer changes: `kind` what it is, `size` how big, `count` how many. */
+export type Axis = 'kind' | 'size' | 'count';
 
 export interface Option {
+  /** What the answer keeps: a product's name, a size's or a count's amount. */
+  id: string;
   label: string;
-  /** The product with this answer (and the other questions at the model's guess). */
+  /** The product with this answer, the other answers as they are. */
   product: Product;
   values: Values;
-  /** Against the model's guess. */
+  /** Against the product as it is. */
   delta: Values;
-  /** The model's guess. */
   chosen: boolean;
 }
 
 export interface Question {
   axis: Axis;
   options: Option[];
-  /** The largest change of an answer, kcal either way. */
+  /** The largest change of an answer at the model's guesses, kcal either way. */
   change: number;
-  /** Asked: left unasked, it and the smaller ones would typically change the meal by more than
-   * its budget. */
+  /**
+   * Asked: left unasked, it and the smaller ones would typically change the meal by more than
+   * its budget.
+   */
   asked: boolean;
 }
 
 export interface ProcessedItem {
+  /** The product's name, as chosen. */
   name: string;
-  /** As said: `2 шт. × 50 г`, `обычная, 200 г`. */
+  /** As said: `2 шт. × 50г`, `M, 250мл`. */
   amount: string;
   product: Product;
   values: Values;
@@ -74,6 +95,36 @@ export interface Processed {
   title: string;
   dishes: ProcessedDish[];
   total: Values;
+}
+
+/**
+ * The user's answers to a product's questions: the product chosen (by name), the size chosen
+ * for each product (by its amount: each has its own sizes, kept for when it is chosen again), the
+ * count chosen. An answer no option has any more is ignored.
+ */
+export interface ItemAnswers {
+  food?: string;
+  sizes?: Record<string, string>;
+  count?: string;
+}
+
+/** The answers of a meal, by `itemKey`. */
+export type Answers = Record<string, ItemAnswers>;
+
+/** A product's place in the meal, which its answers are kept by. */
+export const itemKey = (dish: number, item: number): string => `${dish}.${item}`;
+
+/** A product's answers with one more: the option `id` of question `q`, for the product as shown. */
+export function choose(
+  answers: ItemAnswers | undefined,
+  item: ProcessedItem,
+  q: Question,
+  id: string,
+): ItemAnswers {
+  const a = answers ?? {};
+  if (q.axis === 'kind') return { ...a, food: id };
+  if (q.axis === 'size') return { ...a, sizes: { ...a.sizes, [item.name]: id } };
+  return { ...a, count: id };
 }
 
 const ZERO: Values = { amount: 0, kcal: 0, protein: 0, fat: 0, carbs: 0, water: 0 };
@@ -119,109 +170,148 @@ export function units(language: string): { g: string; ml: string } {
   return language === 'ru' ? { g: 'г', ml: 'мл' } : { g: 'g', ml: 'ml' };
 }
 
-export function process(meal: Meal, language = 'ru'): Processed {
+type Units = ReturnType<typeof units>;
+
+export function process(meal: Meal, language = 'ru', answers: Answers = {}): Processed {
   const u = units(language);
-  const dishes = meal.dishes.map((d) => {
-    const items = d.items.map((i) => processItem(i, u));
-    return { name: d.name, items, values: items.reduce((s, i) => add(s, i.values), ZERO) };
-  });
-  const total = dishes.reduce((s, d) => add(s, d.values), ZERO);
-  // the largest first, until the rest fits the budget (as squares: independent errors)
-  const left = dishes
-    .flatMap((d) => d.items.flatMap((i) => i.questions))
-    .sort((a, b) => b.change - a.change);
-  let rest = left.reduce((s, q) => s + q.change ** 2, 0);
-  const most = budget(total.kcal);
-  for (const q of left) {
+  // what is asked: judged at the model's guesses, the largest first, until the rest fits
+  const all = meal.dishes.flatMap((d, di) =>
+    d.items.flatMap((item, ii) =>
+      (Object.entries(changes(item)) as [Axis, number][]).map(([axis, change]) => ({
+        key: `${itemKey(di, ii)}:${axis}`,
+        change,
+      })),
+    ),
+  );
+  const guessed = meal.dishes.reduce(
+    (s, d) => s + d.items.reduce((t, i) => t + values(product(i, i.foods[0]!)).kcal, 0),
+    0,
+  );
+  const asked = new Set<string>();
+  let rest = all.reduce((s, q) => s + q.change ** 2, 0);
+  const most = budget(guessed);
+  for (const q of [...all].sort((a, b) => b.change - a.change)) {
     if (rest <= most ** 2 || q.change < BUDGET.min) break;
-    q.asked = true;
+    asked.add(q.key);
     rest -= q.change ** 2;
   }
-  return { title: meal.title, dishes, total };
+
+  const dishes = meal.dishes.map((d, di) => {
+    const items = d.items.map((item, ii) => {
+      const key = itemKey(di, ii);
+      const shown = view(item, answers[key] ?? {}, u);
+      for (const q of shown.questions) q.asked = asked.has(`${key}:${q.axis}`);
+      return shown;
+    });
+    return { name: d.name, items, values: items.reduce((s, i) => add(s, i.values), ZERO) };
+  });
+  return { title: meal.title, dishes, total: dishes.reduce((s, d) => add(s, d.values), ZERO) };
 }
 
-function processItem(item: Item, u: { g: string; ml: string }): ProcessedItem {
-  const { alternatives, ...product } = item;
+/** The product of an item as eaten: this food, at this size and count. */
+function product(item: Item, food: Food, size = food.size, count = item.count): Product {
   return {
-    name: product.name,
-    amount: amountText(product, u),
-    product,
-    values: values(product),
-    questions: questions(product, alternatives, u),
+    name: food.name,
+    base: item.base,
+    count,
+    unit: item.unit,
+    alias: size.name,
+    size: size.amount,
+    per_100: food.per_100,
   };
 }
 
-/** What an alternative changes against the guess. */
-export function axisOf(guess: Product, alt: Product): Axis {
-  const kind = !(sameName(guess, alt) || samePer100(guess.per_100, alt.per_100));
-  const size = alt.size !== guess.size || alt.alias !== guess.alias;
-  const count = alt.count !== guess.count;
-  if (kind && !count) return 'kind'; // a kind may come with its own size (a bigger croissant)
-  if (!kind && size && !count) return 'size';
-  if (!kind && !size && count) return 'count';
-  return 'whole';
+const sizesOf = (f: Food): Size[] => [f.smaller, f.size, f.larger].filter((s) => s !== null);
+const countsOf = (i: Item): number[] =>
+  i.count === null ? [] : [i.fewer, i.count, i.more].filter((c) => c !== null);
+
+/** How much each of an item's questions can change it, at the model's guesses. */
+function changes(item: Item): Partial<Record<Axis, number>> {
+  const guess = item.foods[0]!;
+  const kcal = (p: Product) => values(p).kcal;
+  const at = kcal(product(item, guess));
+  const largest = (xs: number[]) => Math.max(0, ...xs.map((x) => Math.abs(x)));
+  const out: Partial<Record<Axis, number>> = {};
+  if (item.foods.length > 1) out.kind = largest(item.foods.map((f) => kcal(product(item, f)) - at));
+  // another product has its own sizes: the largest change of any product's
+  const sizes = item.foods.map((f) =>
+    largest(sizesOf(f).map((s) => kcal(product(item, f, s)) - kcal(product(item, f)))),
+  );
+  if (item.foods.some((f) => sizesOf(f).length > 1)) out.size = Math.max(...sizes);
+  if (countsOf(item).length > 1) {
+    out.count = largest(countsOf(item).map((c) => kcal(product(item, guess, guess.size, c)) - at));
+  }
+  return out;
 }
 
-/**
- * The alternatives as questions: independent ones (what, how big, how many) when every
- * alternative changes one of them and no kind brings its own size while a size is also asked;
- * else one question of whole products.
- */
-export function questions(guess: Product, alts: Product[], u = units('ru')): Question[] {
-  if (alts.length === 0) return [];
-  const axes = alts.map((a) => axisOf(guess, a));
-  const kindsSized = alts.some((a, i) => axes[i] === 'kind' && a.size !== guess.size);
-  const split = !axes.includes('whole') && !(kindsSized && axes.includes('size'));
-  if (!split) return [question('whole', guess, alts, u)];
-  const of = (axis: Axis) => alts.filter((_, i) => axes[i] === axis);
-  return (['kind', 'size', 'count'] as const)
-    .filter((axis) => of(axis).length > 0)
-    .map((axis) => {
-      // each answer changes only its own part of the guess
-      const products = of(axis).map((a): Product => {
-        if (axis === 'kind') return { ...a, count: guess.count };
-        if (axis === 'size') return { ...guess, size: a.size, alias: a.alias };
-        return { ...guess, count: a.count, unit: a.unit ?? guess.unit };
-      });
-      return question(axis, guess, products, u);
-    });
-}
-
-function question(
-  axis: Axis,
-  guess: Product,
-  products: Product[],
-  u: { g: string; ml: string },
-): Question {
-  const all = [guess, ...products];
-  const labels = optionLabels(axis, all, u);
-  const base = values(guess);
-  const options = all.map((p, i): Option => {
-    const v = values(p);
+/** An item as answered: the product chosen, at its size and count chosen, and its questions. */
+function view(item: Item, a: ItemAnswers, u: Units): ProcessedItem {
+  const food = item.foods.find((f) => f.name === a.food) ?? item.foods[0]!;
+  const size = sizesOf(food).find((s) => String(s.amount) === a.sizes?.[food.name]) ?? food.size;
+  const count = countsOf(item).find((c) => String(c) === a.count) ?? item.count;
+  const current = product(item, food, size, count);
+  const now = values(current);
+  const question = (axis: Axis, options: { id: string; product: Product }[], id: string) => {
+    const labels = optionLabels(
+      axis,
+      options.map((o) => o.product),
+      u,
+    );
     return {
-      label: labels[i]!,
-      product: p,
-      values: v,
-      delta: subtract(v, base),
-      chosen: i === 0,
+      axis,
+      options: options.map((o, i): Option => ({
+        ...o,
+        label: labels[i]!,
+        values: values(o.product),
+        delta: subtract(values(o.product), now),
+        chosen: o.id === id,
+      })),
+      change: 0,
+      asked: false,
     };
-  });
-  // natural order where there is one: small to large, counts ascending
-  if (axis === 'size' || axis === 'count')
-    options.sort((a, b) => a.values.amount - b.values.amount);
-  const change = Math.max(...options.map((o) => Math.abs(o.delta.kcal)));
-  return { axis, options, change, asked: false };
+  };
+
+  const questions: Question[] = [];
+  if (item.foods.length > 1) {
+    const options = item.foods.map((f) => ({
+      id: f.name,
+      // another product at its own default size
+      product: f === food ? current : product(item, f, f.size, count),
+    }));
+    questions.push(question('kind', options, food.name));
+  }
+  if (sizesOf(food).length > 1) {
+    const options = sizesOf(food).map((s) => ({
+      id: String(s.amount),
+      product: product(item, food, s, count),
+    }));
+    questions.push(question('size', options, String(size.amount)));
+  }
+  if (countsOf(item).length > 1) {
+    const options = countsOf(item).map((c) => ({
+      id: String(c),
+      product: product(item, food, size, c),
+    }));
+    questions.push(question('count', options, String(count)));
+  }
+  const ch = changes(item);
+  for (const q of questions) q.change = ch[q.axis] ?? 0;
+  return {
+    name: food.name,
+    amount: amountText(current, u),
+    product: current,
+    values: now,
+    questions,
+  };
 }
 
 /** The chips: only what tells the options apart; made unique by their amounts if need be. */
-function optionLabels(axis: Axis, all: Product[], u: { g: string; ml: string }): string[] {
+function optionLabels(axis: Axis, all: Product[], u: Units): string[] {
   const kinds = distinctNames(all.map((p) => p.name));
   const labels = all.map((p, i) => {
     if (axis === 'kind') return kinds[i]!;
-    if (axis === 'size') return p.alias ?? `${num(p.size)} ${u[p.base]}`;
-    if (axis === 'count') return p.count === 0 ? '0' : num(p.count ?? 1);
-    const amount = amountText(p, u);
-    return all.every((o) => sameName(o, all[0]!)) ? amount : `${kinds[i]}, ${amount}`;
+    if (axis === 'size') return p.alias ?? `${num(p.size)}${u[p.base]}`;
+    return num(p.count ?? 1);
   });
   if (new Set(labels).size === labels.length) return labels;
   return labels.map((l, i) => `${l} (${amountText(all[i]!, u)})`);
@@ -255,58 +345,15 @@ export function distinctNames(names: string[]): string[] {
   return words.map((w, i) => w.slice(start, w.length - end).join(' ') || names[i]!);
 }
 
-/** The amount as said: `2 шт. × 50 г`, `1 стакан M, 350 мл`, `обычная, 200 г`, `150 г`. */
+/**
+ * The amount as said: `2 ломт. × 30г`, `2 × 50г` (a piece with no name), `1 стакан M × 350мл`,
+ * `0,5, 500мл`, `150г`; a unit right after its number, as in the values (`450g, 675kcal`).
+ */
 export function amountText(p: Product, u = units('ru')): string {
-  const size = `${num(p.size)} ${u[p.base]}`;
+  const size = `${num(p.size)}${u[p.base]}`;
   if (p.count === null) return p.alias ? `${p.alias}, ${size}` : size;
-  const unit = [p.unit ?? 'шт.', p.alias].filter(Boolean).join(' ');
-  return `${num(p.count)} ${unit} × ${size}`;
+  const unit = [p.unit, p.alias].filter(Boolean).join(' ');
+  return `${num(p.count)}${unit ? ` ${unit}` : ''} × ${size}`;
 }
 
 export const num = (x: number) => String(Math.round(x * 10) / 10);
-
-/** The user's answers: per product (by `itemKey`), per question, the label of the option chosen. */
-export type Answers = Record<string, Partial<Record<Axis, string>>>;
-
-/** A product's place in the meal, which its answers are kept by. */
-export const itemKey = (dish: number, item: number): string => `${dish}.${item}`;
-
-/**
- * The meal with the user's answers: each answered product as chosen, with its amount and values,
- * and the totals again; each question's `chosen` moved to the answer. Answers to independent
- * questions combine: the kind chosen, at the size and the count chosen. A label that no option
- * has is ignored (the guess stays).
- */
-export function answered(meal: Processed, answers: Answers, language = 'ru'): Processed {
-  const u = units(language);
-  const dishes = meal.dishes.map((d, di) => {
-    const items = d.items.map((item, ii): ProcessedItem => {
-      const mine = answers[itemKey(di, ii)] ?? {};
-      let product = item.product;
-      const questions = item.questions.map((q): Question => {
-        const pick = q.options.find((o) => o.label === mine[q.axis]);
-        if (!pick) return q;
-        product = withAnswer(q.axis, product, pick.product);
-        return { ...q, options: q.options.map((o) => ({ ...o, chosen: o === pick })) };
-      });
-      return {
-        ...item,
-        name: product.name,
-        amount: amountText(product, u),
-        product,
-        values: values(product),
-        questions,
-      };
-    });
-    return { ...d, items, values: items.reduce((s, i) => add(s, i.values), ZERO) };
-  });
-  return { ...meal, dishes, total: dishes.reduce((s, d) => add(s, d.values), ZERO) };
-}
-
-/** The product so far with one more answer: only that answer's part of it changes. */
-function withAnswer(axis: Axis, so: Product, chosen: Product): Product {
-  if (axis === 'size') return { ...so, size: chosen.size, alias: chosen.alias };
-  if (axis === 'count') return { ...so, count: chosen.count, unit: chosen.unit };
-  // a kind comes first, with the count of the guess (see questions); a whole answer is all of it
-  return chosen;
-}

@@ -1,14 +1,17 @@
 /**
  * What the model answers (Gemini's `responseJsonSchema`): only what it perceives. Dishes named
- * as a menu or a food diary would (for finding them in history later), their products with
- * amounts and values per 100 of their unit, and, where it is unsure, alternatives: whole
- * products it could be instead. Nothing about what to ask or what matters: the code decides
- * that (process.ts). Keys are in the order the model should decide them (Gemini keeps the
- * schema's order). Read by read.ts, forgivingly.
+ * as a menu or a food diary would (for finding them in history later); their products with
+ * amounts and values per 100 of their unit; where it is unsure, the fewest and the most pieces,
+ * the smallest and the largest size, and other products it could be. Nothing about what to ask
+ * or what matters: the code decides that (process.ts). Keys are in the order the model should
+ * decide them (Gemini keeps the schema's order). Read by read.ts, forgivingly.
  *
  * Names and descriptions say everything, units and scale included: the model follows them more
  * closely than the prompt (`hydration_ml` alone was read as the ml drunk, see
- * docs/lab-meal-format.md).
+ * docs/lab-meal-format.md). Examples are in English, of form only (never values to copy), and
+ * the answer is in the answer language: copied Russian words came out uninflected, and copied
+ * English ones untranslated ("cup", "small"), so piece names have no examples, and a size is named
+ * only when it has a real name (a menu's, a package's); the code shows the rest by amount.
  */
 
 type Schema = Record<string, unknown>;
@@ -29,10 +32,68 @@ const orNull = (type: string, description: string): Schema => ({
 // No minimum or item counts: Gemini rejects a schema with many of them ("too many states").
 const number = (description: string): Schema => ({ type: 'number', description });
 
-const PRODUCT = {
+/** A size's name: only a real one, as printed; anything else is shown by its amount. */
+const SIZE_NAME = 'as named on a menu or a package (S, M, L, grande, venti, 0,5)';
+
+/** A product's size and its likely range: the product's own, or an alternative product's. */
+const SIZE = {
+  piece_size_name: orNull(
+    'string',
+    `The piece's size ${SIZE_NAME}; null when it has no such name.`,
+  ),
+  base_units_in_piece: number(
+    'In base_unit: one piece (an egg: 50); for loose food and stated weights, the whole amount ' +
+      'eaten, as one piece (rice: 200). Never the total of all pieces.',
+  ),
+  smaller_piece_size_name: orNull(
+    'string',
+    `The size of smaller_base_units_in_piece ${SIZE_NAME}; null when it has no such name.`,
+  ),
+  smaller_base_units_in_piece: orNull(
+    'number',
+    'The smallest one piece likely is, or the next smaller size on the menu, in base_unit; 0 ' +
+      'when it may not be there at all. null when the size is stated, weighed or a standard ' +
+      'package.',
+  ),
+  larger_piece_size_name: orNull(
+    'string',
+    `The size of larger_base_units_in_piece ${SIZE_NAME}; null when it has no such name.`,
+  ),
+  larger_base_units_in_piece: orNull(
+    'number',
+    'The largest one piece likely is, or the next larger size on the menu, in base_unit. null ' +
+      'when the size is stated, weighed or a standard package.',
+  ),
+};
+
+const VALUES = {
+  kcal_per_100_base_units: number('kcal in 100 base_unit of the product as eaten.'),
+  protein_g_per_100_base_units: number('Protein, g in 100 base_unit of the product as eaten.'),
+  carbs_g_per_100_base_units: number('Carbohydrates, g in 100 base_unit of the product as eaten.'),
+  fat_g_per_100_base_units: number('Fat, g in 100 base_unit of the product as eaten.'),
+  hydration_ml_per_100_base_units: number(
+    'Water it gives to drink, ml in 100 base_unit of it, so at most 100: from a drink or a ' +
+      'soup; 0 for food, and for a food or drink cooked into a food (milk in an omelette).',
+  ),
+};
+
+const ALTERNATIVE_PRODUCT = object(
+  {
+    name: string('The specific food or drink, as the product’s name, in the answer language.'),
+    ...SIZE,
+    ...VALUES,
+  },
+  {
+    description:
+      'Another food or drink it may be, at the same count: its own size and range (the same ' +
+      'as the product’s unless it comes in its own size) and its own values.',
+  },
+);
+
+const PRODUCT = object({
   name: string(
-    'The specific food or drink, with its preparation when it matters, in the answer language: ' +
-      '"Яйцо жареное", "Вареники с картошкой".',
+    'The specific food or drink, with its preparation when it matters, in the answer ' +
+      'language: "Fried egg", "Potato vareniki".',
   ),
   base_unit: {
     type: 'string',
@@ -44,61 +105,51 @@ const PRODUCT = {
     'How many pieces when it comes in pieces (eggs, slices, cutlets, dumplings, cookies, ' +
       'drinks); null for loose food and stated weights.',
   ),
+  fewer_piece_count: orNull(
+    'number',
+    'The fewest pieces it likely is, when some are hidden or hard to count; 0 for an add-on ' +
+      'that may not be there. null when all are in plain view or the count is stated, or ' +
+      'piece_count is null.',
+  ),
+  more_piece_count: orNull(
+    'number',
+    'The most pieces it likely is, when some are hidden or hard to count. null when all are ' +
+      'in plain view or the count is stated, or piece_count is null.',
+  ),
   piece_name: orNull(
     'string',
-    'The piece as counted, short: шт., ломт., стакан, бутылка; null when piece_count is null.',
+    'The piece as counted, by its usual short name in the answer language, when it has one; ' +
+      'null when it has none, or piece_count is null.',
   ),
-  piece_size_name: orNull(
-    'string',
-    "The piece's size by name when there is one: a menu size (S, M, L, grande, 0,5) or a " +
-      'portion (маленькая, обычная, большая); null otherwise.',
-  ),
-  base_units_in_piece: number(
-    'In base_unit: one piece (an egg: 50); for loose food and stated weights, the whole amount ' +
-      'eaten, as one piece (rice: 200). Never the total of all pieces.',
-  ),
-  kcal_per_100_base_units: number('kcal in 100 base_unit of the product as eaten.'),
-  protein_g_per_100_base_units: number('Protein, g in 100 base_unit of the product as eaten.'),
-  carbs_g_per_100_base_units: number('Carbohydrates, g in 100 base_unit of the product as eaten.'),
-  fat_g_per_100_base_units: number('Fat, g in 100 base_unit of the product as eaten.'),
-  hydration_ml_per_100_base_units: number(
-    'Water it gives to drink, ml in 100 base_unit of it, so at most 100: from a drink or a ' +
-      'soup; 0 for food, and for a food or drink cooked into a food (milk in an omelette).',
-  ),
-};
-
-const ALTERNATIVE = object(PRODUCT, {
-  description: 'A complete product, as it would be if this reading were right.',
-});
-
-const DISH_PRODUCT = object({
-  ...PRODUCT,
-  alternatives: {
+  ...SIZE,
+  ...VALUES,
+  alternative_products: {
     type: 'array',
-    items: ALTERNATIVE,
+    items: ALTERNATIVE_PRODUCT,
     description:
-      'Other real readings of this product, most likely first, up to 4: a different food it ' +
-      'could be (cod / chicken / pork, another filling), another size, another count when ' +
-      'pieces are hidden. Change one thing per alternative. [] when the input states it or ' +
-      'the photo shows it clearly. Do not judge whether it matters: the app does.',
+      'Other foods or drinks it likely is, most likely first: another meat, another filling, ' +
+      'another drink. [] when the input states what it is or the photo shows it clearly.',
   },
 });
 
 const DISH = object({
   name: string(
-    'The dish as a menu or a food diary names it, the same each time: "Борщ", "Тефтели с ' +
-      'картофелем", "Капучино". What is certain only; never the plate, cup or board, the meal, ' +
-      'an amount or a doubt.',
+    'The dish as a menu or a food diary names it, the same each time, in the answer language: ' +
+      '"Borscht", "Meatballs with potatoes", "Cappuccino". What is certain only; never the ' +
+      'plate, cup or board, the meal, an amount or a doubt.',
   ),
   products: {
     type: 'array',
-    items: DISH_PRODUCT,
+    items: PRODUCT,
     description: 'What the dish is made of or served with as its part (a side, a sauce, sugar).',
   },
 });
 
 export const MEAL_SCHEMA: Schema = object({
-  title: string('A short title for the meals list: "Завтрак", "Борщ с пампушкой".'),
+  title: string(
+    'A short title for the meals list, in the answer language: "Breakfast", "Borscht with ' +
+      'pampushka".',
+  ),
   dishes: {
     type: 'array',
     items: DISH,

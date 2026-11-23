@@ -118,12 +118,12 @@ src/lab/
                   download); clearLab(): deletes every kcal-lab-* database
   ai/             model requests and replies, provider-neutral (model.ts), and Gemini
                   (gemini.ts); shrinking photos to send
-  meal/           the meal request with prompt v5: settings, prompt, schema, the forgiving
+  meal/           the meal request with prompt v6: settings, prompt, schema, the forgiving
                   reader, processing (totals, questions) and the text view; pure, also run by
                   scripts/meal.ts (one meal from the command line) and scripts/meal-bench.ts,
                   see docs/lab-meal-prompt.md
   composer/       running now: the meal composer (photos, text and barcodes → a meal of
-                  dishes and products by prompt v5, its questions answered on the phone),
+                  dishes and products by prompt v6, its questions answered on the phone),
                   see docs/lab.md
   <experiment>/   one experiment: its page (main.tsx), UI, settings and logic
 ```

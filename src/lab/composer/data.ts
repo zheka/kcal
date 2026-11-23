@@ -1,3 +1,4 @@
+import type { Meal } from '../meal/read';
 import type { ComposedMeal } from './types';
 
 /**
@@ -16,21 +17,26 @@ export interface ComposerData {
 export const EMPTY: ComposerData = { meals: [], language: 'ru' };
 
 /**
- * What was kept, with anything missing at its default. A meal of an older shape keeps what it is
- * composed from, without its answer (another format): an update makes it again.
+ * What was kept, with anything missing at its default. A meal answered in an older shape keeps
+ * what it is composed from, without its answer and the user's answers: an update makes it again.
  */
 export function fromStored(stored: Partial<ComposerData> | undefined): ComposerData {
   return {
     meals: (stored?.meals ?? [])
       .filter((m) => Array.isArray(m.context)) // before whole-context updates: left out
       .map((m) => {
-        if (m.answers) return m;
+        if (m.answers && (!m.meal || current(m.meal))) return m;
         const { id, title, at, context } = m;
         return { id, title, at, context, answers: {}, changed: context.length > 0 };
       }),
     language: stored?.language || EMPTY.language,
   };
 }
+
+/** An answer read in today's shape (read.ts): each product with the foods it may be. */
+const current = (meal: Meal) =>
+  Array.isArray(meal.dishes) &&
+  meal.dishes.every((d) => Array.isArray(d.items) && d.items.every((i) => Array.isArray(i.foods)));
 
 /** A meal saved: replaced by id, or added; newest first. */
 export function withMeal(meals: readonly ComposedMeal[], meal: ComposedMeal): ComposedMeal[] {
