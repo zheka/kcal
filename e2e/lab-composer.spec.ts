@@ -98,10 +98,13 @@ test('composes a meal from its attached context, answers it locally, updates it 
   const total = page.locator('.composed-total');
   await expect(total).toContainText('This meal: 739 kcal');
   await expect(total).toContainText('250 ml water');
+  // amounts with no piece names: the count × a piece; one piece without "1 ×"
+  await expect(items.first()).toContainText('10 × 45г · 675 kcal');
+  await expect(items.last()).toContainText('250мл · ');
 
   // the questions as chips; an answer updates the values here (no request)
   await page.getByRole('group', { name: 'how many' }).getByRole('button', { name: '14' }).click();
-  await expect(items.first()).toContainText('14 шт. × 45г · 945 kcal');
+  await expect(items.first()).toContainText('14 × 45г · 945 kcal');
   await page
     .getByRole('group', { name: 'what' })
     .getByRole('button', { name: 'с творогом' })
@@ -150,7 +153,7 @@ test('composes a meal from its attached context, answers it locally, updates it 
     meal: expect.any(String),
     request: {
       model: 'gemini-3.5-flash-lite',
-      instructions: expect.stringContaining('You are the food-recognition step'),
+      instructions: expect.stringContaining('You recognize what was eaten'),
       content: [
         { text: expect.stringContaining('answer language: ru') },
         { image: expect.any(String) },

@@ -22,7 +22,7 @@ const photo = (id: string): Attached => ({ id, kind: 'photo', file: `file-${id}`
 const answered = (m: ComposedMeal) => applyUpdate(m, m.context, { ms: 900, answer: testAnswer });
 
 describe('the update request', () => {
-  it('is the tool’s request: prompt v5, the settings, the context as attached, in order', () => {
+  it('is the tool’s request: the prompt, the settings, the context as attached, in order', () => {
     const skyr: ScannedProductData = {
       code: '4006040',
       language: 'de',

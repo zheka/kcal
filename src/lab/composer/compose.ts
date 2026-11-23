@@ -6,8 +6,8 @@ import { mealRequest } from '../meal/request';
 import type { Attached, ComposedMeal } from './types';
 
 /**
- * Updating a meal: one request with its whole context, as attached (prompt v5, the same request
- * as the command-line tool's: src/lab/meal/request.ts); the answer, read forgivingly, replaces
+ * Updating a meal: one request with its whole context, as attached (the same request as the
+ * command-line tool's: src/lab/meal/request.ts); the answer, read forgivingly, replaces
  * the meal and the user's answers.
  */
 
