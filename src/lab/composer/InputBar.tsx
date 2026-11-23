@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
-import { CloseIcon } from '../../ui/icons';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { canScan } from '../../barcode';
+import { BarcodeScanner } from '../../ui/BarcodeScanner';
+import { BarcodeIcon, CloseIcon } from '../../ui/icons';
 import { canUseCamera, startCamera, type Camera, type CameraError } from './camera';
 
 /**
  * The bar at the bottom: each photo, text or scanned barcode is attached to the meal as it comes
- * (prepared by the caller); Update sends them.
+ * (prepared by the caller); Update sends them. Photos and barcodes have a button each, so that
+ * a barcode in sight doesn't stop a photo of the food.
  */
 export function InputBar({
   disabled,
@@ -19,6 +22,16 @@ export function InputBar({
 }) {
   const [text, setText] = useState('');
   const [camera, setCamera] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  // The scanner restarts the camera when its callback changes: keep one, calling the latest.
+  const scannedRef = useRef(scanned);
+  useEffect(() => {
+    scannedRef.current = scanned;
+  });
+  const read = useCallback((code: string) => {
+    setScanning(false);
+    scannedRef.current(code);
+  }, []);
 
   return (
     <div class="input-bar">
@@ -40,6 +53,17 @@ export function InputBar({
             onClick={() => setCamera(true)}
           >
             📷
+          </button>
+        )}
+        {canScan() && (
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="Scan barcode"
+            disabled={disabled}
+            onClick={() => setScanning(true)}
+          >
+            <BarcodeIcon />
           </button>
         )}
         <label class="icon-button" aria-label="Pick photos">
@@ -75,12 +99,9 @@ export function InputBar({
             setCamera(false);
             attachPhoto(blob);
           }}
-          code={(c) => {
-            setCamera(false);
-            scanned(c);
-          }}
         />
       )}
+      {scanning && <BarcodeScanner onCode={read} onClose={() => setScanning(false)} />}
     </div>
   );
 }
@@ -90,32 +111,18 @@ const CAMERA_ERRORS: Record<CameraError, string> = {
   failed: 'The camera couldn’t start. Close this and try again.',
 };
 
-function CameraView({
-  close,
-  photo,
-  code,
-}: {
-  close: () => void;
-  photo: (blob: Blob) => void;
-  code: (code: string) => void;
-}) {
+function CameraView({ close, photo }: { close: () => void; photo: (blob: Blob) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraRef = useRef<Camera | null>(null);
   const [error, setError] = useState<CameraError | null>(null);
-  const onCodeRef = useRef(code);
   useEffect(() => {
-    onCodeRef.current = code;
-  });
-  useEffect(() => {
-    cameraRef.current = startCamera(videoRef.current!, (c) => onCodeRef.current(c), setError);
+    cameraRef.current = startCamera(videoRef.current!, setError);
     return () => cameraRef.current?.stop();
   }, []);
   return (
     <div class="scanner" role="dialog" aria-label="Camera">
       <video ref={videoRef} class="scanner-video" muted playsInline />
-      <p class="scanner-hint">
-        {error ? CAMERA_ERRORS[error] : 'Point at the food, or at a barcode'}
-      </p>
+      <p class="scanner-hint">{error ? CAMERA_ERRORS[error] : 'Point at the food'}</p>
       <button
         type="button"
         class="icon-button scanner-close"

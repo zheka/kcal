@@ -123,6 +123,8 @@
 
 .input-bar {
   position: fixed;
+  /* above the topbar: the camera and the scanner open full screen from inside the bar */
+  z-index: 2;
   right: 0;
   bottom: 0;
   left: 0;

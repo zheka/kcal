@@ -1,10 +1,7 @@
 /**
- * One camera, two behaviours: while it shows, it watches for barcodes and
- * reports the first one at once (no shutter); a photo is taken with the shutter (`capture`).
- * Barcodes are read only where the browser has a reader; photos work with any camera.
+ * The camera for photos: it shows until the shutter (`capture`) or closing. It reads no
+ * barcodes; scanning has its own button and scanner.
  */
-
-const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
 
 export type CameraError = 'denied' | 'failed';
 
@@ -19,23 +16,13 @@ export function canUseCamera(): boolean {
   return !!navigator.mediaDevices?.getUserMedia;
 }
 
-export function canReadBarcodes(): boolean {
-  return typeof window.BarcodeDetector === 'function';
-}
-
 export function startCamera(
   video: HTMLVideoElement,
-  onCode: (code: string) => void,
   onError: (error: CameraError) => void,
 ): Camera {
-  const running: {
-    stopped: boolean;
-    stream?: MediaStream;
-    timer?: ReturnType<typeof setInterval>;
-  } = { stopped: false };
+  const running: { stopped: boolean; stream?: MediaStream } = { stopped: false };
   const stop = () => {
     running.stopped = true;
-    if (running.timer) clearInterval(running.timer);
     running.stream?.getTracks().forEach((t) => t.stop());
     video.srcObject = null;
   };
@@ -56,24 +43,6 @@ export function startCamera(
       onError((err as Error).name === 'NotAllowedError' ? 'denied' : 'failed');
       return;
     }
-    if (running.stopped || !canReadBarcodes()) return;
-    const detector = new window.BarcodeDetector!({ formats: FORMATS });
-    let busy = false;
-    running.timer = setInterval(() => {
-      if (busy || video.readyState < 2) return;
-      busy = true;
-      detector
-        .detect(video)
-        .then((codes) => {
-          const code = codes.map((c) => c.rawValue).find((v) => /^\d{8,14}$/.test(v));
-          if (code && !running.stopped) {
-            stop();
-            onCode(code);
-          }
-        })
-        .catch(() => {})
-        .finally(() => (busy = false));
-    }, 250);
   })();
 
   return {

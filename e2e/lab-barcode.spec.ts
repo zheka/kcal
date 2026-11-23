@@ -87,8 +87,9 @@ async function newMeal(page: Page, known: boolean) {
 }
 
 async function scan(page: Page) {
-  await page.getByRole('button', { name: 'Camera' }).click();
-  await expect(page.getByRole('dialog', { name: 'Camera' })).toBeHidden();
+  await page.getByRole('button', { name: 'Scan barcode' }).click();
+  // the fake camera usually reads in about 2 s, but at times starts slowly
+  await expect(page.getByRole('dialog', { name: 'Scan barcode' })).toBeHidden({ timeout: 15_000 });
 }
 
 test('a scanned barcode is Open Food Facts’ data, attached and sent as it is', async ({
@@ -123,11 +124,26 @@ test('a barcode Open Food Facts doesn’t have is not attached, and says so', as
 }) => {
   const { asked } = await newMeal(page, false);
   const popup = page.waitForEvent('dialog');
-  await page.getByRole('button', { name: 'Camera' }).click();
+  await page.getByRole('button', { name: 'Scan barcode' }).click();
   const dialog = await popup;
   expect(dialog.message()).toBe(`${CODE}: not in Open Food Facts. Describe it in text instead.`);
   await dialog.dismiss();
-  await expect(page.getByRole('dialog', { name: 'Camera' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Scan barcode' })).toBeHidden();
   expect(asked).toHaveLength(1);
   await expect(page.getByRole('region', { name: 'Attached' })).toHaveCount(0);
+});
+
+test('the photo camera reads no barcodes: it stays open with one in sight', async ({
+  seeded: page,
+}) => {
+  const { asked } = await newMeal(page, true);
+  await page.getByRole('button', { name: 'Camera' }).click();
+  const camera = page.getByRole('dialog', { name: 'Camera' });
+  await expect(camera).toBeVisible();
+  // the stand-in reader would have read CODE after a few frames by now
+  await page.waitForTimeout(1500);
+  await expect(camera).toBeVisible();
+  expect(asked).toHaveLength(0);
+  await page.getByRole('button', { name: 'Close camera' }).click();
+  await expect(camera).toBeHidden();
 });
