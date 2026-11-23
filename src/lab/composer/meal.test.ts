@@ -57,7 +57,6 @@ const meal: Meal = {
       dish: {
         name: 'Тако',
         items: [tortilla, filling],
-        sizes: one({ label: 'порция', size: 1 }),
         counts: {
           why: 'одно закрыто',
           chosen: '3',
@@ -111,6 +110,41 @@ describe('readMeal', () => {
     expect(read.problems).toEqual([]);
     expect(read.notes).toEqual(['items[1].counts: a why on a certain question, dropped']);
     expect((read.meal.items[1] as typeof milk).food.counts.why).toBe('');
+  });
+});
+
+describe('readMeal, what no one eats', () => {
+  const omelette = (count: number, size: number) => ({
+    title: 'Омлет',
+    items: [
+      {
+        food: {
+          products: one({ label: 'омлет', name: 'Омлет', base: 'g', per_100: per(180) }),
+          sizes: one({ label: 'порция', size }),
+          counts: one({ label: String(count), count }),
+        },
+      },
+    ],
+  });
+
+  it('rejects a weight written as both a count and a size', () => {
+    expect(readMeal(omelette(1, 200)).problems).toEqual([]);
+    expect(readMeal(omelette(200, 200)).problems).toEqual([
+      'items[0] "Омлет": 40000 g, 72000 kcal',
+    ]);
+  });
+
+  it('rejects a dish part counted in servings again, at the largest count', () => {
+    const m = structuredClone(meal);
+    const part = (m.items[0] as { dish: { items: (typeof filling)[] } }).dish.items[1]!;
+    part.food.counts = count(1000);
+    expect(readMeal(m).problems).toEqual(['items[0] "Тако": 3000 g, 6900 kcal']);
+  });
+
+  it('notes a choice without a why', () => {
+    const m = structuredClone(meal);
+    (m.items[1] as typeof milk).food.products.why = '';
+    expect(readMeal(m).notes).toEqual(['items[1].products: a choice without a why']);
   });
 });
 

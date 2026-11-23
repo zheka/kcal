@@ -5,7 +5,7 @@
  * reading. Answers and the whole output (run.log) are kept in test-results/meal-bench/.
  *
  *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--model lite|flash|<id>] [--only p7,t3]
- *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute 9]
+ *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute 9] [--out <dir>]
  *
  * Photo cases are skipped without --photos (the photos are personal, not in the repo).
  */
@@ -33,6 +33,7 @@ const { values: args } = parseArgs({
     photos: { type: 'string' },
     parallel: { type: 'string', default: '4' },
     'per-minute': { type: 'string', default: '9' },
+    out: { type: 'string', default: 'test-results/meal-bench' },
   },
 });
 const key = process.env.GEMINI_API_KEY;
@@ -41,7 +42,7 @@ if (!key) {
   process.exit(1);
 }
 const API = 'https://generativelanguage.googleapis.com/v1beta';
-const OUT = 'test-results/meal-bench';
+const OUT = args.out;
 const PROMPT = readFileSync('src/lab/composer/prompt-v4.md', 'utf8');
 const LANGUAGE = 'ru';
 /** A fixed time, so runs differ only by the model. */
@@ -216,17 +217,19 @@ async function run(c: Case): Promise<string> {
       }
     }
     if (meal && step.choose) {
-      for (const { row, question, label: chosen } of step.choose) {
+      for (const { row, question, pick } of step.choose) {
         const q = findQuestion(meal, row, question);
-        if (q && q.options.some((o) => o.label === chosen)) q.chosen = chosen;
-        else out.push(`  (no "${chosen}" in ${question} of "${row}")`);
+        if (q && q.options.length > 1) {
+          q.chosen = (pick === 'last' ? q.options.at(-1)! : q.options[0]!).label;
+          out.push(`  (picked "${q.chosen}" for ${row})`);
+        } else out.push(`  (no choice in ${question} of "${row}" to pick)`);
       }
     }
     const given = [
       ...(step.texts ?? []).map((t) => `“${t}”`),
       ...(step.photos ?? []).map((p) => `[${p}]`),
       ...(step.remove ?? []).map((r) => `× ${r}`),
-      ...(step.choose ?? []).map((x) => `${x.row}: ${x.question} → ${x.label}`),
+      ...(step.choose ?? []).map((x) => `${x.row}: ${x.question} → ${x.pick}`),
     ];
     out.push(`--- ${label}${given.join(' ')}`);
     for (const t of step.texts ?? []) parts.push({ text: t });
@@ -305,7 +308,10 @@ async function run(c: Case): Promise<string> {
   return out.join('\n');
 }
 
-/** A question of a row (or a dish's part) whose name contains `row`. */
+/**
+ * A question of a row (or a dish's part) whose name contains `row`; `amount` is whichever of its
+ * sizes and counts is a choice (the model may ask a portion either way).
+ */
 function findQuestion(
   meal: Meal,
   row: string,
@@ -315,7 +321,8 @@ function findQuestion(
   const r = rows.find((x) => rowName(x).toLowerCase().includes(row));
   if (!r) return null;
   const body = ('dish' in r ? r.dish : 'sized_food' in r ? r.sized_food : r.food) as Json;
-  return body[question] ?? null;
+  if (question !== 'amount') return body[question] ?? null;
+  return [body.sizes, body.counts].find((q) => q?.options.length > 1) ?? null;
 }
 
 // The run ---------------------------------------------------------------------------------------

@@ -56,7 +56,7 @@ const SIZED_PRODUCT = object({
 
 const SIZE = object({
   label: string('The menu’s name for the size, also the unit in the amount (1 grande).'),
-  size: amount('In the product’s base; in servings on a dish.'),
+  size: amount('In the product’s base.'),
 });
 
 const COUNT = object({
@@ -93,11 +93,10 @@ const DISH = object(
     dish: object({
       name: string('What is certain about the dish.'),
       items: { type: 'array', items: { anyOf: [SIZED_FOOD, FOOD] } },
-      sizes: question(SIZE),
       counts: question(COUNT),
     }),
   },
-  { title: 'Dish', description: 'A dish of foods, counted in servings.' },
+  { title: 'Dish', description: 'A dish of foods per serving, counted in servings.' },
 );
 
 export const MEAL_SCHEMA: Schema = object({

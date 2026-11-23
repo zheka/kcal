@@ -27,7 +27,7 @@ export interface SizedProduct extends Product {
   unit: { name: string; size: number };
 }
 
-/** A size in the product's base, or in servings on a dish. Its label is the unit in the amount. */
+/** A size in the product's base. Its label is the unit in the amount ("1 grande", "150 г"). */
 export interface Size {
   label: string;
   size: number;
@@ -51,18 +51,20 @@ export interface SizedFood {
   counts: Question<Count>;
 }
 
-/** A food whose size is chosen on its own (latte tall / grande), or loose food (a size of 1 g). */
+/**
+ * A food whose size is chosen on its own: a menu size (latte tall / grande), a named portion of
+ * loose food (маленькая / обычная / большая, counted 1), or loose food in grams (a size of 1 g).
+ */
 export interface Food {
   products: Question<Product>;
   sizes: Question<Size>;
   counts: Question<Count>;
 }
 
-/** A dish of foods, counted in servings; its size, in servings, multiplies every part. */
+/** A dish of foods, each part's amount per serving; the count of servings multiplies them. */
 export interface Dish {
   name: string;
   items: Part[];
-  sizes: Question<Size>;
   counts: Question<Count>;
 }
 
@@ -78,6 +80,10 @@ export interface Meal {
 
 /** More options than this is the model hedging, not a choice. */
 export const MAX_OPTIONS = 8;
+
+/** More than this in one row, at any of its answers, isn't a meal (g or ml, kcal). */
+export const MAX_AMOUNT = 3000;
+export const MAX_KCAL = 3000;
 
 /**
  * Reads a meal (the model's answer, or a stored one) strictly: any problem and it isn't used.
@@ -119,6 +125,7 @@ export function readMeal(raw: unknown): { meal: Meal; problems: string[]; notes:
       notes.push(`${at}: a why on a certain question, dropped`);
       why = '';
     }
+    if (options.length > 1 && !why) notes.push(`${at}: a choice without a why`);
     return { why, chosen, options };
   }
 
@@ -195,7 +202,6 @@ export function readMeal(raw: unknown): { meal: Meal; problems: string[]; notes:
       dish: {
         name: label(d.name, `${at}.dish.name`),
         items: (d.items as unknown[]).map((p, i) => part(p, `${at}.dish.items[${i}]`)),
-        sizes: question(d.sizes, `${at}.dish.sizes`, size),
         counts: question(d.counts, `${at}.dish.counts`, count),
       },
     };
@@ -209,6 +215,18 @@ export function readMeal(raw: unknown): { meal: Meal; problems: string[]; notes:
       title: text(m.title, 'title'),
       items: (m.items as unknown[]).map((r, i) => row(r, `items[${i}]`)),
     };
+    // An amount no one eats is the model multiplying twice (a weight as a count and a size, a
+    // dish's servings counted again in a part): checked at every answer, not only the chosen.
+    meal.items.forEach((r, i) => {
+      for (const a of extremes(r)) {
+        if (a.amount > MAX_AMOUNT || a.kcal > MAX_KCAL) {
+          fail(
+            `items[${i}] "${rowName(r)}"`,
+            `${Math.round(a.amount)} g, ${Math.round(a.kcal)} kcal`,
+          );
+        }
+      }
+    });
     return { meal, problems, notes };
   } catch (err) {
     if (!(err instanceof Problem)) throw err;
@@ -249,12 +267,11 @@ export function add(a: Amounts, b: Amounts): Amounts {
   };
 }
 
-/** What a row amounts to with its current answers; `servings` is a dish's count × size. */
+/** What a row amounts to with its current answers; `servings` is a dish's count. */
 export function amounts(row: Row, servings = 1): Amounts {
   if ('dish' in row) {
-    const { items, sizes, counts } = row.dish;
-    const n = servings * answer(counts).count * answer(sizes).size;
-    return items.reduce((sum, p) => add(sum, amounts(p, n)), ZERO);
+    const n = servings * answer(row.dish.counts).count;
+    return row.dish.items.reduce((sum, p) => add(sum, amounts(p, n)), ZERO);
   }
   const { product, size } =
     'sized_food' in row
@@ -277,6 +294,33 @@ export function amounts(row: Row, servings = 1): Amounts {
   };
 }
 
+/** The row's amounts at its largest answers (each question's option with the most). */
+function extremes(row: Row): Amounts[] {
+  const largest = <T extends { label: string }>(q: Question<T>, value: (o: T) => number) => ({
+    ...q,
+    chosen: q.options.reduce((a, b) => (value(b) > value(a) ? b : a)).label,
+  });
+  const big = (p: Part): Part =>
+    'sized_food' in p
+      ? {
+          sized_food: {
+            sized_products: largest(p.sized_food.sized_products, (o) => o.unit.size),
+            counts: largest(p.sized_food.counts, (o) => o.count),
+          },
+        }
+      : {
+          food: {
+            products: largest(p.food.products, (o) => o.per_100.kcal),
+            sizes: largest(p.food.sizes, (o) => o.size),
+            counts: largest(p.food.counts, (o) => o.count),
+          },
+        };
+  if (!('dish' in row)) return [amounts(big(row))];
+  // per part, at the dish's largest count: one part's amount is what can't be eaten
+  const n = Math.max(...row.dish.counts.options.map((o) => o.count));
+  return row.dish.items.map((p) => amounts(big(p), n));
+}
+
 export function total(meal: Meal): Amounts {
   return meal.items.reduce((sum, r) => add(sum, amounts(r)), ZERO);
 }
@@ -286,8 +330,7 @@ export function total(meal: Meal): Amounts {
  * and hides the row's other questions.
  */
 export function isNone(row: Row): boolean {
-  if ('dish' in row)
-    return answer(row.dish.counts).count === 0 || answer(row.dish.sizes).size === 0;
+  if ('dish' in row) return answer(row.dish.counts).count === 0;
   if ('sized_food' in row) {
     const p = answer(row.sized_food.sized_products);
     return answer(row.sized_food.counts).count === 0 || p.unit.size === 0 || zero(p.per_100);
@@ -308,10 +351,7 @@ export function rowName(row: Row): string {
 
 /** The amount as said: `2 шт.`, `1 grande`, `150 г`; a dish's servings: `×3`. */
 export function amountText(row: Row): string {
-  if ('dish' in row) {
-    const size = answer(row.dish.sizes);
-    return `×${num(answer(row.dish.counts).count)}${size.size !== 1 ? ` ${size.label}` : ''}`;
-  }
+  if ('dish' in row) return `×${num(answer(row.dish.counts).count)}`;
   if ('sized_food' in row) {
     return `${num(answer(row.sized_food.counts).count)} ${answer(row.sized_food.sized_products).unit.name}`;
   }
@@ -344,9 +384,8 @@ export function screenForm(meal: Meal): string {
     const eaten = isNone(row) ? 'нет' : values(a);
     lines.push(`${indent}- ${rowName(row)} — ${amountText(row)} (${eaten})`);
     if ('dish' in row) {
-      ask('S', row.dish.sizes, indent, (o) => `${o.label} ${num(o.size)}`);
       ask('C', row.dish.counts, indent);
-      const n = servings * answer(row.dish.counts).count * answer(row.dish.sizes).size;
+      const n = servings * answer(row.dish.counts).count;
       for (const p of row.dish.items) show(p, `${indent}  `, n);
     } else if ('sized_food' in row) {
       ask(
