@@ -5,7 +5,7 @@
  *
  *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
  *     <test>     a test file, or a folder of them (its *.json, not its subfolders)
- *     --repeat   each test N times (p7t-1, p7t-2, …), to tell a rule from chance
+ *     --repeat   each test N times (<test>-1, <test>-2, …), to tell a rule from chance
  *     --out      writes each test's everything (as scripts/meal.ts --out) to <dir>/<test>.json;
  *                nothing is written without it
  *     --verbose  each test's meal as text on stdout; on stderr the settings, brief notes as it

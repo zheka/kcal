@@ -1,10 +1,9 @@
 /**
  * The meal composer experiment (lab/index.html): compose a meal from photos, text and barcodes
- * into parametric items, adjust them locally, update it from the whole context. Built from the
- * approach docs (kcal-approach: ux-flows.md §1–4, ai-role.md §5, prompt-v3.txt). Reads the app's
- * data (as history), never writes it; keeps its meals, photos, key and logs in the lab
- * (kcal-lab-composer). The meal screen is meant to become the app's; the menu holds the lab's
- * settings and logs.
+ * into parametric items, adjust them locally, update it from the whole context (prompt-v3.txt).
+ * Reads the app's data (as history), never writes it; keeps its meals, photos, key and logs in
+ * the lab (kcal-lab-composer). The meal screen is meant to become the app's; the menu holds the
+ * lab's settings and logs.
  */
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';

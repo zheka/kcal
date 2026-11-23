@@ -6,10 +6,10 @@ is in [lab-meal-prompt.md](lab-meal-prompt.md). 1,000 example meals written in t
 version (questions written by the model), with the problems they raised, are in
 [lab-meal-examples.md](lab-meal-examples.md).
 
-Status (2026-11-23): **in code with the local tool and the bench, run once on the bench, not
-in the lab's UI.** `src/lab/meal/`: `schema.ts` (what the model answers), `read.ts` (the
-forgiving reader), `process.ts` (amounts, totals, questions), `view.ts` (the text view),
-`request.ts` and `settings.ts` (what is sent, see the prompt doc). The lab's meal screen still
+Status (2026-11-23): **in code with the command-line tool and the bench, not in the lab's UI.**
+`src/lab/meal/`: `schema.ts` (what the model answers), `read.ts` (the forgiving reader),
+`process.ts` (amounts, totals, questions), `view.ts` (the text view), `request.ts` and
+`settings.ts` (what is sent, see the prompt doc). The lab's meal screen still
 uses prompt v3's `parameters` (`src/lab/composer/types.ts`). The previous format (v4: questions
 written by the model) is in git history up to commit 381aee4. Each decision below says why
 ("Why:").
@@ -21,8 +21,8 @@ written by the model) is in git history up to commit 381aee4. Each decision belo
   worth asking about, turns them into questions and labels the chips. Why: in v4 the model wrote
   the questions itself (`why`, `chosen`, `options` on three axes) and had to judge "80+ kcal
   between options, at most 3 questions in the meal", which needs arithmetic and a view of rows it
-  hadn't written yet; without thinking, Flash-Lite broke those rules at random (see the prompt
-  doc, the v4 results). Code does them exactly.
+  hadn't written yet; without thinking, Flash-Lite broke those rules at random. Code does them
+  exactly.
 - **Flat, forgiving, natural.** A schema the model writes the way it thinks ("it's X, 2 pieces of
   50 g; it could be Y"), and a reader that uses whatever it can. Why: v4's fixed shapes (wrappers,
   `sized_food` vs `food`, a size-and-count table with `г` only of 1) existed to make the model's
@@ -173,7 +173,7 @@ Decisions in order, with what was set aside:
 10. **1,000 example meals** (2026-11-22) and their five problems, all settled without changing the
     shape: "none" as a kind; no linked questions; a size where it changes; one base per row;
     weighed totals stay exact (see lab-meal-examples.md, Problems).
-11. **On the bench** (2026-11-23, see lab-meal-prompt.md, The bench): rows as one-key wrappers in
+11. **From running v4 on real meals** (2026-11-23): rows as one-key wrappers in
     one list; `responseJsonSchema` without limits; no dish size; `sizes` always present; named
     portions; pieces counted; the 3 kg / 3,000 kcal check; `title` only at the meal level; all of
     it eaten by me alone; no removed rows sent.

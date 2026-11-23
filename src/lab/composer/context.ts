@@ -6,8 +6,8 @@ import PROMPT from './prompt-v3.txt?raw';
 
 /**
  * What a model call is sent: prompt-v3.txt with its {CONTEXT} and {INPUT} filled in. The context
- * follows model-prompt.md in the approach docs, without "remaining today" (goals are out of the
- * experiment's scope; the prompt's thresholds are absolute) and with no habits yet.
+ * has no "remaining today" (goals are out of the experiment's scope; the prompt's thresholds are
+ * absolute) and no habits yet.
  */
 
 /** History matches sent per call: enough to cover a meal, few enough to stay cheap. */

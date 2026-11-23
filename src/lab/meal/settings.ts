@@ -1,5 +1,5 @@
 /**
- * How the meal request is sent, for the lab and the local tool alike (scripts/meal.ts, the
+ * How the meal request is sent, for the lab and the command-line tool alike (scripts/meal.ts, the
  * bench): one place, kept with the prompt (prompt.md) and the schema (schema.ts), and recorded in
  * every log entry with the request. Changed here, not per run or in the lab's menu, so that runs
  * and answers are comparable. Why each: docs/lab-meal-prompt.md, The model.

@@ -1,31 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { parseAnswer } from './answer';
 import { amounts, choose, setCount, total } from './recompute';
-import food2 from './fixtures/food2-v2-gemini.json';
-import food7 from './fixtures/food7-v2-gemini.json';
-import food7hist from './fixtures/food7-v2-hist-gemini.json';
+import testAnswer from './testAnswer.json';
 
 const read = (json: object) => parseAnswer(JSON.stringify(json));
 
-describe('the recorded Gemini answers', () => {
-  it('are read without problems, every item kept', () => {
-    for (const json of [food7, food7hist, food2]) {
-      const { answer, problems } = read(json);
-      expect(problems).toEqual([]);
-      expect(answer.items).toHaveLength(json.items.length);
-    }
+describe('a well-formed answer', () => {
+  it('is read without problems, every item kept', () => {
+    const { answer, problems } = read(testAnswer);
+    expect(problems).toEqual([]);
+    expect(answer.items).toHaveLength(testAnswer.items.length);
   });
 
-  it('give the expected totals at their defaults: food7 with history counts only', () => {
-    const items = read(food7hist).answer.items;
-    // meatballs 320 + bread 114 + cheese 111 + sausage 93 (label values, from history)
+  it('adds up at its defaults', () => {
+    const items = read(testAnswer).answer.items;
+    // meatballs 320 + bread 114 + cheese 111 + sausage 93 (from history)
     const known = items.filter((i) => i.source === 'history');
     expect(Math.round(total(known).kcal)).toBe(638);
   });
 });
 
 describe('local recompute', () => {
-  const meatballs = read(food7hist).answer.items[0]!;
+  const meatballs = read(testAnswer).answer.items[0]!;
 
   it('is count × grams per unit × values per 100 g', () => {
     expect(amounts(meatballs)).toMatchObject({ grams: 200, kcal: 320, protein: 28 });
@@ -33,10 +29,10 @@ describe('local recompute', () => {
   });
 
   it('uses the chosen variant’s values and size', () => {
-    const mixed = choose(meatballs, 'Вид фарша', 'Смешанный фарш (свинина/говядина)');
+    const mixed = choose(meatballs, 'mince', 'pork and beef');
     // 8 × 35 g of 215 kcal / 100 g
     expect(amounts(mixed)).toMatchObject({ grams: 280, kcal: 602 });
-    expect(meatballs.parameters[0]!.default).toBe('Куриные (из истории)');
+    expect(meatballs.parameters[0]!.default).toBe('chicken');
   });
 });
 

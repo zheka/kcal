@@ -3,14 +3,14 @@ import type { Page } from '@playwright/test';
 import { expect, expectNoHorizontalScroll, test } from './fixtures';
 
 /**
- * The meal composer experiment in the lab (/kcal/lab/), with Gemini replaced by recorded answers:
+ * The meal composer experiment in the lab (/kcal/lab/), with Gemini replaced by a made-up answer:
  * attach a photo and text, update, adjust locally, attach more and update with it all, keep the
  * meal; the logs hold every request and answer. Never writes the app's data.
  */
 
-const FOOD7 = JSON.parse(
-  readFileSync('src/lab/composer/fixtures/food7-v2-hist-gemini.json', 'utf8'),
-) as { items: { name: string; count: number }[] };
+const ANSWER = JSON.parse(readFileSync('src/lab/composer/testAnswer.json', 'utf8')) as {
+  items: { name: string; count: number }[];
+};
 // An 8×8 PNG: something to "photograph".
 const PHOTO = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR4nGM4UaGBFTEMLQkAUtVaAV8W4QQAAAAASUVORK5CYII=',
@@ -80,7 +80,7 @@ test('composes a meal from its attached context, adjusts it, updates it with mor
 }) => {
   const sent = await fakeGemini(page, (n) => {
     // the second update ("potatoes 100 g") returns the potatoes at 100 g
-    const answer = structuredClone(FOOD7);
+    const answer = structuredClone(ANSWER);
     if (n > 1) answer.items[1]!.count = 100;
     return reply(answer);
   });
@@ -91,7 +91,7 @@ test('composes a meal from its attached context, adjusts it, updates it with mor
   await page.getByRole('button', { name: 'New meal' }).click();
   await page
     .locator('input[type=file]')
-    .setInputFiles({ name: 'food7.png', mimeType: 'image/png', buffer: PHOTO });
+    .setInputFiles({ name: 'meal.png', mimeType: 'image/png', buffer: PHOTO });
   await page.getByLabel('What you eat').fill('chicken meatballs');
   await page.getByRole('button', { name: 'Add' }).click();
   const attached = page.getByRole('region', { name: 'Attached' }).locator('.attached');
@@ -113,9 +113,9 @@ test('composes a meal from its attached context, adjusts it, updates it with mor
   await expect(page.locator('.composed-total')).toContainText('This meal: 900 kcal');
 
   // local: pick a variant, edit an amount (no request)
-  await page.getByRole('button', { name: 'Смешанный фарш (свинина/говядина)' }).click();
+  await page.getByRole('button', { name: 'pork and beef' }).click();
   await expect(items.first()).toContainText('602 kcal');
-  await page.getByLabel('Amount of Куриные тефтели').fill('6');
+  await page.getByLabel('Amount of meatballs').fill('6');
   await expect(items.first()).toContainText('452 kcal');
   await expect(page.getByRole('button', { name: 'Update' })).toHaveCount(0);
   await expectNoHorizontalScroll(page);
@@ -125,13 +125,13 @@ test('composes a meal from its attached context, adjusts it, updates it with mor
   await page.getByLabel('What you eat').fill('potatoes 100 g');
   await page.getByRole('button', { name: 'Add' }).click();
   await page.getByRole('button', { name: 'Update' }).click();
-  await expect(page.getByLabel('Amount of Отварной картофель')).toHaveValue('100');
+  await expect(page.getByLabel('Amount of potatoes')).toHaveValue('100');
   expect(sent[1]!.parts.slice(2)).toEqual([
     { text: 'chicken meatballs' },
     { text: 'potatoes 100 g' },
   ]);
-  expect(sent[1]!.parts[0]!.text).toContain('meal so far: [{"name":"Куриные тефтели","count":6');
-  expect(sent[1]!.parts[0]!.text).toContain('"default":"Смешанный фарш (свинина/говядина)"');
+  expect(sent[1]!.parts[0]!.text).toContain('meal so far: [{"name":"meatballs","count":6');
+  expect(sent[1]!.parts[0]!.text).toContain('"default":"pork and beef"');
 
   // removing context needs an update too
   await page.getByRole('button', { name: 'Remove “potatoes 100 g”' }).click();
@@ -180,7 +180,7 @@ test('a failed update keeps the meal, says why, and can be retried; logs both', 
   seeded: page,
 }) => {
   const sent = await fakeGemini(page, (n) =>
-    n === 1 ? { status: 400, json: { error: { message: 'Something went wrong' } } } : reply(FOOD7),
+    n === 1 ? { status: 400, json: { error: { message: 'Something went wrong' } } } : reply(ANSWER),
   );
   await page.goto('lab/');
   await page.getByRole('button', { name: 'New meal' }).click();

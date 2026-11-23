@@ -40,7 +40,7 @@ export function given(arg: string): Given {
 }
 
 /**
- * A test (a JSON file, kept out of the repo): what is hard about it, and the inputs in order.
+ * A test (a JSON file): what is hard about it, and the inputs in order.
  * Texts and barcodes are inline; files (photos, product JSON, text files) are paths relative to
  * the test file, or absolute.
  *

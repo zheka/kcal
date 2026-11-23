@@ -1,5 +1,5 @@
 /**
- * One camera, two behaviours (ux-flows.md §1): while it shows, it watches for barcodes and
+ * One camera, two behaviours: while it shows, it watches for barcodes and
  * reports the first one at once (no shutter); a photo is taken with the shutter (`capture`).
  * Barcodes are read only where the browser has a reader; photos work with any camera.
  */

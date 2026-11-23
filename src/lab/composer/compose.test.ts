@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { appData, egg } from '../../core/testData';
 import { ANSWER_SCHEMA, parseAnswer } from './answer';
 import { applyUpdate, checkAnswer, updateRequest, withContext } from './compose';
-import food7hist from './fixtures/food7-v2-hist-gemini.json';
+import testAnswer from './testAnswer.json';
 import type { ScannedProductData } from '../../data/openFoodFacts';
 import type { Attached, ComposedMeal } from './types';
 
@@ -19,7 +19,7 @@ const meal = (context: Attached[] = [], more: Partial<ComposedMeal> = {}): Compo
 });
 const text = (id: string, t: string): Attached => ({ id, kind: 'text', text: t });
 const photo = (id: string): Attached => ({ id, kind: 'photo', file: `file-${id}` });
-const items = parseAnswer(JSON.stringify(food7hist)).answer.items;
+const items = parseAnswer(JSON.stringify(testAnswer)).answer.items;
 
 describe('the update request', () => {
   it('sends the prompt, then the whole context as attached, in order', () => {
@@ -49,7 +49,7 @@ describe('the update request', () => {
       config: { schema: ANSWER_SCHEMA, temperature: 0.2, thinking: 'default' },
     });
     const [prompt, ...rest] = request.content;
-    expect(prompt).toEqual({ text: expect.stringContaining('meal so far: [{"name":"Куриные') });
+    expect(prompt).toEqual({ text: expect.stringContaining('meal so far: [{"name":"meatballs') });
     expect(rest).toEqual([
       { image: 'file-a' },
       { text: 'chicken meatballs' },
@@ -70,7 +70,7 @@ describe('the update request', () => {
 });
 
 describe('applying an update', () => {
-  const answer = food7hist;
+  const answer = testAnswer;
 
   it('takes the answer’s items and label; the context is answered', () => {
     const m = meal([text('a', 'lunch')]);

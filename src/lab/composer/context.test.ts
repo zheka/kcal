@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { appData, egg, ing, makes, meal, oatFlakes, product, recipe } from '../../core/testData';
 import { parseAnswer } from './answer';
 import { candidates, contextBlock, fillPrompt, pickMatches } from './context';
-import food7hist from './fixtures/food7-v2-hist-gemini.json';
+import testAnswer from './testAnswer.json';
 import type { ComposedMeal } from './types';
 
-const items = parseAnswer(JSON.stringify(food7hist)).answer.items;
+const items = parseAnswer(JSON.stringify(testAnswer)).answer.items;
 const composed: ComposedMeal = {
   id: 'c1',
   title: 'lunch',
@@ -16,7 +16,7 @@ const composed: ComposedMeal = {
 };
 
 describe('history candidates', () => {
-  it('describe my products, recipes and composed items as test 4 did', () => {
+  it('describe my products, recipes and composed items', () => {
     const oats = recipe('oats', [ing(oatFlakes, 60)], [makes(1, 'bowl')]);
     const app = appData({
       products: [{ ...egg, barcode: '4006040002093' }, oatFlakes],
@@ -25,7 +25,7 @@ describe('history candidates', () => {
     });
     const lines = candidates(app, [composed]).map((c) => `"${c.name}" (${c.kind}): ${c.details}`);
     expect(lines).toContain(
-      '"Куриные тефтели" (history): 1 шт. = 25 g; per 100 g: 160 kcal, protein 14, fat 9, carbs 6; last time: 8 шт.',
+      '"meatballs" (history): 1 pc = 25 g; per 100 g: 160 kcal, protein 14, fat 9, carbs 6; last time: 8 pc',
     );
     expect(lines).toContain(
       '"egg" (label): 1 piece = 60 g; per 100 g: 143 kcal, protein 12.6, fat 9.5, carbs 0.7; last time: 2 piece',
@@ -52,7 +52,7 @@ describe('the prompt', () => {
     const context = contextBlock(items.slice(0, 1), [], new Date(2026, 10, 21, 12, 30), 'ru');
     expect(context).toContain('language: ru');
     expect(context).toContain('time: 12:30, place: unknown');
-    expect(context).toContain('meal so far: [{"name":"Куриные тефтели"');
+    expect(context).toContain('meal so far: [{"name":"meatballs"');
     expect(context).toContain('history matches: none');
     const prompt = fillPrompt(context);
     expect(prompt).toContain('You are the food-recognition step');
