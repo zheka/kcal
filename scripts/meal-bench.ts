@@ -6,6 +6,7 @@
  *
  *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--model lite|flash|<id>] [--only p7,t3]
  *     [--photos <dir with food1.jpg …>] [--parallel 4] [--per-minute <n>] [--out <dir>]
+ *     [--thinking minimal|low|medium|high]
  *
  * Photo cases are skipped without --photos (the photos are personal, not in the repo).
  */
@@ -20,7 +21,7 @@ import {
   rowName,
   screenForm,
 } from '../src/lab/composer/meal.ts';
-import { contextText } from '../src/lab/composer/request.ts';
+import { CHECKLIST, contextText } from '../src/lab/composer/request.ts';
 import { MEAL_SCHEMA } from '../src/lab/composer/schema.ts';
 import { CASES, type Case } from './meal-bench-cases.ts';
 
@@ -34,6 +35,8 @@ const { values: args } = parseArgs({
     parallel: { type: 'string', default: '4' },
     'per-minute': { type: 'string' },
     out: { type: 'string', default: 'test-results/meal-bench' },
+    /** minimal (Flash-Lite's default), low, medium, high; none sent by default. */
+    thinking: { type: 'string' },
   },
 });
 const key = process.env.GEMINI_API_KEY;
@@ -166,7 +169,7 @@ if (!model || !models.includes(model)) {
   process.exit(1);
 }
 PER_MINUTE = perMinute(model);
-log(`model: ${model}`);
+log(`model: ${model}, thinking: ${args.thinking ?? 'the model’s default'}`);
 
 // The cases -------------------------------------------------------------------------------------
 
@@ -259,11 +262,12 @@ async function run(c: Case): Promise<void> {
           method: 'POST',
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: PROMPT }] },
-            contents: [{ role: 'user', parts: [{ text: context }, ...parts] }],
+            contents: [{ role: 'user', parts: [{ text: context }, ...parts, { text: CHECKLIST }] }],
             generationConfig: {
               responseMimeType: 'application/json',
               responseJsonSchema: MEAL_SCHEMA,
-              temperature: 0.2,
+              // no temperature: Gemini 3 reasons worse away from its default
+              ...(args.thinking && { thinkingConfig: { thinkingLevel: args.thinking } }),
             },
           }),
         },
