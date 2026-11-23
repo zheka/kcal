@@ -1,4 +1,4 @@
-import { withRetries } from '../../data/retry';
+import { withRetries } from '../../data/retry.ts';
 
 /**
  * A model request and its outcome, the same whatever the provider: what an experiment builds,
@@ -9,15 +9,19 @@ import { withRetries } from '../../data/retry';
 export type Part = { text: string } | { image: string };
 
 /**
- * How the model answers: the answer's JSON schema; `temperature` (null: the model's default);
+ * How the model answers: the answer's schema, Google's OpenAPI subset unless `schemaFormat` is
+ * `json` (standard JSON Schema, kept in its key order); `temperature` (null: the model's default);
  * `thinking` off asks it not to reason before answering (faster; a model that can't turn it off
- * refuses the request, which says so).
+ * refuses the request, which says so), a level asks for that much (Gemini 3).
  */
 export interface Config {
   schema: object;
+  schemaFormat?: 'json';
   temperature: number | null;
-  thinking: 'default' | 'off';
+  thinking: 'default' | 'off' | ThinkingLevel;
 }
+
+export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 
 /** The settings part of Config: what the user picks. */
 export type Options = Omit<Config, 'schema'>;
@@ -49,11 +53,10 @@ export interface Reply {
  * it is logged; `busy`: worth trying again a little later; `reply`: what came back anyway.
  */
 export class ModelError extends Error {
-  constructor(
-    message: string,
-    readonly options: { sent: boolean; busy?: boolean; reply?: Omit<Reply, 'text'> },
-  ) {
+  readonly options: { sent: boolean; busy?: boolean; reply?: Omit<Reply, 'text'> };
+  constructor(message: string, options: ModelError['options']) {
     super(message);
+    this.options = options;
   }
 }
 
@@ -88,6 +91,8 @@ export interface RunOptions {
   notSent?: (why: string) => void;
   wait?: (ms: number) => Promise<void>;
   now?: () => number;
+  /** The waits before each new try of a busy provider; RETRY_DELAYS_MS by default. */
+  delays?: readonly number[];
 }
 
 /**
@@ -99,7 +104,15 @@ export async function run(
   request: ModelRequest,
   options: RunOptions,
 ): Promise<ModelResponse | null> {
-  const { send, check, onRetry, notSent, wait, now = () => performance.now() } = options;
+  const {
+    send,
+    check,
+    onRetry,
+    notSent,
+    wait,
+    now = () => performance.now(),
+    delays = RETRY_DELAYS_MS,
+  } = options;
   const retried: string[] = [];
   const also = () => (retried.length > 0 ? { retried } : {});
   let started = 0;
@@ -112,7 +125,7 @@ export async function run(
         return send(request);
       },
       {
-        delays: RETRY_DELAYS_MS,
+        delays,
         retriable: (err) => err instanceof ModelError && !!err.options.busy,
         onRetry: (err, attempt, of, delay) => {
           retried.push(err instanceof Error ? err.message : String(err));

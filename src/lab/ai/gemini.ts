@@ -1,4 +1,4 @@
-import { ModelError, type Config, type ModelRequest, type Reply } from './model';
+import { ModelError, type Config, type ModelRequest, type Reply } from './model.ts';
 
 /**
  * Gemini, called straight from the browser with the user's own key (kept on the device): the
@@ -66,12 +66,14 @@ export async function requestBody(request: ModelRequest, photo: PhotoData): Prom
   };
 }
 
-function generationConfig({ schema, temperature, thinking }: Config): object {
+function generationConfig({ schema, schemaFormat, temperature, thinking }: Config): object {
   return {
     responseMimeType: 'application/json',
-    responseSchema: schema,
+    ...(schemaFormat === 'json' ? { responseJsonSchema: schema } : { responseSchema: schema }),
     ...(temperature !== null && { temperature }),
     ...(thinking === 'off' && { thinkingConfig: { thinkingBudget: 0 } }),
+    ...(thinking !== 'off' &&
+      thinking !== 'default' && { thinkingConfig: { thinkingLevel: thinking } }),
   };
 }
 

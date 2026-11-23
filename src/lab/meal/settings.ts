@@ -1,0 +1,18 @@
+/**
+ * How the meal request is sent, for the lab and the local tool alike (scripts/meal.ts, the
+ * bench): one place, kept with the prompt (prompt.md) and the schema (schema.ts), and recorded in
+ * every log entry with the request. Changed here, not per run or in the lab's menu, so that runs
+ * and answers are comparable. Why each: docs/lab-meal-prompt.md, The model.
+ */
+export const SETTINGS = {
+  /** Flash-Lite: the cheapest and fastest, with the most generous free quota. */
+  model: 'gemini-3.5-flash-lite',
+  /** Thinks only when it judges a request hard; `medium` thinks always, at twice the time. */
+  thinking: 'low',
+  /** The model's default (null): Gemini 3 reasons worse away from it. */
+  temperature: null,
+  /** Requests a minute, retries included: under the free tier's 15 for Flash-Lite. */
+  perMinute: 9,
+  /** Photos as sent (shrunk by src/lab/ai/image.ts and the tool alike): longer side, quality. */
+  photo: { maxSide: 1024, quality: 85 },
+} as const;

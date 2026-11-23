@@ -1,6 +1,6 @@
-import type { NutrientValues } from '../core/types';
-import { cleanText, nameKey } from '../core/text';
-import { withRetries } from './retry';
+import type { NutrientValues } from '../core/types.ts';
+import { cleanText, nameKey } from '../core/text.ts';
+import { withRetries } from './retry.ts';
 
 /**
  * Looking up a scanned barcode on Open Food Facts (https://world.openfoodfacts.org), the free
