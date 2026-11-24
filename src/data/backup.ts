@@ -11,7 +11,7 @@ import { validateAppData } from '../core/validate';
  * The version of the format, independent of app releases. While 0.x, a minor bump may break
  * (needs a migration) and a patch only adds optional fields.
  */
-export const SCHEMA_VERSION = '0.2.1';
+export const SCHEMA_VERSION = '0.2.0';
 /** `version` of every kcal document: marks it as kcal data and versions it. */
 export const VERSION_TAG = `${APP_NAME} ${SCHEMA_VERSION}`;
 

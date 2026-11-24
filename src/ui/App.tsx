@@ -8,6 +8,7 @@ import { RecipeForm } from './RecipeForm';
 import { isValidDate } from '../core/time';
 import { DayNav, DayScreen } from './DayScreen';
 import { GoalsScreen } from './GoalsScreen';
+import { SettingsScreen } from './SettingsScreen';
 import { MealComposer } from './MealComposer';
 import { dropDraft, productRequest } from './drafts';
 import { CloseIcon, MenuIcon } from './icons';
@@ -64,6 +65,7 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
     };
   }
   if (path === '/goals') return { title: 'Goals', body: <GoalsScreen store={store} /> };
+  if (path === '/settings') return { title: 'Settings', body: <SettingsScreen /> };
   if (path === '/menu') return { title: 'Menu', body: <MenuScreen store={store} /> };
   if (path === '/library') return { title: 'Library', body: <LibraryScreen store={store} /> };
   if (path === '/product/new') {

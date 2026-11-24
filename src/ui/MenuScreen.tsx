@@ -1,11 +1,9 @@
 import { checkForUpdate, installUpdate, updateState, type UpdateState } from '../pwa';
-import { useEffect, useState } from 'preact/hooks';
-import { taskSettings } from '../ai/tasks';
+import { useState } from 'preact/hooks';
 import type { AppData } from '../core/types';
 import { localDate } from '../core/time';
 import { parseDocument, serializeBackup, VERSION_TAG } from '../data/backup';
 import { savedSize, SIZE_WARNING_CHARS } from '../data/storage';
-import { geminiKey, loadGeminiKey, setGeminiKey } from '../state/aiKey';
 import type { Store } from '../state/store';
 import { ConfirmButton } from './ConfirmButton';
 import { downloadText } from './download';
@@ -40,6 +38,9 @@ export function MenuScreen({ store }: { store: Store }) {
       </button>
       <button type="button" class="menu-item" onClick={() => navigate('/goals')}>
         Goals
+      </button>
+      <button type="button" class="menu-item" onClick={() => navigate('/settings')}>
+        Settings
       </button>
 
       <section class="section">
@@ -111,8 +112,6 @@ export function MenuScreen({ store }: { store: Store }) {
         {importing.step === 'done' && <p class="notice">Imported.</p>}
       </section>
 
-      <AiSection data={data} />
-
       <AppVersion />
 
       <section class="section about">
@@ -123,72 +122,6 @@ export function MenuScreen({ store }: { store: Store }) {
         <p>Data format: {VERSION_TAG}</p>
       </section>
     </div>
-  );
-}
-
-/**
- * The Gemini key (the user's own, kept on this device only) and how each task asks the model:
- * built in, or as the settings in a backup changed it.
- */
-function AiSection({ data }: { data: AppData }) {
-  const key = geminiKey.value;
-  const [text, setText] = useState('');
-  const [error, setError] = useState('');
-  useEffect(() => void loadGeminiKey(), []);
-  const product = taskSettings(data.settings, 'product');
-
-  async function keep(value: string) {
-    setError('');
-    try {
-      await setGeminiKey(value);
-      setText('');
-    } catch (err) {
-      setError(`Could not ${value ? 'save' : 'forget'} the key: ${(err as Error).message}`);
-    }
-  }
-
-  return (
-    <section class="section">
-      <h2 class="label">AI</h2>
-      {key === undefined ? null : key ? (
-        <div class="actions ai-key">
-          <span class="ai-key-saved">Gemini key saved on this device (…{key.slice(-4)})</span>
-          <button type="button" class="button" onClick={() => void keep('')}>
-            Forget
-          </button>
-        </div>
-      ) : (
-        <form
-          class="actions ai-key"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (text.trim()) void keep(text);
-          }}
-        >
-          <input
-            class="input"
-            type="password"
-            autoComplete="off"
-            aria-label="Gemini key"
-            placeholder="Paste your Gemini key"
-            value={text}
-            onInput={(e) => setText(e.currentTarget.value)}
-          />
-          <button type="submit" class="button primary">
-            Save
-          </button>
-        </form>
-      )}
-      {error && <p class="error">{error}</p>}
-      <p class="hint">
-        Your own key from{' '}
-        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-          Google AI Studio
-        </a>
-        : kept on this device only, never in a backup, and sent only to Gemini. Products:{' '}
-        {product.model}, thinking {product.thinking}.
-      </p>
-    </section>
   );
 }
 

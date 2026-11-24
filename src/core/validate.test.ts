@@ -16,7 +16,6 @@ const valid = (): AppData =>
       meal('2026-11-17T09:00:00.000Z', [ing(water, 330, 'ml'), ing(coffee, 1, 'u:mug')]),
     ],
     settings: {
-      ai: {},
       quickButtons: [{ amount: 250, food: water.id, label: '💧', unit: 'ml' }, { label: '🍽️' }],
     },
   });
@@ -260,38 +259,6 @@ describe('validateAppData', () => {
     it('refuse unknown fields', () => {
       expect(problemsAfter((d) => (raw(d.settings).theme = 'dark'))).toEqual([
         'settings: unknown field "theme"',
-      ]);
-    });
-  });
-
-  describe('model settings', () => {
-    it('are per known task, each field optional; temperature may be null', () => {
-      const set = (ai: unknown) => problemsAfter((d) => (raw(d.settings).ai = ai));
-      expect(set({ product: {} })).toEqual([]);
-      expect(
-        set({ product: { model: 'gemini-3.5-flash', thinking: 'off', temperature: 0 } }),
-      ).toEqual([]);
-      expect(set({ product: { temperature: null } })).toEqual([]);
-      expect(set({ meal: {} })).toEqual(['settings, ai: unknown field "meal"']);
-      expect(set([])).toEqual(['settings, ai: must be an object']);
-    });
-
-    it('need a model id, a known thinking level, a temperature from 0 to 2', () => {
-      expect(
-        problemsAfter(
-          (d) =>
-            (raw(d.settings).ai = {
-              product: { model: ' x', thinking: 'lots', temperature: 3, top_p: 1 },
-            }),
-        ),
-      ).toEqual([
-        'settings, ai, product: unknown field "top_p"',
-        'settings, ai, product: model must be a model id',
-        'settings, ai, product: thinking must be one of default, off, minimal, low, medium, high',
-        'settings, ai, product: temperature must be null or a number from 0 to 2',
-      ]);
-      expect(problemsAfter((d) => (raw(d.settings).ai = { product: { model: '' } }))).toEqual([
-        'settings, ai, product: model must be a model id',
       ]);
     });
   });

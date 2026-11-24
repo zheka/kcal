@@ -30,7 +30,7 @@ function withoutEmpty<T extends object>(record: T): Partial<T> {
 
 /**
  * The data as written in a document: canonical, with every empty list and object omitted
- * (the document's lists, a product's units, the settings and their `ai`, an empty `perDay`). A product's
+ * (the document's lists, a product's units, the settings, an empty `perDay`). A product's
  * values are never empty, so they are always written when present.
  */
 export function toDocument(data: AppData): Doc {
@@ -40,7 +40,7 @@ export function toDocument(data: AppData): Doc {
     meals,
     products: products.map((p) => withoutEmpty(p)),
     recipes,
-    settings: withoutEmpty({ ...settings, ai: withoutEmpty(settings.ai) }),
+    settings: withoutEmpty(settings),
   });
 }
 
@@ -58,10 +58,7 @@ export function fromDocument(doc: Doc): AppData {
     meals: list(doc.meals),
     products: list<Product>(doc.products).map((p) => ({ ...p, units: p.units ?? [] })),
     recipes: list(doc.recipes),
-    settings: {
-      ai: (settings.ai ?? {}) as AppData['settings']['ai'],
-      quickButtons: list(settings.quickButtons),
-    },
+    settings: { quickButtons: list(settings.quickButtons) },
   });
 }
 

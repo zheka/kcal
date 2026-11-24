@@ -22,7 +22,6 @@ export function freshData(): AppData {
     products: [water],
     recipes: [],
     settings: {
-      ai: {},
       quickButtons: [{ amount: 250, food: water.id, label: '💧', unit: 'ml' }, { label: '🍽️' }],
     },
   };

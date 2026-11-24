@@ -33,7 +33,6 @@ const data = appData({
     meal('2026-11-16T07:00:00.000Z', [ing(egg, 2, 'u:piece'), ing(honey, 2, 'u:tsp')]),
   ],
   settings: {
-    ai: {},
     quickButtons: [{ amount: 250, food: water.id, label: '💧', unit: 'ml' }, { label: '🍽️' }],
   },
 });

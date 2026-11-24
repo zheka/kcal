@@ -1030,10 +1030,10 @@ select.input.base {
   color: #ffffff;
 }
 
-/* The Gemini key in the menu: the field or what's saved takes the row, its button beside it. */
+/* A key in the settings: the field or what's saved takes the row, its button beside it. */
 
-.ai-key > .input,
-.ai-key-saved {
+.key-field > .input,
+.key-saved {
   flex: 1;
   min-width: 0;
 }

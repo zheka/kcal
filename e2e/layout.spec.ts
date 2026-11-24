@@ -188,6 +188,7 @@ test.describe('forms', () => {
     ['library', '#/library'],
     ['menu', '#/menu'],
     ['goals', '#/goals'],
+    ['settings', '#/settings'],
     ['new product', '#/product/new'],
     ['new recipe', '#/recipe/new'],
   ] as const) {

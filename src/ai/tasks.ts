@@ -1,46 +1,44 @@
-import type { AiTask, Thinking } from '../config.ts';
-import type { Settings } from '../core/types.ts';
+import type { Config } from './model.ts';
 import type { PhotoSize } from './image.ts';
 
 /**
- * How the app asks a model, per task: built in, and overridden by `settings.ai` (only the model
- * settings: what's sent in a request). Photos, retries and the timeout are the app's, not
- * settings: they are about the phone, not the model. The lab's tasks have their own (e.g.
- * src/lab/meal/settings.ts), longer on retries: a test shouldn't lose a request to a busy minute.
+ * How the app asks a model, per task: built in, like the task's prompt and schema, because the
+ * prompt is tuned to exactly this model, thinking and temperature (a change goes through the
+ * bench, then into a build). Nothing here is a user setting; the user only gives each known
+ * provider its key (src/state/keys.ts). The lab's tasks have their own (src/lab/meal/settings.ts).
  */
 
+/** The providers the app knows how to ask (src/ai/gemini.ts). */
+export type Provider = 'gemini';
+
 export interface TaskSettings {
+  provider: Provider;
+  /** An id or an alias, as the provider names it. */
   model: string;
-  thinking: Thinking;
+  thinking: Config['thinking'];
   /** null: the model's own default. */
-  temperature: number | null;
+  temperature: Config['temperature'];
+  /** How photos are sent. */
   photo: PhotoSize;
 }
 
-const BUILT_IN: Record<AiTask, TaskSettings> = {
+export const TASKS = {
   /** What a product is, from a photo or words: its name and values, for the product form. */
   product: {
+    provider: 'gemini',
     model: 'gemini-3.5-flash-lite',
     thinking: 'low',
     temperature: null,
     photo: { maxSide: 1024, quality: 85 },
   },
-};
+} as const satisfies Record<string, TaskSettings>;
 
-/** A request in a form: shorter than the lab's, and tried again once or twice only. */
+/**
+ * A request from a form: shorter than the lab's, which may wait minutes for a busy model; here
+ * someone is waiting, and can type the values instead.
+ */
 export const APP_REQUEST = {
   /** Waits before each new try of a busy model: their number is how many more tries. */
   retryDelaysMs: [3_000, 10_000],
   timeoutMs: 40_000,
 } as const;
-
-/** A task's settings: built in, with what the user's settings override. */
-export function taskSettings(settings: Settings, task: AiTask): TaskSettings {
-  const own = settings.ai[task] ?? {};
-  return {
-    ...BUILT_IN[task],
-    ...(own.model !== undefined && { model: own.model }),
-    ...(own.thinking !== undefined && { thinking: own.thinking }),
-    ...(own.temperature !== undefined && { temperature: own.temperature }),
-  };
-}

@@ -24,7 +24,7 @@ describe('applyChange', () => {
 
   it('adds goal sets and replaces the settings', () => {
     const set = { perDay: { kcal: 2000 }, setAt: '2026-11-17T07:00:00.000Z' };
-    const settings = { ai: {}, quickButtons: [{ label: '🍽️' }] };
+    const settings = { quickButtons: [{ label: '🍽️' }] };
     const next = applyChange(data, { goals: [set], settings });
     expect(next.goals).toEqual([set]);
     expect(next.settings).toBe(settings);
