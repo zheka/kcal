@@ -1048,7 +1048,3 @@ select.input.base {
   flex: 1;
   min-width: 0;
 }
-
-.hint a {
-  color: var(--accent);
-}

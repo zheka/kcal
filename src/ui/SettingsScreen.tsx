@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'preact/hooks';
-import { TASKS } from '../ai/tasks';
 import { localDate } from '../core/time';
 import type { AppData } from '../core/types';
 import { parseDocument, serializeBackup, VERSION_TAG } from '../data/backup';
@@ -13,11 +12,10 @@ import { plural } from './ProductForm';
 /**
  * The app itself: its data as a whole (backup: export, import, how much is saved, the format),
  * and the keys of the providers the app asks (each the user's own, kept on this device only,
- * never in a backup). Which model a task asks is built in (src/ai/tasks.ts), so it is only shown.
+ * never in a backup). Which model a task asks is built in (src/ai/tasks.ts), not a setting.
  */
 export function SettingsScreen({ store }: { store: Store }) {
   useEffect(() => void loadKeys(), []);
-  const product = TASKS.product;
   return (
     <div class="form">
       <Backup store={store} />
@@ -25,14 +23,6 @@ export function SettingsScreen({ store }: { store: Store }) {
         <h2 class="label">Gemini</h2>
         <KeyField name="gemini" label="Key" />
         <KeyField name="gemini-2" label="Key 2" />
-        <p class="hint">
-          Your own keys from{' '}
-          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-            Google AI Studio
-          </a>
-          : kept on this device only, never in a backup, and sent only to Gemini. Products:{' '}
-          {product.model}, thinking {product.thinking}.
-        </p>
       </section>
     </div>
   );
@@ -203,7 +193,7 @@ function KeyField({ name, label }: { name: KeyName; label: string }) {
             class="input"
             type="password"
             autoComplete="off"
-            placeholder="Paste a key"
+            placeholder="Paste your Gemini key"
             value={text}
             onInput={(e) => setText(e.currentTarget.value)}
           />

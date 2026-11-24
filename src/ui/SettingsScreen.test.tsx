@@ -3,7 +3,6 @@ import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { deleteDB } from 'idb';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TASKS } from '../ai/tasks';
 import { appData, egg } from '../core/testData';
 import { createStore } from '../state/store';
 import { DB_NAME } from '../data/db';
@@ -40,16 +39,8 @@ describe('Gemini keys', () => {
     expect(screen.getByText('Saved on this device (…5678)')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Forget key' }));
-    await waitFor(() => expect(screen.getByPlaceholderText('Paste a key')).toBeTruthy());
+    await waitFor(() => expect(screen.getByPlaceholderText('Paste your Gemini key')).toBeTruthy());
     expect(screen.getByText('Saved on this device (…5678)')).toBeTruthy();
-  });
-
-  it('says which model a task asks: built in', async () => {
-    render(<SettingsScreen store={createStore(appData(), vi.fn())} />);
-    const { model, thinking } = TASKS.product;
-    expect(
-      await screen.findByText(new RegExp(`Products: ${model}, thinking ${thinking}\\.`)),
-    ).toBeTruthy();
   });
 });
 
