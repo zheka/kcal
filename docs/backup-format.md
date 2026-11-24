@@ -1,6 +1,6 @@
 # kcal backup format
 
-The format of kcal's backup file and of the data the app saves in the browser: `kcal 0.2.0`.
+The format of kcal's backup file and of the data the app saves in the browser: `kcal 0.2.1`.
 
 Status (2026-11-20): **agreed and implemented.**
 
@@ -9,6 +9,7 @@ Status (2026-11-20): **agreed and implemented.**
 | `0.1.0` | the first format                                                                                                                                                                                    |
 | `0.1.1` | products may have a `barcode` (an optional field: `0.1.0` files are read as they are)                                                                                                               |
 | `0.2.0` | products per g and/or per ml; no built-in foods; quick buttons in `settings`; empty lists omitted; zeros stored. Not compatible: older files are refused, and older saved data means starting fresh |
+| `0.2.1` | model settings per task in `settings.ai` (an optional field: `0.2.0` files are read as they are)                                                                                                    |
 
 ## Purpose and principles
 
@@ -111,7 +112,7 @@ forms ──(save: check, convert, round)──▶ stored data ──(derive)─
   "products": [],
   "recipes": [],
   "settings": {},
-  "version": "kcal 0.2.0"
+  "version": "kcal 0.2.1"
 }
 ```
 
@@ -150,7 +151,7 @@ depends on them, and they can be edited or removed like anything else.
       { "label": "🍽️" }
     ]
   },
-  "version": "kcal 0.2.0"
+  "version": "kcal 0.2.1"
 }
 ```
 
@@ -325,7 +326,11 @@ here. Each setting is an optional field.
 
 | Field          | Required | Meaning                                                         |
 | -------------- | -------- | --------------------------------------------------------------- |
+| `ai`           | no       | how a model is asked, per task, where it differs from built in  |
 | `quickButtons` | no       | the day screen's buttons that start a meal, in the user's order |
+
+The key a model is asked with is not a setting and never in a backup: it stays on the device
+(the app's IndexedDB database `kcal`, see `src/data/db.ts`).
 
 ### Quick buttons
 
@@ -353,6 +358,25 @@ here. Each setting is an optional field.
 - A food used by a button counts as used: it can't be deleted.
 - No button is required: without one that has no food, the day screen has no plain "eat"
   button.
+
+### Model settings
+
+```json
+"ai": {
+  "product": { "model": "gemini-3.5-flash", "temperature": null, "thinking": "medium" }
+}
+```
+
+Per task, by its name: `product` (what a product is, from a photo or words, for the product
+form). Each field is optional, and an omitted one is the task's built-in setting
+(`src/ai/tasks.ts`), so a better built-in setting in a later version reaches everyone who
+didn't choose otherwise. A task with no field is omitted.
+
+| Field         | Required | Meaning                                                                         |
+| ------------- | -------- | ------------------------------------------------------------------------------- |
+| `model`       | no       | the model, by its provider's id or alias                                        |
+| `temperature` | no       | a number from 0 to 2, or `null` for the model's own default                     |
+| `thinking`    | no       | how much it reasons first: `default`, `off`, `minimal`, `low`, `medium`, `high` |
 
 ## Numbers
 

@@ -56,7 +56,10 @@ describe('store', () => {
       appData({
         products: [egg, oatFlakes, honey],
         meals: [meal('2026-11-17T07:00:00.000Z', [ing(egg, 1)])],
-        settings: { quickButtons: [{ amount: 1, food: honey.id, label: '🍯', unit: 'u:tsp' }] },
+        settings: {
+          ai: {},
+          quickButtons: [{ amount: 1, food: honey.id, label: '🍯', unit: 'u:tsp' }],
+        },
       }),
     );
     expect(() => store.deleteFood(egg.id)).toThrow('in use');

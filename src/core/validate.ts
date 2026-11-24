@@ -1,4 +1,12 @@
-import { BASES, LABEL_MAX_CHARS, NUTRIENTS, type Base } from '../config';
+import {
+  AI_TASKS,
+  BASES,
+  LABEL_MAX_CHARS,
+  NUTRIENTS,
+  TEMPERATURE_MAX,
+  THINKING,
+  type Base,
+} from '../config';
 import { isStoredPrecision } from './decimal';
 import { buildFoodTable, FoodTableError } from './nutrition';
 import { charCount, isClean, nameKey } from './text';
@@ -71,8 +79,32 @@ class Checker {
 
   settings(value: unknown): { quickButtons: unknown[] } {
     if (value === undefined) return { quickButtons: [] };
-    const settings = this.record(value, 'settings', [], ['quickButtons']);
+    const settings = this.record(value, 'settings', [], ['ai', 'quickButtons']);
+    if (settings?.ai !== undefined) this.ai(settings.ai);
     return { quickButtons: this.list(settings?.quickButtons, 'settings, quickButtons') };
+  }
+
+  /** Model settings per task: known tasks only, each with only what it overrides. */
+  private ai(value: unknown): void {
+    const ai = this.record(value, 'settings, ai', [], AI_TASKS);
+    if (!ai) return;
+    for (const task of AI_TASKS) {
+      if (ai[task] === undefined) continue;
+      const where = `settings, ai, ${task}`;
+      const s = this.record(ai[task], where, [], ['model', 'temperature', 'thinking']);
+      if (!s) continue;
+      const { model, temperature, thinking } = s;
+      if ('model' in s && (typeof model !== 'string' || !model || !isClean(model))) {
+        this.problem(where, 'model must be a model id');
+      }
+      if ('thinking' in s && !(THINKING as readonly unknown[]).includes(thinking)) {
+        this.problem(where, `thinking must be one of ${THINKING.join(', ')}`);
+      }
+      const inRange = isNumber(temperature) && temperature >= 0 && temperature <= TEMPERATURE_MAX;
+      if ('temperature' in s && temperature !== null && !inRange) {
+        this.problem(where, `temperature must be null or a number from 0 to ${TEMPERATURE_MAX}`);
+      }
+    }
   }
 
   /** An object with exactly these required and optional fields. */

@@ -376,7 +376,7 @@ screen stays about today.)_
 - Goals: one form with a target per nutrient (empty = no goal); see Goals.
 - Menu: backup export/import, and **App version** (agreed): the build, as the short commit hash
   and the build date (`a1b2c3d · 2026-11-20`); the data format's version is shown apart from it
-  (`Data format: kcal 0.2.0`), as the two change independently. And what a tap
+  (`Data format: kcal 0.2.1`), as the two change independently. And what a tap
   does: check for an update ("Tap to check for updates", "Up to date", "Offline: connect to
   check for updates"), or install one that is ready ("Update available: tap to install"), which
   reloads into the new version. A new version otherwise downloads in the background and takes

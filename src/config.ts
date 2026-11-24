@@ -41,3 +41,20 @@ export const LABEL_MAX_CHARS = 12;
 
 /** Decimals every stored number may have at most. */
 export const STORED_DECIMALS = 3;
+
+/**
+ * What the app asks a model to do: each a task with its own prompt and built-in model settings
+ * (src/ai/tasks.ts), which `settings.ai` may override per task.
+ */
+export const AI_TASKS = ['product'] as const;
+export type AiTask = (typeof AI_TASKS)[number];
+
+/**
+ * How much a model reasons before answering: `default` the model's own, `off` not at all (a
+ * model that can't turn it off refuses the request), or a level (Gemini 3).
+ */
+export const THINKING = ['default', 'off', 'minimal', 'low', 'medium', 'high'] as const;
+export type Thinking = (typeof THINKING)[number];
+
+/** A model's temperature, when one is set: Gemini's range. */
+export const TEMPERATURE_MAX = 2;

@@ -1,3 +1,4 @@
+import type { Thinking } from '../config.ts';
 import { withRetries } from '../data/retry.ts';
 
 /**
@@ -22,10 +23,8 @@ export interface Config {
   schema: object;
   schemaFormat?: 'json';
   temperature: number | null;
-  thinking: 'default' | 'off' | ThinkingLevel;
+  thinking: Thinking;
 }
-
-export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 
 export interface ModelRequest {
   /** As asked: an id or an alias. */

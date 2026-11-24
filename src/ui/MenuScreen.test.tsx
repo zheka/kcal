@@ -26,7 +26,7 @@ afterEach(() => {
 describe('App version', () => {
   it('shows the build, and the data format separately', () => {
     expect(versionItem().textContent).toContain(__APP_VERSION__);
-    expect(screen.getByText('Data format: kcal 0.2.0')).toBeTruthy();
+    expect(screen.getByText('Data format: kcal 0.2.1')).toBeTruthy();
   });
 
   it('says what a tap does in every state', async () => {

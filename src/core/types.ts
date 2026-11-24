@@ -1,4 +1,4 @@
-import type { Base, Nutrient } from '../config';
+import type { AiTask, Base, Nutrient, Thinking } from '../config';
 
 /**
  * The stored data: the primary form of the data, as in a backup (see docs/backup-format.md).
@@ -71,7 +71,22 @@ export interface GoalSet {
 export type QuickButton =
   { label: string; amount?: never; food?: never; unit?: never } | ({ label: string } & Ingredient);
 
+/**
+ * How a model is asked for a task, where it differs from the task's built-in settings
+ * (src/ai/tasks.ts): an omitted field is the built-in one, so a better default in a later build
+ * reaches everyone who didn't choose otherwise.
+ */
+export interface ModelSettings {
+  /** An id or an alias, as the provider names it (`gemini-3.5-flash-lite`). */
+  model?: string;
+  thinking?: Thinking;
+  /** null: the model's own default. */
+  temperature?: number | null;
+}
+
 export interface Settings {
+  /** Per task; a task not here uses its built-in settings. */
+  ai: Partial<Record<AiTask, ModelSettings>>;
   quickButtons: QuickButton[];
 }
 

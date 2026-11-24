@@ -48,7 +48,7 @@ export function appData(data: Partial<AppData> = {}): AppData {
     meals: [],
     products: [],
     recipes: [],
-    settings: { quickButtons: [] },
+    settings: { ai: {}, quickButtons: [] },
     ...data,
   };
 }

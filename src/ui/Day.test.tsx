@@ -29,6 +29,7 @@ function start(data: Partial<AppData> = {}, path = '/') {
       products: [egg, oatFlakes, honey, water],
       goals,
       settings: {
+        ai: {},
         quickButtons: [{ amount: 250, food: water.id, label: '💧', unit: 'ml' }, { label: '🍽️' }],
       },
       meals: [breakfast, lunch, yesterday],
@@ -133,6 +134,7 @@ describe('meal composer', () => {
   it('shows the quick buttons from the settings, in their order, round or pill-shaped', () => {
     start({
       settings: {
+        ai: {},
         quickButtons: [
           { amount: 250, food: water.id, label: '💧', unit: 'ml' },
           { amount: 2, food: egg.id, label: 'eggs', unit: 'u:piece' },
@@ -153,7 +155,7 @@ describe('meal composer', () => {
   });
 
   it('has no quick buttons, and no plain eat button, when the settings have none', () => {
-    start({ settings: { quickButtons: [] } });
+    start({ settings: { ai: {}, quickButtons: [] } });
     expect(screen.queryByRole('navigation', { name: 'Quick buttons' })).toBeNull();
   });
 
