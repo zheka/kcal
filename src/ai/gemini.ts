@@ -55,7 +55,7 @@ export async function requestBody(request: ModelRequest, photo: PhotoData): Prom
     request.content.map(async (part) => {
       if ('text' in part) return { text: part.text };
       const data = await photo(part.image);
-      if (!data) throw new ModelError('a photo of the meal is gone', { sent: false });
+      if (!data) throw new ModelError('a photo is gone', { sent: false });
       return { inline_data: { mime_type: data.type, data: data.base64 } };
     }),
   );

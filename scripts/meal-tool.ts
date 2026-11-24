@@ -1,7 +1,7 @@
 /**
  * The meal composer's request, run locally: inputs (photos, texts, barcodes, product JSON) in,
  * the model's answer and what the code makes of it out, as one entry (the lab's log entry, with
- * the code's side added). The lab's own code does the work (src/lab/meal, src/lab/ai); this file
+ * the code's side added). The lab's own code does the work (src/lab/meal, src/ai); this file
  * only does what the browser would: shrink photos (sharp), look up barcodes, keep to the quota.
  * Used by scripts/meal.ts (one meal) and scripts/meal-bench.ts (tests).
  */
@@ -10,8 +10,8 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, resolve } from 'node:path';
 import sharp from 'sharp';
 import { lookUpBarcode } from '../src/data/openFoodFacts.ts';
-import { gemini } from '../src/lab/ai/gemini.ts';
-import { type ModelRequest, type ModelResponse, type Reply, run } from '../src/lab/ai/model.ts';
+import { gemini } from '../src/ai/gemini.ts';
+import { type ModelRequest, type ModelResponse, type Reply, run } from '../src/ai/model.ts';
 import { type Processed, process as processMeal } from '../src/lab/meal/process.ts';
 import { type Meal, readMeal } from '../src/lab/meal/read.ts';
 import { type Input, mealRequest } from '../src/lab/meal/request.ts';

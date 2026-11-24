@@ -38,7 +38,7 @@ description, brands, categories, ingredients, pack and serving sizes) and the la
 track per 100 g or ml (kcal, protein, fat, carbs). A busy or unreachable Open Food Facts is tried
 again after 1 s and 3 s, each try given 8 s.
 
-Requests are built provider-neutral (`src/lab/ai/model.ts`); `ai/gemini.ts` turns them into
+Requests are built provider-neutral (`src/ai/model.ts`); `src/ai/gemini.ts` turns them into
 Gemini's and reads Gemini's reply back. Retries and the timeout are the tool's and the bench's
 (`settings.ts`): a busy Gemini (429, 500, 503, 504), one that doesn't answer within 120 s, or one
 that can't be reached, is tried again after 5, 15, 30, 60 and 120 s. Long for a phone, but the

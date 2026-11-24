@@ -43,7 +43,7 @@ entry records them with the request.
   at a busy hour are common (run 5 lost 3 of 20 after these); a timed-out request is as worth
   another try as a 503.
 - **Photos at most 1024 px on the longer side, JPEG 85**, shrunk the same by the lab
-  (`src/lab/ai/image.ts`) and the tool (sharp). Why: enough to tell foods and portions apart,
+  (`src/ai/image.ts`) and the tool (sharp). Why: enough to tell foods and portions apart,
   small enough to send quickly; the same, so the tool sees what the phone sends.
 - **The answer as JSON in the schema** (`responseJsonSchema`, see the format doc).
 
@@ -176,7 +176,7 @@ sizes, and a cutlet example turned meatballs into "котлеты".
 ## The tool
 
 `scripts/meal.ts` sends one meal from the command line with the lab's own code (the prompt,
-schema, request, reader and processing; Gemini through `src/lab/ai/gemini.ts`), and does only
+schema, request, reader and processing; Gemini through `src/ai/gemini.ts`), and does only
 what the browser would: shrinks photos, looks up barcodes, keeps to the quota.
 
 ```

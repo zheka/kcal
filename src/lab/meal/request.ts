@@ -4,7 +4,7 @@
  * then the CHECKLIST (instructions after a large input are heeded best). Only what the user gave:
  * no meal so far is sent back, so every request perceives the whole input afresh.
  */
-import type { ModelRequest, Part } from '../ai/model.ts';
+import type { ModelRequest, Part } from '../../ai/model.ts';
 import { MEAL_SCHEMA } from './schema.ts';
 import { SETTINGS } from './settings.ts';
 

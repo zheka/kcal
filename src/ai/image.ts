@@ -1,6 +1,4 @@
-import { SETTINGS } from '../meal/settings.ts';
-
-/** A photo ready to send: a JPEG, at most MAX_SIDE px on its longer side, base64-encoded. */
+/** A photo ready to send: a JPEG, at most `maxSide` px on its longer side, base64-encoded. */
 export interface Photo {
   type: 'image/jpeg';
   base64: string;
@@ -13,13 +11,16 @@ export interface Photo {
   url: string;
 }
 
-/** Enough to tell foods and portions apart, and small enough to send quickly (SETTINGS.photo). */
-export const MAX_SIDE = SETTINGS.photo.maxSide;
+/** How a photo is sent: its longer side at most, in px; JPEG quality, 0–100. A task's setting. */
+export interface PhotoSize {
+  maxSide: number;
+  quality: number;
+}
 
-export async function shrinkPhoto(file: Blob): Promise<Photo> {
+export async function shrinkPhoto(file: Blob, { maxSide, quality }: PhotoSize): Promise<Photo> {
   // Respects the photo's EXIF orientation, so portrait photos stay upright.
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
   const height = Math.round(bitmap.height * scale);
   const canvas = document.createElement('canvas');
@@ -31,7 +32,7 @@ export async function shrinkPhoto(file: Blob): Promise<Photo> {
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error('could not encode the photo'))),
       'image/jpeg',
-      SETTINGS.photo.quality / 100,
+      quality / 100,
     ),
   );
   const base64 = await toBase64(blob);

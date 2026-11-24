@@ -13,7 +13,7 @@ export const SETTINGS = {
   temperature: null,
   /** Requests a minute, retries included: under the free tier's 15 for Flash-Lite. */
   perMinute: 9,
-  /** Photos as sent (shrunk by src/lab/ai/image.ts and the tool alike): longer side, quality. */
+  /** Photos as sent (shrunk by src/ai/image.ts and the tool alike): longer side, quality. */
   photo: { maxSide: 1024, quality: 85 },
   /**
    * Waits before each new try of a busy model (503 at a busy hour, 429): five more tries over

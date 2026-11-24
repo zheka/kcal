@@ -3,7 +3,8 @@ import { newId } from '../../core/foods';
 import { formName, lookUpBarcode } from '../../data/openFoodFacts';
 import { ConfirmButton } from '../../ui/ConfirmButton';
 import { CloseIcon } from '../../ui/icons';
-import { shrinkPhoto } from '../ai/image';
+import { shrinkPhoto } from '../../ai/image';
+import { SETTINGS } from '../meal/settings';
 import type { Lab } from '../storage/lab';
 import { type Axis, choose, itemKey, type ProcessedItem, type Question } from '../meal/process';
 import { shown, withContext } from './compose';
@@ -58,7 +59,7 @@ export function MealScreen({ lab, meal, language, change, update, close, remove 
   async function attachPhoto(photo: Blob) {
     try {
       setBusy('Preparing the photo');
-      const shrunk = await shrinkPhoto(photo);
+      const shrunk = await shrinkPhoto(photo, SETTINGS.photo);
       const file = await lab.files.put(shrunk.blob);
       attach({ id: newId(), kind: 'photo', file });
     } catch (err) {

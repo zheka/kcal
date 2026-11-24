@@ -1,4 +1,4 @@
-import type { ModelRequest, ModelResponse } from '../ai/model';
+import type { ModelRequest, ModelResponse } from '../../ai/model';
 import { process, type Processed } from '../meal/process';
 import PROMPT from '../meal/prompt.md?raw';
 import { readMeal } from '../meal/read';

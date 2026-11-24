@@ -1,11 +1,15 @@
-import { withRetries } from '../../data/retry.ts';
+import { withRetries } from '../data/retry.ts';
 
 /**
- * A model request and its outcome, the same whatever the provider: what an experiment builds,
- * what the lab logs, what an adapter (gemini.ts) turns into its provider's own request and back.
+ * A model request and its outcome, the same whatever the provider: what a task builds (the
+ * lab's meal, the app's), what the lab logs, what an adapter (gemini.ts) turns into its
+ * provider's own request and back.
  */
 
-/** One part of the request's content, in order: text, or a photo by its lab file id. */
+/**
+ * One part of the request's content, in order: text, or a photo by an id the sender resolves
+ * (gemini.ts, PhotoData), so a request, as logged, never holds a photo's data.
+ */
 export type Part = { text: string } | { image: string };
 
 /**
