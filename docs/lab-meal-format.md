@@ -44,8 +44,8 @@ lab's meal screen runs on it.** `src/lab/meal/`: `schema.ts` (what the model ans
 meal    = { title, dishes: [dish] }
 dish    = { name, products: [product] }
 product = { name, base_unit,
-            piece_count, fewer_piece_count, more_piece_count,
-            size, values, alternative_products: [{ name, size, values }] }
+            piece_count, fewer_piece_count, more_piece_count, piece_name,
+            size, values, alternative_products: [{ name, piece_name, size, values }] }
 size    = piece_size_name, base_units_in_piece,
           smaller_piece_size_name, smaller_base_units_in_piece,
           larger_piece_size_name, larger_base_units_in_piece
@@ -75,8 +75,10 @@ values  = kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100
   what the model writes anyway; `piece_count` null for loose food leaves no slot to fill with a
   weight twice. The fields are named after the piece so they read as one thing, apart from
   `base_unit` (they were `count`, `unit_name`, `amount_alias`, `unit_amount`: "unit" meant
-  both). A piece has no name (it had `piece_name`: шт., ломт., стакан): next to the count and
-  the size it often read wrong ("1 стакан M"), and the count alone says it (`2 × 50г`).
+  both). `piece_name` is the piece's usual short name (шт., ломт., стакан), or null; an
+  alternative product has its own. The model gives it, the code never shows it: next to the
+  count and the size it often read wrong ("1 стакан M"), and the count alone says it (`2 ×
+50г`). It was dropped from the answer for that, and asked for again to keep it.
 - **Values in 100 base units as eaten**, and the water to drink in them
   (`hydration_ml_per_100_base_units`): from drinks and soups, 0 for food, at most 100. Why: the
   app's water nutrient is hydration (design.md, Water); as `water_g` the model gave every food
@@ -92,17 +94,18 @@ values  = kcal_per_100_base_units, protein_g_per_100_base_units, carbs_g_per_100
   product's guessed size is where it is least sure (an egg 50–65 g, a meatball 20–35), its count
   of pieces in view the surest. Two bounds, not every likely value (41, 42, 43…), not steps.
 - **Alternative products: other foods or drinks it may be**, at the same count, each with its own
-  size and range (an almond croissant 90 g, a classic one 60) and its own values; no `base_unit`
+  piece name, size and range (an almond croissant 90 g, a classic one 60) and its own values; no `base_unit`
   of their own (rule 10: one per product). Why: "it could be X" is how the model thinks about
   what a food is; with sizes and counts in their own fields, an alternative product is only
   that, and the code no longer has to work out what each one changed.
 - **Examples in English, the answer in the answer language**; a size name as on the menu (S, M,
   grande). Why: the model copied example words: Russian portions ("большая") came out
   uninflected next to masculine names; and the lab asks in other languages too.
-- **No words to copy for sizes, and no piece names.** A size has a name only from a menu or a
-  package; any other is null, and the code labels it by its amount (`45 г`). A piece has no
-  name: the amount is the count alone (`2 × 50г`). No examples of size names. Why: with English examples (pc., cup, small, large, portion) the first v6 runs answered
-  "1 cup M × 250 мл", "20 pc. × 10 г" and sizes "small" / "large" in a Russian answer; and an
+- **No words to copy for sizes or pieces.** A size has a name only from a menu or a
+  package; any other is null, and the code labels it by its amount (`45 г`). A piece's name is
+  never shown: the amount is the count alone (`2 × 50г`). No examples of size or piece names.
+  Why: with English examples (pc., cup, small, large, portion) the first v6 runs answered "1 cup
+  M × 250 мл", "20 pc. × 10 г" and sizes "small" / "large" in a Russian answer; and an
   amount tells a size apart better than "small" does.
 - **Nothing about what matters.** The schema and the prompt say what the model perceives, never
   that something decides after it. Why: the model has no use for knowing; v5's "the app decides

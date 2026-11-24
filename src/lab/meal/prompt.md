@@ -21,12 +21,12 @@ may be. You only perceive and estimate.
 - `hydration_ml_per_100_base_units` is the water a drink or a soup gives to drink. Food is 0: a
   soup's sour cream, bread, fruit, a porridge; so is a food or drink cooked into a food (milk in
   an omelette).
-- All names and the title are in the answer language; a size name stays as on the menu (S, M,
-  L, grande, venti).
+- All names, the title and the piece names are in the answer language; a size name stays as on
+  the menu (S, M, L, grande, venti).
 
-**The amount.** Pieces are counted: `piece_count` pieces of `base_units_in_piece` each.
-Anything else is one piece of `base_units_in_piece`, with `piece_count` null. Pick the line that
-fits:
+**The amount.** Pieces are counted: `piece_count` pieces of `base_units_in_piece` each, with
+`piece_name` the piece's usual short name, or null when it has none. Anything else is one piece
+of `base_units_in_piece`, with `piece_count` and `piece_name` null. Pick the line that fits:
 
 | What it is                                                     | piece_count | piece_size_name            | base_units_in_piece |
 | -------------------------------------------------------------- | ----------- | -------------------------- | ------------------- |
@@ -52,8 +52,8 @@ An add-on that may not be there (sugar in tea, butter on toast) has 0 as its sma
 its fewest pieces).
 
 **Alternative products** are other foods or drinks it may be, each at the same count, with its
-own values and its own size and range (the same as the product's unless it comes in its own
-size).
+own values and its own piece name, size and range (the same as the product's unless it comes in
+its own pieces or size).
 </format>
 
 <rules>
@@ -96,7 +96,7 @@ size).
 10. One `base_unit` per product, its alternative products included: g when they would differ.
 
 11. Names in full ("Khinkali with beef and pork"), an alternative product's too ("Cottage cheese
-vareniki"). The title is short ("Breakfast", "Borscht with pampushka").
+vareniki"); piece names short. The title is short ("Breakfast", "Borscht with pampushka").
 </rules>
 
 <examples>
@@ -170,6 +170,7 @@ Photo of vareniki (the filling can't be seen; some hidden under others), in full
       "piece_count": 10,
       "fewer_piece_count": 8,
       "more_piece_count": 12,
+      "piece_name": null,
       "piece_size_name": null,
       "base_units_in_piece": 45,
       "smaller_piece_size_name": null,
@@ -184,6 +185,7 @@ Photo of vareniki (the filling can't be seen; some hidden under others), in full
       "alternative_products": [
         {
           "name": "Cottage cheese vareniki",
+          "piece_name": null,
           "piece_size_name": null,
           "base_units_in_piece": 45,
           "smaller_piece_size_name": null,
@@ -198,6 +200,7 @@ Photo of vareniki (the filling can't be seen; some hidden under others), in full
         },
         {
           "name": "Cherry vareniki",
+          "piece_name": null,
           "piece_size_name": null,
           "base_units_in_piece": 45,
           "smaller_piece_size_name": null,

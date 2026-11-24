@@ -29,6 +29,7 @@ const NO_RANGE = {
 /** A food as the model answers it: an alternative product, or a product's own part. */
 const food = (over: Record<string, unknown> = {}) => ({
   name: 'Вареники с картошкой',
+  piece_name: 'шт.', // read by no one: never shown
   piece_size_name: null,
   base_units_in_piece: 45,
   ...NO_RANGE,

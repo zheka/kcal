@@ -82,8 +82,8 @@ the model can't perceive or check was taken out (see the dish names below, and t
   and asked for "the same name each time", but the model never sees its earlier answers, so it
   can't keep names the same; the plainest usual name is what it can do that makes names match
   most often. Matching itself is for the code, or for past names sent as input.
-- **The amount, as a table**: pieces counted (`piece_count` × one piece), menu sizes
-  (`piece_size_name`), loose food and stated weights as one `base_units_in_piece` with
+- **The amount, as a table**: pieces counted (`piece_count` × one piece, `piece_name` its usual
+  short name, never shown), menu sizes (`piece_size_name`), loose food and stated weights as one `base_units_in_piece` with
   `piece_count` null. Never a weight in two
   places. Why: a table of plain cases worked in v4 where prose was mixed up (eggs weighed, "3
   г"); the 72,000 kcal omelette was a weight written twice.
@@ -91,12 +91,12 @@ the model can't perceive or check was taken out (see the dish names below, and t
   largest size, or the next on the menu, always for a size guessed from a photo or a vague text;
   null only for what is stated, weighed, a package or in plain view; 0 as the smallest for an
   add-on that may not be there. Why: see the format doc (How sure).
-- **Alternative products** are other foods only, at the same count, with their own size, range
-  and values. Why: amounts have their own fields.
+- **Alternative products** are other foods only, at the same count, with their own piece name,
+  size, range and values. Why: amounts have their own fields.
 - **Examples and the schema's examples in English**, names in the answer language, a size name
-  as on the menu; no words at all for sizes, and no piece names. Why: Russian example words
-  were copied uninflected ("большая" next to a masculine name), and English ones untranslated
-  ("cup", "pc.", "small"): see the format doc.
+  as on the menu; no words at all for sizes and pieces (piece names null in the examples). Why:
+  Russian example words were copied uninflected ("большая" next to a masculine name), and
+  English ones untranslated ("cup", "pc.", "small"): see the format doc.
 - **`hydration_ml_per_100_base_units`: the water to drink**, from drinks and soups; food 0, a
   soup's sour cream included, and so is a food or drink cooked into a food. Only what it means,
   no values: how much water a drink gives is the model's to find, as kcal are. Why: the field was
@@ -136,7 +136,7 @@ the model can't perceive or check was taken out (see the dish names below, and t
 9. **Amounts are what is eaten** (no bones, shells, peel, ice); cooking fat is part of the food.
 10. **One `base_unit` per product, its alternative products included**, g when they'd differ (#40,
     #502). Why: the code compares their values.
-11. **Names in full** (an alternative product's too), size names short, in
+11. **Names in full** (an alternative product's too), piece and size names short, in
     the answer language. Why: a chip's label is computed from the names' difference.
 
 **What v4's rules became:** the threshold (now a share of the meal's kcal), "at most 3 questions",

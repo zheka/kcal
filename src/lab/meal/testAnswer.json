@@ -10,6 +10,7 @@
           "piece_count": 10,
           "fewer_piece_count": 8,
           "more_piece_count": 14,
+          "piece_name": "шт.",
           "piece_size_name": null,
           "base_units_in_piece": 45,
           "smaller_piece_size_name": null,
@@ -24,6 +25,7 @@
           "alternative_products": [
             {
               "name": "Вареники с творогом",
+              "piece_name": "шт.",
               "piece_size_name": null,
               "base_units_in_piece": 45,
               "smaller_piece_size_name": null,
@@ -44,6 +46,7 @@
           "piece_count": null,
           "fewer_piece_count": null,
           "more_piece_count": null,
+          "piece_name": null,
           "piece_size_name": null,
           "base_units_in_piece": 30,
           "smaller_piece_size_name": null,
@@ -68,6 +71,7 @@
           "piece_count": 1,
           "fewer_piece_count": null,
           "more_piece_count": null,
+          "piece_name": "чашка",
           "piece_size_name": null,
           "base_units_in_piece": 250,
           "smaller_piece_size_name": null,

@@ -10,9 +10,10 @@
  * closely than the prompt (`hydration_ml` alone was read as the ml drunk, see
  * docs/lab-meal-format.md). Examples are in English, of form only (never values to copy), and
  * the answer is in the answer language: copied Russian words came out uninflected, and copied
- * English ones untranslated ("cup", "small"). Pieces have no names (шт., стакан read wrong next to
- * the count and the size), and a size is named only when it has a real name (a menu's, a
- * package's); the code shows the rest by amount.
+ * English ones untranslated ("cup", "small"), so piece names have no examples. A piece's name
+ * (шт., стакан) is asked for but never shown (it read wrong next to the count and the size: "1
+ * стакан M"), and a size is named only when it has a real name (a menu's, a package's); the code
+ * shows the rest by amount.
  */
 
 type Schema = Record<string, unknown>;
@@ -81,13 +82,18 @@ const VALUES = {
 const ALTERNATIVE_PRODUCT = object(
   {
     name: string('The specific food or drink, as the product’s name, in the answer language.'),
+    piece_name: orNull(
+      'string',
+      'One of its pieces by its usual short name in the answer language, when it has one; null ' +
+        "when it has none, or the product's piece_count is null.",
+    ),
     ...SIZE,
     ...VALUES,
   },
   {
     description:
-      'Another food or drink it may be, at the same count: its own size and range (the same ' +
-      'as the product’s unless it comes in its own size) and its own values.',
+      'Another food or drink it may be, at the same count: its own piece name, size and range ' +
+      '(the same as the product’s unless it comes in its own pieces or size) and its own values.',
   },
 );
 
@@ -116,6 +122,11 @@ const PRODUCT = object({
     'number',
     'The most pieces it likely is, when some are hidden or hard to count. null when all are ' +
       'in plain view or the count is stated, or piece_count is null.',
+  ),
+  piece_name: orNull(
+    'string',
+    'The piece as counted, by its usual short name in the answer language, when it has one; ' +
+      'null when it has none, or piece_count is null.',
   ),
   ...SIZE,
   ...VALUES,
