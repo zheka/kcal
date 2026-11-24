@@ -1029,3 +1029,15 @@ select.input.base {
   right: 4px;
   color: #ffffff;
 }
+
+/* The Gemini key in the menu: the field or what's saved takes the row, its button beside it. */
+
+.ai-key > .input,
+.ai-key-saved {
+  flex: 1;
+  min-width: 0;
+}
+
+.hint a {
+  color: var(--accent);
+}
