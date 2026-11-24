@@ -1,8 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { appData } from '../core/testData';
 import { checkForUpdate, installUpdate, updateState } from '../pwa';
-import { createStore } from '../state/store';
 import { MenuScreen } from './MenuScreen';
 
 vi.mock('../pwa', async (original) => ({
@@ -16,7 +14,7 @@ const versionItem = () => screen.getByRole('button', { name: /^App version/ });
 beforeEach(() => {
   vi.mocked(checkForUpdate).mockClear();
   vi.mocked(installUpdate).mockClear();
-  render(<MenuScreen store={createStore(appData(), vi.fn())} />);
+  render(<MenuScreen />);
 });
 afterEach(() => {
   cleanup();
@@ -24,9 +22,14 @@ afterEach(() => {
 });
 
 describe('App version', () => {
-  it('shows the build, and the data format separately', () => {
+  it('shows the build', () => {
     expect(versionItem().textContent).toContain(__APP_VERSION__);
-    expect(screen.getByText('Data format: kcal 0.2.0')).toBeTruthy();
+  });
+
+  it('comes last, after where to go', () => {
+    const items = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(items.slice(0, 3)).toEqual(['Library', 'Goals', 'Settings']);
+    expect(items[3]).toMatch(/^App version/);
   });
 
   it('says what a tap does in every state', async () => {

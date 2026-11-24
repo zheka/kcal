@@ -621,18 +621,29 @@ select.input.base {
   font-weight: 600;
 }
 
-.menu-item.file input {
+/* Backup in the settings: Export and Import side by side, each half the row. */
+.backup-actions > .button {
+  flex: 1;
+}
+
+/* A button that opens a file picker: a label around a hidden file input. */
+.button.file {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button.file input {
   position: absolute;
   width: 1px;
   height: 1px;
   opacity: 0;
 }
 
-.menu h2 {
-  margin: 8px 0 0;
-}
-
 .about {
+  display: flex;
+  flex-direction: column;
   color: var(--muted);
   font-size: 0.875rem;
   gap: 4px;

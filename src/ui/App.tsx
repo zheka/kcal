@@ -65,8 +65,8 @@ function screenFor(store: Store, path: string, params: URLSearchParams): Screen 
     };
   }
   if (path === '/goals') return { title: 'Goals', body: <GoalsScreen store={store} /> };
-  if (path === '/settings') return { title: 'Settings', body: <SettingsScreen /> };
-  if (path === '/menu') return { title: 'Menu', body: <MenuScreen store={store} /> };
+  if (path === '/settings') return { title: 'Settings', body: <SettingsScreen store={store} /> };
+  if (path === '/menu') return { title: 'Menu', body: <MenuScreen /> };
   if (path === '/library') return { title: 'Library', body: <LibraryScreen store={store} /> };
   if (path === '/product/new') {
     return {

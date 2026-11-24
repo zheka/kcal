@@ -374,18 +374,20 @@ screen stays about today.)_
 ### Goals and menu
 
 - Goals: one form with a target per nutrient (empty = no goal); see Goals.
-- Menu: backup export/import, and **App version** (agreed): the build, as the short commit hash
-  and the build date (`a1b2c3d · 2026-11-20`); the data format's version is shown apart from it
-  (`Data format: kcal 0.2.0`), as the two change independently. And what a tap
-  does: check for an update ("Tap to check for updates", "Up to date", "Offline: connect to
-  check for updates"), or install one that is ready ("Update available: tap to install"), which
-  reloads into the new version. A new version otherwise downloads in the background and takes
-  over on the next launch; the app never reloads by itself.
-- Settings (a screen from the menu): what is set up on this device only. For now the Gemini
-  keys, **Key** and **Key 2**, the user's own: kept in the app's IndexedDB database `kcal`
-  (`src/data/db.ts`), never in a backup, sent only to Gemini. Which model a task asks, with
-  which thinking and temperature, is built in (`src/ai/tasks.ts`), not a setting: each task's
-  prompt is tuned to exactly that, so it changes through the bench and a new build.
+- Menu: where to go (Library, Goals, Settings), and last **App version** (agreed): the build, as
+  the short commit hash and the build date (`a1b2c3d · 2026-11-20`), and what a tap does: check
+  for an update ("Tap to check for updates", "Up to date", "Offline: connect to check for
+  updates"), or install one that is ready ("Update available: tap to install"), which reloads
+  into the new version. A new version otherwise downloads in the background and takes over on
+  the next launch; the app never reloads by itself.
+- Settings (a screen from the menu): the app itself. First **Backup**: Export and Import, what
+  is saved (`Saved: 12 products, 3 recipes, 140 meals`), its size and the data format's version
+  (`0.05 MB · data format kcal 0.2.0`), shown apart from the app's version, as the two change
+  independently. Then **Gemini**: the keys, **Key** and **Key 2**, the user's own: kept in the
+  app's IndexedDB database `kcal` (`src/data/db.ts`), never in a backup, sent only to Gemini.
+  Which model a task asks, with which thinking and temperature, is built in (`src/ai/tasks.ts`),
+  not a setting: each task's prompt is tuned to exactly that, so it changes through the bench
+  and a new build.
 
 ## Technical design
 
@@ -511,7 +513,7 @@ has a single cause.
 - **`localStorage`** (agreed): the document is stored as one value under the key `kcal`. It
   loads synchronously at startup (no loading state), is simple to test and easy to inspect in
   the browser's tools. Its cap of about 5 million characters is roughly 5+ years of data away;
-  the menu shows the saved size and warns past 3 million. Storage sits behind
+  the settings show the saved size and warns past 3 million. Storage sits behind
   `loadSaved()`/`saveData()`, so moving to IndexedDB later is a contained change: read the old
   key once, write it to IndexedDB, remove the key. Eviction and persistent storage are the same
   for both.

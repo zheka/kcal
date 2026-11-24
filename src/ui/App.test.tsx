@@ -298,7 +298,7 @@ describe('recipes', () => {
 
 describe('backup', () => {
   it('imports a backup after a two-tap confirmation', async () => {
-    start(appData(), '/menu');
+    start(appData(), '/settings');
     const backup = serializeBackup(appData({ products: [egg] }), new Date());
     fireEvent.change(field('Import backup'), {
       target: { files: [new File([backup], 'kcal-backup.json')] },
@@ -311,7 +311,7 @@ describe('backup', () => {
   });
 
   it('refuses a broken backup, listing its problems', async () => {
-    start(appData({ products: [egg] }), '/menu');
+    start(appData({ products: [egg] }), '/settings');
     fireEvent.change(field('Import backup'), {
       target: {
         files: [new File(['{"version":"kcal 0.2.0","goals":{},"products":{}}'], 'bad.json')],
@@ -355,7 +355,7 @@ describe('refused saves (storage full: another zheka.github.io project may have 
   });
 
   it('says so when an import can’t replace the data, and changes nothing', async () => {
-    startFull(appData({ products: [egg] }), '/menu');
+    startFull(appData({ products: [egg] }), '/settings');
     const backup = serializeBackup(appData({ products: [milk] }), new Date());
     fireEvent.change(field('Import backup'), {
       target: { files: [new File([backup], 'kcal-backup.json')] },
