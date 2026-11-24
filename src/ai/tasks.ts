@@ -5,7 +5,7 @@ import type { PhotoSize } from './image.ts';
  * How the app asks a model, per task: built in, like the task's prompt and schema, because the
  * prompt is tuned to exactly this model, thinking and temperature (a change goes through the
  * bench, then into a build). Nothing here is a user setting; the user only gives each known
- * provider its key (src/state/keys.ts). The lab's tasks have their own (src/lab/meal/settings.ts).
+ * provider its key (src/ai/keys.ts). The lab's tasks have their own (src/lab/meal/settings.ts).
  */
 
 /** The providers the app knows how to ask (src/ai/gemini.ts). */

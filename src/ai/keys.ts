@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals';
-import { openAppDb, type Db } from '../data/db';
+import { openAppDb, type Db } from '../data/db.ts';
 
 /**
  * The user's API keys, by name: kept in the app's database (never in the stored data or a
@@ -32,6 +32,20 @@ export function loadKeys(): Promise<void> {
       keys.value = none();
     }
   })());
+}
+
+/**
+ * A key as stored now, read afresh (a request reads it just before sending, so a key set or
+ * forgotten meanwhile, in another tab or the app, is the one used); '' when there is none or it
+ * can't be read.
+ */
+export async function readKey(name: KeyName): Promise<string> {
+  try {
+    return (await (await appDb()).secret(name)) ?? '';
+  } catch (err) {
+    console.error(`kcal: could not read the key ${name}`, err);
+    return '';
+  }
 }
 
 /** Keeps a key (trimmed); an empty one forgets it. Throws when it can't be kept. */

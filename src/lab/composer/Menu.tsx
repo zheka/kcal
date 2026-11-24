@@ -1,12 +1,13 @@
 import { useState } from 'preact/hooks';
 import { ConfirmButton } from '../../ui/ConfirmButton';
+import { GeminiKeys } from '../../ui/GeminiKeys';
 import { CloseIcon } from '../../ui/icons';
 import { SETTINGS } from '../meal/settings';
 
 /**
- * The lab's menu: the composer's settings (the Gemini key, a lab secret; the answer language),
- * kept by the caller; how the model is asked, as src/lab/meal/settings.ts says (the tool's too);
- * and the lab's logs and data.
+ * The lab's menu: the Gemini keys (the app's, the same section as its Settings: the lab asks
+ * with Key); the composer's settings (the answer language), kept by the caller; how the model
+ * is asked, as src/lab/meal/settings.ts says (the tool's too); and the lab's logs and data.
  */
 
 interface LabActions {
@@ -27,6 +28,7 @@ export function Menu(props: Parameters<typeof Settings>[0] & LabActions) {
         </button>
       </header>
       <main class="form">
+        <GeminiKeys />
         <Settings {...settings} />
         <section class="section">
           <h2 class="label">Lab</h2>
@@ -53,55 +55,17 @@ export function Menu(props: Parameters<typeof Settings>[0] & LabActions) {
 }
 
 function Settings({
-  keyValue,
-  setKey,
   language,
   setLanguage,
 }: {
-  keyValue: string;
-  setKey: (k: string) => void;
   language: string;
   setLanguage: (language: string) => void;
 }) {
   const [languageText, setLanguageText] = useState(language);
-  const [text, setText] = useState('');
 
   return (
     <section class="section">
       <h2 class="label">Settings</h2>
-      {keyValue ? (
-        <div class="actions">
-          <span class="grow muted">Gemini key saved on this device (…{keyValue.slice(-4)})</span>
-          <button type="button" class="button" onClick={() => setKey('')}>
-            Forget
-          </button>
-        </div>
-      ) : (
-        <form
-          class="actions"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const k = text.trim();
-            if (!k) return;
-            setKey(k);
-            setText('');
-          }}
-        >
-          <input
-            id="composer-key"
-            class="input grow"
-            type="password"
-            autoComplete="off"
-            aria-label="Gemini key"
-            placeholder="Paste your key from Google AI Studio"
-            value={text}
-            onInput={(e) => setText(e.currentTarget.value)}
-          />
-          <button type="submit" class="button primary">
-            Save
-          </button>
-        </form>
-      )}
       <label class="field">
         <span class="label">Answer language</span>
         <input

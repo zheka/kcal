@@ -16,8 +16,10 @@ and what comes next.
   that changed (Retry after a failure, with a short note why). An update brings a new answer, and
   the user's answers start again. Attaching prepares each thing at once: a photo is shrunk and kept,
   a barcode is looked up on Open Food Facts (a popup when it can't be, and nothing is attached).
-- **Menu:** the Gemini key and the answer language (a code, `ru` by default); how the model is
-  asked, as `src/lab/meal/settings.ts` says (model, thinking, retries: the tool's settings, not
+- **Menu:** the Gemini keys, the app's own (the same section as the app's Settings, editing the
+  same keys, `src/ai/keys.ts`: the lab asks with Key, read just before each update, so a key set
+  or forgotten meanwhile is the one used; it reads and writes nothing else of the app's); the
+  answer language (a code, `ru` by default); how the model is asked, as `src/lab/meal/settings.ts` says (model, thinking, retries: the tool's settings, not
   the user's); Download logs, Clear logs, Clear all lab data; the build.
 
 ## Requests
@@ -47,7 +49,7 @@ lose it.
 
 ## Logs
 
-One entry per update that sent something (none for "no API key" or offline); the download is the
+One entry per update that sent something (none for no Gemini key or offline); the download is the
 entries as a JSON array, oldest first. No key, no image data, no meals.
 
 ```jsonc

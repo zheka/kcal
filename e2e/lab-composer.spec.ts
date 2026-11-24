@@ -46,9 +46,9 @@ const reply = (answer: object) => ({
 
 async function saveKey(page: Page) {
   await page.getByRole('button', { name: 'Menu' }).click();
-  await page.getByLabel('Gemini key').fill('test-key');
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('Gemini key saved on this device')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Key', exact: true }).fill('test-key');
+  await page.getByRole('button', { name: 'Save key', exact: true }).click();
+  await expect(page.getByText('Saved on this device (…-key)')).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 }
 
@@ -186,7 +186,7 @@ test('a failed update keeps the meal, says why, and can be retried; logs both', 
 
   // no key: nothing is sent, nothing logged
   await page.getByRole('button', { name: 'Update' }).click();
-  await expect(page.getByText('Couldn’t update: no API key')).toBeVisible();
+  await expect(page.getByText('Couldn’t update: no Gemini key: set Key in the menu')).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
   await saveKey(page);
   await page.locator('.composed-row').first().click();

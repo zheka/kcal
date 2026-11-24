@@ -78,8 +78,8 @@ async function newMeal(page: Page, known: boolean) {
   }, CODE);
   await page.reload();
   await page.getByRole('button', { name: 'Menu' }).click();
-  await page.getByLabel('Gemini key').fill('test-key');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('textbox', { name: 'Key', exact: true }).fill('test-key');
+  await page.getByRole('button', { name: 'Save key', exact: true }).click();
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'New meal' }).click();
 

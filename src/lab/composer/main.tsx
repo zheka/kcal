@@ -1,9 +1,10 @@
 /**
  * The meal composer experiment (lab/index.html): compose a meal from photos, text and barcodes,
  * update it from the whole context (prompt v5, the request of the command-line tool:
- * src/lab/meal), answer its questions on the phone. Never touches the app's data; keeps its
- * meals, photos, key and logs in the lab (kcal-lab-composer). The meal screen is meant to become
- * the app's; the menu holds the lab's settings and logs.
+ * src/lab/meal), answer its questions on the phone. Never touches the app's data; asks Gemini with
+ * the app's Key (src/ai/keys.ts, edited in the menu as in the app's Settings) and keeps its
+ * meals, photos and logs in the lab (kcal-lab-composer). The meal screen is meant to become the
+ * app's; the menu holds the lab's settings and logs.
  */
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
@@ -11,6 +12,7 @@ import '@fontsource-variable/roboto/wght.css';
 import '../../style.css';
 import './composer.css';
 import { newId } from '../../core/foods';
+import { readKey } from '../../ai/keys';
 import { MenuIcon } from '../../ui/icons';
 import { gemini } from '../../ai/gemini';
 import { toBase64 } from '../../ai/image';
@@ -24,18 +26,16 @@ import { MealScreen } from './MealScreen';
 import { Menu } from './Menu';
 import type { ComposedMeal } from './types';
 
-/** The Gemini key's name among the lab's secrets. */
-const KEY = 'gemini';
+/** The key the lab kept before it used the app's: forgotten on start. */
+const OLD_KEY = 'gemini';
 
 interface Props {
   lab: Lab<ComposerData>;
   initial: ComposerData;
-  initialKey: string;
 }
 
-function Composer({ lab, initial, initialKey }: Props) {
+function Composer({ lab, initial }: Props) {
   const [data, setData] = useState(initial);
-  const [key, setKeyState] = useState(initialKey);
   const [storeError, setStoreError] = useState('');
   const [screen, setScreen] = useState<{ meal: string } | 'menu' | 'list'>('list');
   const [cleared, setCleared] = useState(false);
@@ -48,10 +48,6 @@ function Composer({ lab, initial, initialKey }: Props) {
     lab.data.set(data).catch(fail('save'));
   }, [lab, data, initial]);
 
-  const setKey = (next: string) => {
-    setKeyState(next);
-    lab.setSecret(KEY, next).catch(fail('keep the key'));
-  };
   /** Changes a meal as it is by then. */
   const change = (id: string, update: (meal: ComposedMeal) => ComposedMeal) =>
     setData((d) => {
@@ -69,6 +65,14 @@ function Composer({ lab, initial, initialKey }: Props) {
     };
     let response = null;
     let notSent: string | undefined;
+    // The key as it is now: set or forgotten meanwhile, in the menu or the app.
+    const key = await readKey('gemini');
+    if (!key) {
+      change(meal.id, (m) =>
+        applyUpdate(m, meal.context, null, 'no Gemini key: set Key in the menu'),
+      );
+      return;
+    }
     try {
       response = await run(request, {
         send: gemini(key, photo, SETTINGS.timeoutMs),
@@ -97,8 +101,6 @@ function Composer({ lab, initial, initialKey }: Props) {
   if (screen === 'menu') {
     return (
       <Menu
-        keyValue={key}
-        setKey={setKey}
         language={data.language}
         setLanguage={(language) => setData((d) => ({ ...d, language }))}
         downloadLogs={() => void lab.download().catch(fail('download the logs'))}
@@ -189,11 +191,9 @@ function Composer({ lab, initial, initialKey }: Props) {
 async function start(root: HTMLElement): Promise<void> {
   try {
     const lab = await openLab<ComposerData>('composer');
-    const [stored, key] = await Promise.all([lab.data.get(), lab.secret(KEY)]);
-    render(
-      <Composer lab={lab} initial={stored ? fromStored(stored) : EMPTY} initialKey={key ?? ''} />,
-      root,
-    );
+    void lab.setSecret(OLD_KEY, '').catch(() => {});
+    const stored = await lab.data.get();
+    render(<Composer lab={lab} initial={stored ? fromStored(stored) : EMPTY} />, root);
   } catch (err) {
     render(
       <main class="app lab-composer">

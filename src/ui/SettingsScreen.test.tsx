@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { appData, egg } from '../core/testData';
 import { createStore } from '../state/store';
 import { DB_NAME } from '../data/db';
-import { resetKeys } from '../state/keys';
+import { resetKeys } from '../ai/keys';
 import { SettingsScreen } from './SettingsScreen';
 
 afterEach(async () => {
