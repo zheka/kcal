@@ -17,10 +17,11 @@ and what comes next.
   the user's answers start again. Attaching prepares each thing at once: a photo is shrunk and kept,
   a barcode is looked up on Open Food Facts (a popup when it can't be, and nothing is attached).
 - **Menu:** the Gemini keys, the app's own (the same section as the app's Settings, editing the
-  same keys, `src/ai/keys.ts`: the lab asks with Key, read just before each update, so a key set
-  or forgotten meanwhile is the one used; it reads and writes nothing else of the app's); the
-  answer language (a code, `ru` by default); how the model is asked, as `src/lab/meal/settings.ts` says (model, thinking, retries: the tool's settings, not
-  the user's); Download logs, Clear logs, Clear all lab data; the build.
+  same keys, `src/ai/keys.ts`: the lab asks with Key, or Key 2 when there is no Key, read
+  before each try, so a key set or forgotten meanwhile is the one used; it reads and writes
+  nothing else of the app's); the answer language (a code, `ru` by default); how the model is
+  asked, as `src/lab/meal/settings.ts` says (model, thinking, how long it may take: the tool's
+  settings, not the user's); Download logs, Clear logs, Clear all lab data; the build.
 
 ## Requests
 
@@ -40,12 +41,11 @@ description, brands, categories, ingredients, pack and serving sizes) and the la
 track per 100 g or ml (kcal, protein, fat, carbs). A busy or unreachable Open Food Facts is tried
 again after 1 s and 3 s, each try given 8 s.
 
-Requests are built provider-neutral (`src/ai/model.ts`); `src/ai/gemini.ts` turns them into
-Gemini's and reads Gemini's reply back. Retries and the timeout are the tool's and the bench's
-(`settings.ts`): a busy Gemini (429, 500, 503, 504), one that doesn't answer within 120 s, or one
-that can't be reached, is tried again after 5, 15, 30, 60 and 120 s. Long for a phone, but the
-lab is a test as much as the bench is: a busy minute (503s at a busy hour are common) shouldn't
-lose it.
+Requests are built provider-neutral and asked of Gemini (`src/ai/`, see [ai.md](ai.md)) with
+the tool's and the bench's urgency (`settings.ts`): no target, so Key 2 is never spent, and
+given up after 5 minutes. Within that Gemini tries a busy model again (its retries:
+ai.md, Gemini now). Long for a phone, but the lab is a test as much as the bench is: a busy
+minute (503s at a busy hour are common) shouldn't lose it.
 
 ## Logs
 
@@ -63,7 +63,7 @@ entries as a JSON array, oldest first. No key, no image data, no meals.
     "content": [
       // in order
       { "text": "answer language: ru\ntime: 13:00\n…" },
-      { "image": "<lab file id>" },
+      { "file": "<lab file id>" }, // a photo; before 2026-11-25: "image"
       { "text": "вареники" },
       { "text": "{\"code\":\"…\",\"language\":\"de\",\"names\":{\"de\":\"…\"},…}" },
       { "text": "Before answering, check: …" },
@@ -74,8 +74,12 @@ entries as a JSON array, oldest first. No key, no image data, no meals.
     "model": "gemini-3.5-flash-lite", // as answered (an alias resolved)
     "stop": "end", // end | max_tokens | safety | other: <reason>
     "tokens": { "input": 2100, "output": 900, "thinking": 640 },
-    "ms": 8123, // the last try
-    "retried": ["Gemini 503: …"], // busy tries before it, if any
+    "ms": 8123, // from asking to the answer, waits included
+    "attempts": [
+      // each try, in order (before 2026-11-25: "retried", the busy errors, and ms the last try)
+      { "key": "key", "ms": 312, "error": "Gemini 503: …" },
+      { "key": "key", "ms": 2790 },
+    ],
     "answer": {}, // when the answer is JSON: the model's, as it came
     "undecoded": ["…"], // the answer's text parts as received, when not JSON
     "error": "…", // why there's no usable answer, when there isn't

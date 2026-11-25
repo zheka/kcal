@@ -156,7 +156,7 @@ test('composes a meal from its attached context, answers it locally, updates it 
       instructions: expect.stringContaining('You recognize what was eaten'),
       content: [
         { text: expect.stringContaining('answer language: ru') },
-        { image: expect.any(String) },
+        { file: expect.any(String) },
         { text: 'вареники' },
         { text: expect.stringContaining('Before answering, check') },
       ],

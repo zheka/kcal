@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ModelError, run, type ModelRequest, type Reply } from './model';
+import { ModelError, run, type ModelRequest } from './model';
+import type { Answered, Provider } from './provider';
 
 const REQUEST: ModelRequest = {
   model: 'm',
@@ -8,42 +9,56 @@ const REQUEST: ModelRequest = {
   config: { schema: {}, temperature: null, thinking: 'default' },
 };
 const ABOUT = { model: 'm-001', stop: 'end', tokens: { input: 10, output: 5 } };
-const reply = (...text: string[]): Reply => ({ ...ABOUT, text });
+const ONE = [{ key: 'key', ms: 80 }];
+const reply = (...text: string[]): Answered => ({ ...ABOUT, text, attempts: ONE });
 const noCheck = () => [];
-// a clock that moves 100 ms per reading, and waits that take no time
+// a clock that moves 100 ms per reading
 const clock = () => {
   let t = 0;
   return () => (t += 100);
 };
-const go = (send: () => Promise<Reply>, more: Partial<Parameters<typeof run>[1]> = {}) =>
+const provider = (ask: () => Promise<Answered>): Provider => ({ ask });
+const go = (ask: () => Promise<Answered>, more: Partial<Parameters<typeof run>[1]> = {}) =>
   run(REQUEST, {
-    send,
+    provider: provider(ask),
+    urgency: { targetMs: 10_000, limitMs: 40_000 },
+    files: async () => null,
     check: noCheck,
-    delays: [5_000, 15_000],
-    wait: async () => {},
     now: clock(),
     ...more,
   });
 
 describe('running a request', () => {
-  it('gives the answer decoded, with what the reply says', async () => {
+  it('gives the answer decoded, with what the reply says and its tries', async () => {
     expect(await go(async () => reply('{"a":', '1}'))).toEqual({
       ...ABOUT,
       ms: 100,
+      attempts: ONE,
       answer: { a: 1 },
     });
+  });
+
+  it('asks the provider with the urgency, files, progress and signal as given', async () => {
+    const ask = vi.fn(async () => reply('{}'));
+    const files = async () => null;
+    const onProgress = () => {};
+    const signal = new AbortController().signal;
+    const urgency = { targetMs: Infinity, limitMs: 1000 };
+    await run(REQUEST, { provider: { ask }, urgency, files, onProgress, signal, check: noCheck });
+    expect(ask).toHaveBeenCalledWith(REQUEST, { urgency, files, onProgress, signal });
   });
 
   it('keeps text parts that aren’t JSON as they came', async () => {
     expect(await go(async () => reply('{"a":', '1'))).toEqual({
       ...ABOUT,
       ms: 100,
+      attempts: ONE,
       undecoded: ['{"a":', '1'],
       error: 'answer isn’t JSON',
     });
-    expect(await go(async () => ({ ...ABOUT, stop: 'safety', text: [] }))).toMatchObject({
-      error: 'no answer: safety',
-    });
+    expect(
+      await go(async () => ({ ...ABOUT, stop: 'safety', text: [], attempts: ONE })),
+    ).toMatchObject({ error: 'no answer: safety' });
   });
 
   it('keeps an answer that doesn’t fit the schema, saying why it isn’t used', async () => {
@@ -54,38 +69,21 @@ describe('running a request', () => {
     });
   });
 
-  it('tries a busy model again, listing what it said', async () => {
-    const send = vi
-      .fn<() => Promise<Reply>>()
-      .mockRejectedValueOnce(new ModelError('Gemini 503: overloaded', { sent: true, busy: true }))
-      .mockResolvedValueOnce(reply('{}'));
-    const onRetry = vi.fn();
-    expect(await go(send, { onRetry })).toEqual({
-      ...ABOUT,
-      ms: 100,
-      retried: ['Gemini 503: overloaded'],
-      answer: {},
+  it('gives the provider’s error, with what came back and the tries', async () => {
+    const attempts = [
+      { key: 'key', ms: 50, error: 'Gemini 503: overloaded' },
+      { key: 'key', ms: 60, error: 'Gemini 400: bad' },
+    ];
+    const bad = new ModelError('Gemini 400: bad', {
+      sent: true,
+      reply: { model: 'm-001' },
+      attempts,
     });
-    expect(onRetry).toHaveBeenCalledWith(2, 3, 5000);
-  });
-
-  it('gives up after the last try, and at once on other errors', async () => {
-    const busy = new ModelError('Gemini 503: overloaded', { sent: true, busy: true });
-    expect(
-      await go(async () => {
-        throw busy;
-      }),
-    ).toEqual({
-      ms: 100,
-      retried: ['Gemini 503: overloaded', 'Gemini 503: overloaded'],
-      error: 'Gemini 503: overloaded',
-    });
-    const bad = new ModelError('Gemini 400: bad', { sent: true, reply: { model: 'm-001' } });
     expect(
       await go(async () => {
         throw bad;
       }),
-    ).toEqual({ model: 'm-001', ms: 100, error: 'Gemini 400: bad' });
+    ).toEqual({ model: 'm-001', ms: 100, attempts, error: 'Gemini 400: bad' });
   });
 
   it('gives nothing to log when nothing was sent, saying why', async () => {
@@ -93,11 +91,11 @@ describe('running a request', () => {
     expect(
       await go(
         async () => {
-          throw new ModelError('no API key', { sent: false });
+          throw new ModelError('no Gemini key', { sent: false });
         },
         { notSent },
       ),
     ).toBeNull();
-    expect(notSent).toHaveBeenCalledWith('no API key');
+    expect(notSent).toHaveBeenCalledWith('no Gemini key');
   });
 });

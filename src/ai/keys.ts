@@ -62,3 +62,9 @@ export function resetKeys(): void {
   loading = undefined;
   keys.value = undefined;
 }
+
+/** The Gemini keys as stored now, for the tab's Gemini (src/ai/browser.ts). */
+export async function geminiKeys(): Promise<{ key: string; key2: string }> {
+  const [key, key2] = await Promise.all([readKey('gemini'), readKey('gemini-2')]);
+  return { key, key2 };
+}

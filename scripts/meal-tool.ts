@@ -2,7 +2,8 @@
  * The meal composer's request, run locally: inputs (photos, texts, barcodes, product JSON) in,
  * the model's answer and what the code makes of it out, as one entry (the lab's log entry, with
  * the code's side added). The lab's own code does the work (src/lab/meal, src/ai); this file
- * only does what the browser would: shrink photos (sharp), look up barcodes, keep to the quota.
+ * only does what the browser would: shrink photos (sharp), look up barcodes, give Gemini its keys
+ * (from the environment).
  * Used by scripts/meal.ts (one meal) and scripts/meal-bench.ts (tests).
  */
 import { execSync } from 'node:child_process';
@@ -10,16 +11,14 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, resolve } from 'node:path';
 import sharp from 'sharp';
 import { lookUpBarcode } from '../src/data/openFoodFacts.ts';
-import { gemini } from '../src/ai/gemini.ts';
-import { type ModelRequest, type ModelResponse, type Reply, run } from '../src/ai/model.ts';
+import { createGemini } from '../src/ai/gemini/index.ts';
+import { type ModelRequest, type ModelResponse, run } from '../src/ai/model.ts';
+import type { Progress, Provider } from '../src/ai/provider.ts';
 import { type Processed, process as processMeal } from '../src/lab/meal/process.ts';
 import { type Meal, readMeal } from '../src/lab/meal/read.ts';
 import { type Input, mealRequest } from '../src/lab/meal/request.ts';
 import { SETTINGS } from '../src/lab/meal/settings.ts';
 import { textView } from '../src/lab/meal/view.ts';
-
-// The lab's code checks navigator.onLine before a request; Node has no such thing.
-Object.defineProperty(globalThis.navigator, 'onLine', { value: true, configurable: true });
 
 export const PROMPT_FILE = 'src/lab/meal/prompt.md';
 
@@ -83,9 +82,6 @@ export function readTest(file: string): Test {
 /** A brief note on what's going on, so a long wait has a reason (--verbose). */
 export type Hint = (text: string) => void;
 
-/** Sends a request, with hints on the way. */
-export type Send = (r: ModelRequest, hint?: Hint) => Promise<Reply>;
-
 /** Inputs as the request takes them: barcodes looked up, product files read. */
 export async function inputs(list: Given[], language: string, hint?: Hint): Promise<Input[]> {
   const out: Input[] = [];
@@ -102,10 +98,10 @@ export async function inputs(list: Given[], language: string, hint?: Hint): Prom
   return out;
 }
 
-const shrunk = new Map<string, Promise<{ type: string; base64: string }>>();
+const shrunk = new Map<string, Promise<Blob>>();
 
-/** A photo as the lab sends it (SETTINGS.photo): upright, shrunk, JPEG. */
-export function photoData(path: string): Promise<{ type: string; base64: string }> {
+/** A photo (by its path) as the lab sends it (SETTINGS.photo): upright, shrunk, JPEG. */
+export function photoFile(path: string): Promise<Blob> {
   let p = shrunk.get(path);
   if (!p) {
     p = sharp(path)
@@ -116,40 +112,30 @@ export function photoData(path: string): Promise<{ type: string; base64: string 
       })
       .jpeg({ quality: SETTINGS.photo.quality })
       .toBuffer()
-      .then((b) => ({ type: 'image/jpeg', base64: b.toString('base64') }));
+      .then((b) => new Blob([new Uint8Array(b)], { type: 'image/jpeg' }));
     shrunk.set(path, p);
   }
   return p;
 }
 
 /**
- * At most SETTINGS.perMinute sends in any 60 s, retries included, across all sent through it;
- * hints when it waits, and as it sends.
+ * Gemini with the keys from the environment: GEMINI_API_KEY (Key, cheap) and GEMINI_API_KEY_2
+ * (Key 2, reliable), either or both; null when neither is set. One per process, so its pace
+ * holds across a bench's requests.
  */
-export function limited(send: (r: ModelRequest) => Promise<Reply>): Send {
-  const n = SETTINGS.perMinute;
-  const sent: number[] = [];
-  let turn = Promise.resolve();
-  const slot = (hint?: Hint) => {
-    const mine = turn.then(async () => {
-      while (sent.length >= n) {
-        const wait = sent[0]! + 60_000 - Date.now();
-        if (wait <= 0) sent.shift();
-        else {
-          hint?.(`waiting ${Math.ceil(wait / 1000)} s for the quota (${n} a minute)…`);
-          await new Promise((r) => setTimeout(r, wait));
-        }
-      }
-      sent.push(Date.now());
-    });
-    turn = mine;
-    return mine;
-  };
-  return async (r, hint) => {
-    await slot(hint);
-    hint?.(`sent to ${r.model}, waiting for the answer…`);
-    return send(r);
-  };
+export function envGemini(): Provider | null {
+  const keys = { key: process.env.GEMINI_API_KEY ?? '', key2: process.env.GEMINI_API_KEY_2 ?? '' };
+  if (!keys.key && !keys.key2) return null;
+  return createGemini({ keys: async () => keys, online: () => true });
+}
+
+/** What Gemini is doing, as a hint. */
+function progressText({ why, waitMs }: Progress, model: string): string {
+  const s = Math.ceil(waitMs / 1000);
+  if (why === 'busy') return `busy; trying again in ${s} s…`;
+  if (why === 'quota') return `waiting ${s} s for the quota…`;
+  if (why === 'slow') return 'slow; asking Key 2 too…';
+  return `sent to ${model}, waiting for the answer…`;
 }
 
 /** A meal request and what came of it: the lab's log entry, with the code's side added. */
@@ -166,7 +152,7 @@ export interface Entry {
 }
 
 export interface Ask {
-  send: Send;
+  provider: Provider;
   language: string;
   now: Date;
   given: Given[];
@@ -182,10 +168,11 @@ export async function ask(a: Ask): Promise<Entry> {
     inputs: await inputs(a.given, a.language, a.hint),
   });
   const response = await run(request, {
-    send: (r) => a.send(r, a.hint),
+    provider: a.provider,
+    urgency: SETTINGS.urgency,
+    files: photoFile, // a photo's id is its path
     check: () => [], // the reader is forgiving: any JSON is read, its repairs flagged
-    delays: SETTINGS.retryDelaysMs,
-    onRetry: (attempt, of, ms) => a.hint?.(`busy; try ${attempt} of ${of} in ${ms / 1000} s…`),
+    onProgress: (p) => a.hint?.(progressText(p, request.model)),
   });
   a.hint?.(
     !response
@@ -215,7 +202,7 @@ export function processEntry(entry: Entry): Entry {
   return { ...rest, read, processed: processMeal(read.meal, entry.language) };
 }
 
-/** What came back, in a line: the model, the time, the tokens, the retries; or `not sent`. */
+/** What came back, in a line: the model, the time, the tokens, the tries; or `not sent`. */
 export function about(entry: Entry): string {
   const r = entry.response;
   if (!r) return 'not sent';
@@ -225,7 +212,7 @@ export function about(entry: Entry): string {
     r.tokens &&
       `tokens in ${r.tokens.input} out ${r.tokens.output} thinking ${r.tokens.thinking ?? 0}`,
     r.stop && `stop ${r.stop}`,
-    r.retried && `${r.retried.length} retried`,
+    r.attempts && r.attempts.length > 1 && `${r.attempts.length} tries`,
   ]
     .filter(Boolean)
     .join(', ');
@@ -242,7 +229,8 @@ export const mealText = (entry: Entry): string =>
 /** The settings a request is sent with, for --verbose. */
 export const settingsText = (language: string, now: Date): string =>
   `model ${SETTINGS.model}, thinking ${SETTINGS.thinking}, ` +
-  `temperature ${SETTINGS.temperature ?? 'default'}; ${SETTINGS.perMinute} requests a minute; ` +
+  `temperature ${SETTINGS.temperature ?? 'default'}; given up after ` +
+  `${SETTINGS.urgency.limitMs / 1000} s; ` +
   `photos ${SETTINGS.photo.maxSide} px, quality ${SETTINGS.photo.quality}\n` +
   `prompt ${PROMPT_FILE}, language ${language}, time ${now.toTimeString().slice(0, 5)}`;
 
@@ -285,6 +273,3 @@ export function givenText(g: Given): string {
   if ('barcode' in g) return `#${g.barcode}`;
   return `{${g.productFile.split('/').at(-1)}}`;
 }
-
-/** The Gemini sender, photos shrunk as the lab does. */
-export const geminiSend = (key: string) => gemini(key, photoData, SETTINGS.timeoutMs);

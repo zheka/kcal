@@ -1,7 +1,7 @@
 /**
  * Trying a request again after errors worth retrying (a busy or unreachable server), waiting
- * longer each time. Used for Open Food Facts lookups and the lab's model requests, each with its
- * own waits.
+ * longer each time. Used for Open Food Facts lookups; model requests have their provider's own
+ * (docs/ai.md).
  */
 export interface RetryOptions {
   /** The waits before each new try, in ms: their number is how many more tries there are. */

@@ -12,11 +12,11 @@ import '@fontsource-variable/roboto/wght.css';
 import '../../style.css';
 import './composer.css';
 import { newId } from '../../core/foods';
-import { readKey } from '../../ai/keys';
+import { gemini } from '../../ai/browser';
+import { geminiKeys } from '../../ai/keys';
 import { MenuIcon } from '../../ui/icons';
-import { gemini } from '../../ai/gemini';
-import { toBase64 } from '../../ai/image';
 import { run } from '../../ai/model';
+import type { Progress } from '../../ai/provider';
 import { SETTINGS } from '../meal/settings';
 import { clearLab } from '../storage/clear';
 import { openLab, type Lab } from '../storage/lab';
@@ -28,6 +28,15 @@ import type { ComposedMeal } from './types';
 
 /** The key the lab kept before it used the app's: forgotten on start. */
 const OLD_KEY = 'gemini';
+
+/** What the update is doing, for the meal screen. */
+function progressText({ why, waitMs }: Progress): string {
+  const s = Math.ceil(waitMs / 1000);
+  if (why === 'busy') return `The model is busy: trying again in ${s} s`;
+  if (why === 'quota') return `Keeping to the quota: sending in ${s} s`;
+  if (why === 'slow') return 'The model is slow: asking Key 2 too';
+  return 'Updating';
+}
 
 interface Props {
   lab: Lab<ComposerData>;
@@ -59,15 +68,13 @@ function Composer({ lab, initial }: Props) {
   async function update(meal: ComposedMeal, onBusy: (what: string) => void) {
     const time = new Date();
     const request = updateRequest(meal, time, data.language);
-    const photo = async (id: string) => {
-      const blob = await lab.files.get(id);
-      return blob ? { type: blob.type || 'image/jpeg', base64: await toBase64(blob) } : null;
-    };
+    // photos kept as shrunk (JPEG)
+    const files = async (id: string) => (await lab.files.get(id)) ?? null;
     let response = null;
     let notSent: string | undefined;
-    // The key as it is now: set or forgotten meanwhile, in the menu or the app.
-    const key = await readKey('gemini');
-    if (!key) {
+    // The keys as they are now: set or forgotten meanwhile, in the menu or the app.
+    const keys = await geminiKeys();
+    if (!keys.key && !keys.key2) {
       change(meal.id, (m) =>
         applyUpdate(m, meal.context, null, 'no Gemini key: set Key in the menu'),
       );
@@ -75,11 +82,11 @@ function Composer({ lab, initial }: Props) {
     }
     try {
       response = await run(request, {
-        send: gemini(key, photo, SETTINGS.timeoutMs),
+        provider: gemini,
+        urgency: SETTINGS.urgency,
+        files,
         check: checkAnswer,
-        delays: SETTINGS.retryDelaysMs,
-        onRetry: (attempt, of, delay) =>
-          onBusy(`The model is busy: trying again in ${delay / 1000} s (${attempt} of ${of})`),
+        onProgress: (p) => onBusy(progressText(p)),
         notSent: (why) => (notSent = why),
       });
     } catch (err) {

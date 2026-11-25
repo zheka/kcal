@@ -7,7 +7,8 @@ all data stays on the device (`localStorage`).
 Live: https://zheka.github.io/kcal/
 
 See [docs/design.md](docs/design.md) for the design and decisions, and
-[docs/barcodes.md](docs/barcodes.md) for the open discussion of barcodes and packs, and
+[docs/barcodes.md](docs/barcodes.md) for the open discussion of barcodes and packs,
+[docs/ai.md](docs/ai.md) for how a model is asked (tasks, providers, keys, retries), and
 [docs/lab.md](docs/lab.md) for the AI experiment in the lab.
 
 ## Development
@@ -116,8 +117,9 @@ src/lab/
   storage/        openLab(id): an experiment's own IndexedDB database, kcal-lab-<id>, with
                   one data object, files (photos), secrets (never downloaded) and logs (the
                   download); clearLab(): deletes every kcal-lab-* database
-  ai/             model requests and replies, provider-neutral (model.ts), and Gemini
-                  (gemini.ts); shrinking photos to send
+  ai/             (src/ai/) model requests and replies, provider-neutral (model.ts,
+                  provider.ts), and Gemini (gemini/: its wire, plan and keys), see
+                  docs/ai.md; shrinking photos to send
   meal/           the meal request with prompt v6: settings, prompt, schema, the forgiving
                   reader, processing (totals, questions) and the text view; pure, also run by
                   scripts/meal.ts (one meal from the command line) and scripts/meal-bench.ts,

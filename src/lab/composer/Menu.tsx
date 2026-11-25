@@ -84,8 +84,8 @@ function Settings({
         />
       </label>
       <p class="hint">
-        {SETTINGS.model}, thinking {SETTINGS.thinking}; up to {SETTINGS.retryDelaysMs.length} more
-        tries when it’s busy (src/lab/meal/settings.ts)
+        {SETTINGS.model}, thinking {SETTINGS.thinking}; Key only, tried again while it’s busy, up to{' '}
+        {SETTINGS.urgency.limitMs / 60_000} min (src/lab/meal/settings.ts)
       </p>
     </section>
   );

@@ -7,7 +7,7 @@ The rules come from 1,000 example meals ([lab-meal-examples.md](lab-meal-example
 from runs of prompts v4 and v5 on real meals.
 
 Status (2026-11-23): **prompt v6 written, to be run; the lab's screen sends it too**, the same
-request with the same settings, retries and timeout (the lab is a manual test, see lab.md).
+request with the same settings and urgency (the lab is a manual test, see lab.md).
 `src/lab/meal/prompt.md` (the system instruction), `settings.ts` (the model and its settings),
 `request.ts` (the context and the checklist), `schema.ts` (the schema's descriptions);
 `scripts/meal.ts` (the tool), `scripts/meal-bench.ts` (the bench). Prompt v5 (whole alternative
@@ -36,12 +36,12 @@ entry records them with the request.
   rules depend on thinking.
 - **No temperature.** Why: Google's guide says Gemini 3 models reason worse away from their
   default; prompt v3 sent 0.2.
-- **9 requests a minute**, retries included: under the free tier's 15 (the tool and the bench;
-  the lab sends one at a time, as tapped).
-- **Retries: 5 more tries after 5, 15, 30, 60 and 120 s**, for a busy Gemini (429, 500, 503,
-  504), one that doesn't answer within **120 s**, or can't be reached; the lab's too. Why: 503s
-  at a busy hour are common (run 5 lost 3 of 20 after these); a timed-out request is as worth
-  another try as a 503.
+- **Urgency: no target, given up after 5 minutes.** No target: Key 2 (paid) is never spent,
+  so runs are free and comparable. Within the 5 minutes Gemini (`src/ai/gemini/`, see
+  [ai.md](ai.md)) keeps to 9 tries a minute per key (under the free tier's 15), and tries a busy
+  Gemini (429, 500, 503, 504), one that doesn't answer within 120 s, or can't be reached, again
+  after 5, 15, 30, 60 and 120 s. Why: 503s at a busy hour are common (run 5 lost 3 of 20 before
+  these retries); a timed-out request is as worth another try as a 503.
 - **Photos at most 1024 px on the longer side, JPEG 85**, shrunk the same by the lab
   (`src/ai/image.ts`) and the tool (sharp). Why: enough to tell foods and portions apart,
   small enough to send quickly; the same, so the tool sees what the phone sends.
@@ -177,10 +177,11 @@ sizes, and a cutlet example turned meatballs into "котлеты".
 
 `scripts/meal.ts` sends one meal from the command line with the lab's own code (the prompt,
 schema, request, reader and processing; Gemini through `src/ai/gemini.ts`), and does only
-what the browser would: shrinks photos, looks up barcodes, keeps to the quota.
+what the browser would: shrinks photos, looks up barcodes, gives Gemini its keys (from the
+environment).
 
 ```
-GEMINI_API_KEY=… node scripts/meal.ts [--verbose] [--test=<file>] [--out=<file>] [<input>…]
+GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal.ts [--verbose] [--test=<file>] [--out=<file>] [<input>…]
 ```
 
 Kept to the minimum: what's needed to run a meal and keep what came of it; no tuning from the
@@ -198,8 +199,8 @@ command line (the model and its settings are `settings.ts`, the language `ru`, t
 - **`--verbose`:** on stderr, the settings first, brief notes on what it's waiting for (a lookup,
   the quota, the answer, a busy retry), and the stats at the end (time, tokens, dishes, items,
   questions, flags). Why: a request may wait minutes on a busy Gemini; the notes say why.
-- **Busy Gemini** (429, 5xx) is tried again after 5, 15, 30, 60, 120 s; each try times out after
-  120 s.
+- **Keys:** `GEMINI_API_KEY` (Key, cheap), `GEMINI_API_KEY_2` (Key 2, reliable), either or
+  both, as the app's (ai.md). A busy Gemini is tried again as the settings' urgency allows.
 
 ## The bench
 
@@ -207,14 +208,14 @@ command line (the model and its settings are `settings.ts`, the language `ru`, t
 another, and reports which failed. A test passes when a meal comes back; expectations come later.
 
 ```
-GEMINI_API_KEY=… node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
+GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
 ```
 
 - **Tests:** test files, or folders of them (their `*.json`, not subfolders, where a test's
   files can be); a test's id is its file name. A correction is more input in the same test. Why:
   no meal is sent back, so there are no steps.
 - **One at a time,** at a fixed time (13:00), so runs differ only by the model, the output is in
-  order, and the quota (the settings' 9 requests a minute) is no worse off: a run of 20 tests is
+  order, and the quota (Gemini's 9 tries a minute) is no worse off: a run of 20 tests is
   some 2–4 minutes.
 - **Output:** each failed test and why, and a summary (passed, failed, flags, questions asked,
   tokens, time); exit code 1 when any failed. `--verbose` adds each test's meal as text on

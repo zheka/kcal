@@ -2,7 +2,7 @@
  * One meal through the model, locally (the lab's own code, see scripts/meal-tool.ts): prints the
  * meal as text, and nothing else.
  *
- *   GEMINI_API_KEY=… node scripts/meal.ts [--verbose] [--test=<file>] [--out=<file>] [<input>…]
+ *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal.ts [--verbose] [--test=<file>] [--out=<file>] [<input>…]
  *     <input>    a photo file, a product JSON file (Open Food Facts data), a barcode, else a text;
  *                sent in the order given, after the test's
  *     --test     a test file (see readTest in meal-tool.ts): its inputs first
@@ -15,11 +15,10 @@
 import { parseArgs } from 'node:util';
 import {
   ask,
-  geminiSend,
+  envGemini,
   given,
   type Given,
   givenText,
-  limited,
   mealText,
   noMeal,
   readTest,
@@ -46,9 +45,9 @@ if (inputs.length === 0) {
   console.error('Give the meal: photos, texts, barcodes, product JSON files, or --test=<file>.');
   process.exit(1);
 }
-const key = process.env.GEMINI_API_KEY;
-if (!key) {
-  console.error('Set GEMINI_API_KEY.');
+const gemini = envGemini();
+if (!gemini) {
+  console.error('Set GEMINI_API_KEY (Key, cheap), GEMINI_API_KEY_2 (Key 2, reliable), or both.');
   process.exit(1);
 }
 
@@ -60,7 +59,7 @@ if (note) {
 }
 
 const entry = await ask({
-  send: limited(geminiSend(key)),
+  provider: gemini,
   language: LANGUAGE,
   now,
   given: inputs,

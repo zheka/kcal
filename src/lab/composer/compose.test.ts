@@ -47,7 +47,7 @@ describe('the update request', () => {
     const [context, ...rest] = request.content;
     expect((context as { text: string }).text).toContain('answer language: ru');
     expect(rest.slice(0, 3)).toEqual([
-      { image: 'file-a' },
+      { file: 'file-a' },
       { text: 'вареники' },
       { text: JSON.stringify(skyr) },
     ]);

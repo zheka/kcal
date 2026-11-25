@@ -39,7 +39,7 @@ describe('Gemini keys', () => {
     expect(screen.getByText('Saved on this device (…5678)')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Forget key' }));
-    await waitFor(() => expect(screen.getByPlaceholderText('Paste your Gemini key')).toBeTruthy());
+    await waitFor(() => expect(screen.getByPlaceholderText('Cheap Gemini key')).toBeTruthy());
     expect(screen.getByText('Saved on this device (…5678)')).toBeTruthy();
   });
 });

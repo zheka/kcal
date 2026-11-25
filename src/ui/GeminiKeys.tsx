@@ -3,7 +3,8 @@ import { type KeyName, keys, loadKeys, setKey } from '../ai/keys';
 
 /**
  * The Gemini keys, the user's own, kept on this device only (the app's IndexedDB, never in a
- * backup): Key, which the app and the lab ask with, and Key 2, kept for later. In the app's
+ * backup): Key, cheap (free tier), asked first, and Key 2, reliable (paid), spent only when a
+ * task needs its answer sooner than Key gives it (src/ai/gemini/). In the app's
  * Settings and the lab's menu alike, both editing the same keys.
  */
 export function GeminiKeys() {
@@ -11,14 +12,15 @@ export function GeminiKeys() {
   return (
     <section class="section">
       <h2 class="label">Gemini</h2>
-      <KeyField name="gemini" label="Key" />
-      <KeyField name="gemini-2" label="Key 2" />
+      <KeyField name="gemini" label="Key" placeholder="Cheap Gemini key" />
+      <KeyField name="gemini-2" label="Key 2" placeholder="Reliable Gemini key" />
     </section>
   );
 }
 
 /** One key: a field to paste it into, or its last four characters and Forget. */
-function KeyField({ name, label }: { name: KeyName; label: string }) {
+function KeyField(props: { name: KeyName; label: string; placeholder: string }) {
+  const { name, label, placeholder } = props;
   const key = keys.value?.[name];
   const [text, setText] = useState('');
   const [error, setError] = useState('');
@@ -70,7 +72,7 @@ function KeyField({ name, label }: { name: KeyName; label: string }) {
             class="input"
             type="password"
             autoComplete="off"
-            placeholder="Paste your Gemini key"
+            placeholder={placeholder}
             value={text}
             onInput={(e) => setText(e.currentTarget.value)}
           />

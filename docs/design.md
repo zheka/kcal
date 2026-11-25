@@ -383,11 +383,13 @@ screen stays about today.)_
 - Settings (a screen from the menu): the app itself. First **Backup**: Export and Import, what
   is saved (`Saved: 12 products, 3 recipes, 140 meals`), its size and the data format's version
   (`0.05 MB · data format kcal 0.2.0`), shown apart from the app's version, as the two change
-  independently. Then **Gemini**: the keys, **Key** and **Key 2**, the user's own: kept in the
-  app's IndexedDB database `kcal` (`src/data/db.ts`), never in a backup, sent only to Gemini.
-  Which model a task asks, with which thinking and temperature, is built in (`src/ai/tasks.ts`),
-  not a setting: each task's prompt is tuned to exactly that, so it changes through the bench
-  and a new build.
+  independently. Then **Gemini**: the keys, **Key** ("Cheap Gemini key": free tier, asked
+  first) and **Key 2** ("Reliable Gemini key": paid, spent only when a task needs its answer
+  sooner), the user's own: kept in the app's IndexedDB database `kcal` (`src/data/db.ts`),
+  never in a backup, sent only to Gemini. Which model a task asks, with which thinking and
+  temperature, and how soon it needs the answer, is built in (`src/ai/tasks.ts`), not a
+  setting: each task's prompt is tuned to exactly that, so it changes through the bench and a
+  new build. How the keys and retries serve that: [ai.md](ai.md).
 
 ## Technical design
 

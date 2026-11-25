@@ -1,16 +1,16 @@
-import { withRetries } from '../data/retry.ts';
+import type { Attempt, AskOptions, Provider } from './provider.ts';
 
 /**
  * A model request and its outcome, the same whatever the provider: what a task builds (the
- * lab's meal, the app's), what the lab logs, what an adapter (gemini.ts) turns into its
- * provider's own request and back.
+ * lab's meal, the app's), what the lab logs, what a provider (provider.ts; gemini/) turns into
+ * its service's own request and back.
  */
 
 /**
- * One part of the request's content, in order: text, or a photo by an id the sender resolves
- * (gemini.ts, PhotoData), so a request, as logged, never holds a photo's data.
+ * One part of the request's content, in order: text, or a file (a photo, say) by an id the
+ * caller's FileSource resolves (provider.ts), so a request, as logged, never holds a file's data.
  */
-export type Part = { text: string } | { image: string };
+export type Part = { text: string } | { file: string };
 
 /**
  * How the model answers: the answer's schema, Google's OpenAPI subset unless `schemaFormat` is
@@ -49,10 +49,10 @@ export interface Reply {
 
 /**
  * A request that got no usable reply. `sent`: it reached the provider (or was on its way), so
- * it is logged; `busy`: worth trying again a little later; `reply`: what came back anyway.
+ * it is logged; `reply`: what came back anyway; `attempts`: the tries it took.
  */
 export class ModelError extends Error {
-  readonly options: { sent: boolean; busy?: boolean; reply?: Omit<Reply, 'text'> };
+  readonly options: { sent: boolean; reply?: Omit<Reply, 'text'>; attempts?: Attempt[] };
   constructor(message: string, options: ModelError['options']) {
     super(message);
     this.options = options;
@@ -64,10 +64,10 @@ export interface ModelResponse {
   model?: string;
   stop?: string;
   tokens?: Reply['tokens'];
-  /** From sending to the whole reply, of the last try. */
+  /** From asking to the answer (or giving up): every try and wait included. */
   ms: number;
-  /** The busy errors of the tries before, when there were any. */
-  retried?: string[];
+  /** Each try, in order (provider.ts, Attempt). */
+  attempts?: Attempt[];
   /** The answer, when it is JSON (whether it fits the schema or not). */
   answer?: unknown;
   /** The answer's text parts as received, when they aren't JSON. */
@@ -76,52 +76,31 @@ export interface ModelResponse {
   error?: string;
 }
 
-export interface RunOptions {
-  /** Sends the request (an adapter, with its key and photos), timing out by itself. */
-  send: (request: ModelRequest) => Promise<Reply>;
+export interface RunOptions extends AskOptions {
+  provider: Provider;
   /** What doesn't fit the answer's shape, if anything: then the answer isn't usable. */
   check: (answer: unknown) => string[];
-  /** A busy provider: which try comes next, of how many, after how long. */
-  onRetry?: (attempt: number, of: number, delayMs: number) => void;
   /** Nothing was sent (no key, offline): why. */
   notSent?: (why: string) => void;
-  wait?: (ms: number) => Promise<void>;
   now?: () => number;
-  /** The waits before each new try of a busy provider: their number is how many more tries. */
-  delays: readonly number[];
 }
 
 /**
- * Sends the request, again after a busy provider (`delays`), and reads the answer: JSON
- * that fits `check`. Null when nothing was sent (no key, offline): nothing to log then. A
- * response with `error` has no usable answer.
+ * Asks the provider (which tries as often as the urgency allows) and reads the answer: JSON
+ * that fits `check`. A usable reply is never asked again: an answer that doesn't fit is the
+ * prompt's problem, not the provider's. Null when nothing was sent (no key, offline): nothing
+ * to log then. A response with `error` has no usable answer.
  */
 export async function run(
   request: ModelRequest,
   options: RunOptions,
 ): Promise<ModelResponse | null> {
-  const { send, check, onRetry, notSent, wait, now = () => performance.now(), delays } = options;
-  const retried: string[] = [];
-  const also = () => (retried.length > 0 ? { retried } : {});
-  let started = 0;
+  const { provider, check, notSent, now = () => performance.now(), ...ask } = options;
+  const started = now();
   const ms = () => Math.round(now() - started);
-  let reply: Reply;
+  let answered;
   try {
-    reply = await withRetries(
-      () => {
-        started = now();
-        return send(request);
-      },
-      {
-        delays,
-        retriable: (err) => err instanceof ModelError && !!err.options.busy,
-        onRetry: (err, attempt, of, delay) => {
-          retried.push(err instanceof Error ? err.message : String(err));
-          onRetry?.(attempt, of, delay);
-        },
-        ...(wait && { wait }),
-      },
-    );
+    answered = await provider.ask(request, ask);
   } catch (err) {
     const error = err instanceof ModelError ? err : null;
     if (error && !error.options.sent) {
@@ -131,13 +110,13 @@ export async function run(
     return {
       ...error?.options.reply,
       ms: ms(),
-      ...also(),
+      ...(error?.options.attempts && { attempts: error.options.attempts }),
       error: err instanceof Error ? err.message : String(err),
     };
   }
-  const { text, ...about } = reply;
-  const done = { ...about, ms: ms(), ...also() };
-  if (text.length === 0) return { ...done, error: `no answer: ${reply.stop ?? 'no text'}` };
+  const { text, ...about } = answered;
+  const done = { ...about, ms: ms() };
+  if (text.length === 0) return { ...done, error: `no answer: ${answered.stop ?? 'no text'}` };
   let answer: unknown;
   try {
     answer = JSON.parse(text.join(''));

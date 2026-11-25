@@ -3,7 +3,7 @@
  * tool's code, one after another, and reports which failed. A test passes when a meal comes back;
  * expectations come later.
  *
- *   GEMINI_API_KEY=… node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
+ *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
  *     <test>     a test file, or a folder of them (its *.json, not its subfolders)
  *     --repeat   each test N times (<test>-1, <test>-2, …), to tell a rule from chance
  *     --out      writes each test's everything (as scripts/meal.ts --out) to <dir>/<test>.json;
@@ -18,10 +18,9 @@ import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   ask,
+  envGemini,
   type Entry,
-  geminiSend,
   givenText,
-  limited,
   mealText,
   noMeal,
   readTest,
@@ -63,9 +62,9 @@ if (twice.length) {
   console.error(`Tests of the same name: ${[...new Set(twice)].join(', ')}.`);
   process.exit(1);
 }
-const key = process.env.GEMINI_API_KEY;
-if (!key) {
-  console.error('Set GEMINI_API_KEY.');
+const gemini = envGemini();
+if (!gemini) {
+  console.error('Set GEMINI_API_KEY (Key, cheap), GEMINI_API_KEY_2 (Key 2, reliable), or both.');
   process.exit(1);
 }
 
@@ -79,7 +78,6 @@ const runs = files.flatMap((file) =>
 note?.(settingsText(LANGUAGE, NOW));
 note?.(`${files.length} tests${repeat > 1 ? ` × ${repeat}` : ''}, one at a time\n`);
 
-const send = limited(geminiSend(key));
 const failed: string[] = [];
 const total = { flags: 0, asked: 0, input: 0, output: 0, thinking: 0 };
 const started = Date.now();
@@ -91,7 +89,7 @@ for (const { file, id } of runs) {
     note?.(`=== ${id}${test.description ? `: ${test.description}` : ''}`);
     note?.(`inputs ${test.given.map(givenText).join(' ')}`);
     entry = await ask({
-      send,
+      provider: gemini,
       language: LANGUAGE,
       now: NOW,
       given: test.given,

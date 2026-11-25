@@ -24,7 +24,7 @@ export function mealRequest(r: MealRequest): ModelRequest {
     'text' in i
       ? { text: i.text }
       : 'photo' in i
-        ? { image: i.photo }
+        ? { file: i.photo }
         : { text: JSON.stringify(i.product) },
   );
   return {
