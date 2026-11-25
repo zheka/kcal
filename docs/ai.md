@@ -157,10 +157,11 @@ each key; `gemini/index.ts` runs it, asking it again after every wait and every 
   at once. Never both: a request that pays anyway gains little from a free try beside it.
 - **A slow try is hedged:** a try on its way is waited for until the last moment another
   could still answer by the target (target − `ANSWER_MS`: 10 s in the app, 25 s in the lab,
-  never without a target); then the other key is asked too, the first answer taken and the
-  other try cancelled (`cancelled` in the log; a paid one cancelled is likely billed anyway).
-  Why not cut the slow try and switch: it costs the same paid try, and loses a free answer
-  that may be a second away. At most one try per key at once.
+  never without a target); then Key 2 is asked too, the first answer taken and the other try
+  cancelled (`cancelled` in the log; a paid one cancelled is likely billed anyway). Why not cut
+  the slow try and switch: it costs the same paid try, and loses a free answer that may be a
+  second away. At most one try per key at once, and Key never beside Key 2: in the bench runs
+  Key 2 never failed (0 of 28), and a free try beside it only spends Key's pace and quota.
 - **Within the limit:** no try starts with less than 5 s left; each may take 120 s at most,
   never past the limit.
 

@@ -9,7 +9,8 @@ import type { Urgency } from '../provider.ts';
  * whichever can start soonest (Key 2 on a tie before the target, Key on a tie past it). With no
  * target, Key 2 is never asked while there is a Key. A key the user left empty is never asked.
  * A try on its way is waited for until the last moment another could still answer by the target
- * (target − ANSWER_MS); then the other key is asked too (a hedge), the first answer taken.
+ * (target − ANSWER_MS); then Key 2 is asked too (a hedge), the first answer taken. Key is never
+ * asked beside Key 2: Key 2 doesn't fail, and a free try beside it only spends Key's quota.
  */
 
 /** The keys, as the user names them: Key (cheap, free tier), Key 2 (reliable, paid). */
@@ -95,7 +96,7 @@ export function nextStep({ urgency, elapsedMs: now, keys }: Situation): Step | n
   const asked: readonly KeyName[] =
     target === Infinity && keys.key.set ? ['key'] : NAMES.filter((n) => keys[n].set);
   const options = asked
-    .filter((name) => !keys[name].running)
+    .filter((name) => !keys[name].running && !(name === 'key' && keys.key2.running))
     .map((name) => ({ name, ...start(keys[name], now) }))
     .filter((o) => o.at + MIN_TRY_MS <= limit);
   if (options.length === 0) return running ? { waitMs: Infinity, why: 'answer' } : null;

@@ -236,12 +236,12 @@ describe('Gemini’s next step', () => {
     ],
     ['both on their way: wait', APP, 12_000, RUNNING, RUNNING, { waitMs: Infinity, why: 'answer' }],
     [
-      'Key 2 on its way (Key cooled), Key free again past 10 s: Key too',
+      'Key 2 on its way (Key cooled), Key free again past 10 s: wait for Key 2, not Key too',
       APP,
       11_000,
       READY,
       RUNNING,
-      { send: 'key', timeoutMs: 19_000 },
+      { waitMs: Infinity, why: 'answer' },
     ],
     [
       'Key on its way, Key 2 backing off: wait for whichever first',
