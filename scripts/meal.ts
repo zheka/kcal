@@ -5,7 +5,8 @@
  *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal.ts [--verbose] [--target=<s>] [--limit=<s>] [--test=<file>] [--out=<file>] [<input>…]
  *     <input>    a photo file, a product JSON file (Open Food Facts data), a barcode, else a text;
  *                sent in the order given, after the test's
- *     --test     a test file (see readTest in meal-tool.ts): its inputs first
+ *     --test     a test file (see readTest in meal-tool.ts): its inputs first; its time and
+ *                language, if it has them, instead of now and ru
  *     --out      writes everything (inputs, request, answer, what the code made of it) to this
  *                JSON file; nothing is written without it
  *     --target   the answer wanted within this many seconds (60), Key 2 spent if need be; `inf`:
@@ -59,16 +60,17 @@ if (!gemini) {
   process.exit(1);
 }
 
-const now = new Date();
+const now = test?.time?.(new Date()) ?? new Date();
+const language = test?.language ?? LANGUAGE;
 if (note) {
-  note(settingsText(LANGUAGE, now, urgency));
+  note(settingsText(language, now, urgency));
   if (args.test) note(`test ${args.test}${test?.description ? `: ${test.description}` : ''}`);
   note(`inputs ${inputs.map(givenText).join(' ')}`);
 }
 
 const entry = await ask({
   provider: gemini,
-  language: LANGUAGE,
+  language,
   now,
   given: inputs,
   urgency,

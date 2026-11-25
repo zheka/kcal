@@ -1,7 +1,7 @@
 /**
  * The meal composer's bench: runs tests (see readTest in scripts/meal-tool.ts) through the local
  * tool's code, one after another, and reports which failed. A test passes when a meal comes back;
- * expectations come later.
+ * expectations come later. Each at 13:00 in ru, unless the test says its time or language.
  *
  *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal-bench.ts [--verbose] [--target=<s>] [--limit=<s>] [--repeat=N] [--out=<dir>] <test>…
  *     <test>     a test file, or a folder of them (its *.json, not its subfolders)
@@ -35,7 +35,7 @@ import {
 } from './meal-tool.ts';
 
 const LANGUAGE = 'ru';
-/** A fixed time, so runs differ only by the model. */
+/** A fixed time (unless the test has its own), so runs differ only by the model. */
 const NOW = new Date('2026-11-22T13:00:00');
 
 const { values: args, positionals } = parseArgs({
@@ -94,12 +94,17 @@ for (const { file, id } of runs) {
   let entry: Entry;
   try {
     const test = readTest(file);
+    const now = test.time?.(NOW) ?? NOW;
+    const language = test.language ?? LANGUAGE;
     note?.(`=== ${id}${test.description ? `: ${test.description}` : ''}`);
+    if (test.time || test.language) {
+      note?.(`the test's: time ${now.toTimeString().slice(0, 5)}, language ${language}`);
+    }
     note?.(`inputs ${test.given.map(givenText).join(' ')}`);
     entry = await ask({
       provider: gemini,
-      language: LANGUAGE,
-      now: NOW,
+      language,
+      now,
       given: test.given,
       urgency,
       ...(note && { hint: note }),

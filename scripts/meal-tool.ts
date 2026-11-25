@@ -39,14 +39,22 @@ export function given(arg: string): Given {
 }
 
 /**
- * A test (a JSON file): what is hard about it, and the inputs in order.
- * Texts and barcodes are inline; files (photos, product JSON, text files) are paths relative to
- * the test file, or absolute.
+ * A test (a JSON file): what is hard about it, the inputs in order, and optionally the time and
+ * the answer language the request tells the model (else the tool's own). Other fields are
+ * ignored (a lab download's own section). Texts and barcodes are inline; files (photos, product
+ * JSON, text files) are paths relative to the test file, or absolute.
  *
- *   { "description": "…", "inputs": [{ "photo": "data/meatballs.jpg" }, { "text": "…" }] }
+ *   { "description": "…", "time": "08:10", "language": "ru",
+ *     "inputs": [{ "photo": "data/meatballs.jpg" }, { "text": "…" }] }
+ *
+ * `time`: `HH:MM`, or a date and time as ISO 8601 (`2026-11-25T08:10:31+01:00`), whose
+ * wall-clock time is sent as written, whatever the zone here.
  */
 export interface Test {
   description?: string;
+  /** The test's time, else undefined: the caller's own. */
+  time?: (base: Date) => Date;
+  language?: string;
   given: Given[];
 }
 
@@ -60,6 +68,8 @@ type TestInput =
 export function readTest(file: string): Test {
   const json = JSON.parse(readFileSync(file, 'utf8')) as {
     description?: string;
+    time?: string;
+    language?: string;
     inputs?: TestInput[];
   };
   if (!Array.isArray(json.inputs)) throw new Error(`${file}: no "inputs" list`);
@@ -76,7 +86,32 @@ export function readTest(file: string): Test {
     if ('textFile' in i) return { text: readFileSync(path(i.textFile), 'utf8').trim() };
     throw new Error(`${file}: an input of no known kind: ${JSON.stringify(i)}`);
   });
-  return { ...(json.description && { description: json.description }), given };
+  const time = json.time === undefined ? undefined : testTime(json.time);
+  if (time === null) throw new Error(`${file}: "time": HH:MM or ISO 8601, not ${json.time}`);
+  return {
+    ...(json.description && { description: json.description }),
+    ...(time && { time }),
+    ...(json.language && { language: json.language }),
+    given,
+  };
+}
+
+/**
+ * A test's time, as written (`HH:MM`, on the base's date; or an ISO 8601 date and time), at the
+ * same wall-clock time here: the model is told the time as the test says. Null when it isn't one.
+ */
+export function testTime(text: string): ((base: Date) => Date) | null {
+  const m =
+    /^(?:(\d{4})-(\d{2})-(\d{2})T)?(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.exec(
+      text,
+    );
+  if (!m || (m[1] === undefined && text.length !== 5)) return null;
+  const [h, min, sec] = [Number(m[4]), Number(m[5]), Number(m[6] ?? 0)];
+  if (h > 23 || min > 59 || sec > 59) return null;
+  return (base) =>
+    m[1] === undefined
+      ? new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, min, sec)
+      : new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), h, min, sec);
 }
 
 /** A brief note on what's going on, so a long wait has a reason (--verbose). */

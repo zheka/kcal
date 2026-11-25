@@ -188,14 +188,19 @@ GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal.ts [--verbose] [--te
 ```
 
 Kept to the minimum: what's needed to run a meal and keep what came of it; no tuning from the
-command line (the model and its settings are `settings.ts`, the language `ru`, the time now).
+command line (the model and its settings are `settings.ts`, the language `ru`, the time now,
+unless the test says its own).
 
 - **Inputs**, sent in the order given: a photo file, a product JSON file (Open Food Facts data),
   a barcode (looked up), else a text.
 - **`--test=<file>`:** a test's inputs, sent before any on the command line. A test is a JSON
-  file, `{ "description": "…", "inputs": [...] }`, the description saying what's hard about it;
-  texts (`text`) and barcodes (`barcode`) inline, files (`photo`, `product`, `textFile`) as paths
-  relative to the test file, or absolute.
+  file, `{ "description": "…", "time": "…", "language": "…", "inputs": [...] }`, the description
+  saying what's hard about it; texts (`text`) and barcodes (`barcode`) inline, files (`photo`,
+  `product`, `textFile`) as paths relative to the test file, or absolute. `time` and `language`
+  are optional: what the request tells the model, instead of the tool's. `time` is `HH:MM` or an
+  ISO 8601 date and time (`2026-11-25T08:10:31+01:00`, as the lab's download writes it); the
+  model is told its wall-clock time as written, whatever the zone the tool runs in. Other fields
+  are ignored. Why: a meal downloaded from the lab replays the request the lab sent.
 - **Output:** the meal as text on stdout, and nothing else; no meal, why on stderr and exit code 1.
 - **`--out=<file>`:** everything as one JSON file: the inputs, the request, the answer, the
   reader's meal and flags, the processed meal. Nothing is written without it.
@@ -217,8 +222,8 @@ GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal-bench.ts [--verbose]
 - **Tests:** test files, or folders of them (their `*.json`, not subfolders, where a test's
   files can be); a test's id is its file name. A correction is more input in the same test. Why:
   no meal is sent back, so there are no steps.
-- **One at a time,** at a fixed time (13:00), so runs differ only by the model, the output is in
-  order, and the quota (Gemini's 12 tries a minute on Key) is no worse off: a run of 20 tests is
+- **One at a time,** at a fixed time (13:00) and in `ru` unless a test has its own, so runs
+  differ only by the model, the output is in order, and the quota (Gemini's 12 tries a minute on Key) is no worse off: a run of 20 tests is
   some 2–4 minutes.
 - **Output:** each failed test and why, and a summary (passed, failed, flags, questions asked,
   tokens, time); exit code 1 when any failed. `--verbose` adds each test's meal as text on
