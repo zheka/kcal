@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { strFromU8, unzipSync } from 'fflate';
 import type { Page } from '@playwright/test';
 import { expect, expectNoHorizontalScroll, test } from './fixtures';
 
@@ -213,4 +214,65 @@ test('a failed update keeps the meal, says why, and can be retried; logs both', 
   await page.getByRole('button', { name: 'Close' }).click();
   expect((await downloadLogs(page)).logs).toEqual([]);
   await expect(page.locator('.composed-row')).toHaveCount(1);
+});
+
+test('downloads the meals as tests: the inputs, the photo as sent, the answer and choices', async ({
+  seeded: page,
+}) => {
+  const sent = await fakeGemini(page, () => reply(ANSWER));
+  await page.goto('lab/');
+  await saveKey(page);
+  await page.getByRole('button', { name: 'New meal' }).click();
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'meal.png', mimeType: 'image/png', buffer: PHOTO });
+  await page.getByLabel('What you eat').fill('вареники');
+  await page.getByRole('button', { name: 'Add' }).click();
+  await page.getByRole('button', { name: 'Update' }).click();
+  await page.getByRole('group', { name: 'how many' }).getByRole('button', { name: '14' }).click();
+  await expect(page.locator('.composed-item').first()).toContainText('14 × 45г');
+  await page.getByRole('button', { name: 'Close' }).click();
+  // a second meal, never answered
+  await page.getByRole('button', { name: 'New meal' }).click();
+  await page.getByLabel('What you eat').fill('чай');
+  await page.getByRole('button', { name: 'Add' }).click();
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: 'Menu' }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download meals' }).click();
+  const zip = await download;
+  expect(zip.suggestedFilename()).toMatch(/^kcal-lab-composer-meals-\d{4}-\d{2}-\d{2}\.zip$/);
+  const files = unzipSync(readFileSync(await zip.path()));
+  const tests = Object.keys(files).filter((f) => f.endsWith('.json') && !f.startsWith('data/'));
+  expect(tests).toHaveLength(2);
+  const meals = tests.map((f) => JSON.parse(strFromU8(files[f]!)) as Record<string, unknown>);
+  const done = meals.find((m) => 'time' in m)!;
+  const fresh = meals.find((m) => !('time' in m))!;
+
+  const photo = Object.keys(files).find((f) => f.startsWith('data/'))!;
+  expect(done).toEqual({
+    description: 'Обед',
+    time: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/),
+    language: 'ru',
+    inputs: [{ photo }, { text: 'вареники' }],
+    'lab-composer': {
+      meal: expect.any(String),
+      build: expect.any(String),
+      answer: ANSWER,
+      answers: [{ dish: 'Вареники', product: 'Вареники с картошкой', base: 'g', count: 14 }],
+    },
+  });
+  // the photo as sent to the model, named by its file id, as the logs' request names it
+  expect(Buffer.from(files[photo]!).toString('base64')).toBe(sent[0]!.parts[1]!.inline_data!.data);
+  await page.getByRole('button', { name: 'Close' }).click();
+  const { logs } = await downloadLogs(page);
+  const content = (logs[0]!.request as { content: { file?: string }[] }).content;
+  expect(photo).toBe(`data/${content[1]!.file}.jpg`);
+  expect(fresh).toEqual({
+    description: '',
+    language: 'ru',
+    inputs: [{ text: 'чай' }],
+    'lab-composer': { meal: expect.any(String) },
+  });
 });

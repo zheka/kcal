@@ -21,7 +21,8 @@ and what comes next.
   before each try, so a key set or forgotten meanwhile is the one used; it reads and writes
   nothing else of the app's); the answer language (a code, `ru` by default); how the model is
   asked, as `src/lab/meal/settings.ts` says (model, thinking, how long it may take: the tool's
-  settings, not the user's); Download logs, Clear logs, Clear all lab data; the build.
+  settings, not the user's); Download meals (as tests, below), Download logs, Clear logs, Clear
+  all lab data; the build.
 
 ## Requests
 
@@ -44,10 +45,50 @@ track per 100 g or ml (kcal, protein, fat, carbs). A busy or unreachable Open Fo
 again after 1 s and 3 s, each try given 8 s.
 
 Requests are built provider-neutral and asked of Gemini (`src/ai/`, see [ai.md](ai.md)) with
-the tool's and the bench's urgency (`settings.ts`): no target, so Key 2 is never spent, and
-given up after 5 minutes. Within that Gemini tries a busy model again (its retries:
-ai.md, Gemini now). Long for a phone, but the lab is a test as much as the bench is: a busy
-minute (503s at a busy hour are common) shouldn't lose it.
+the lab's urgency (`settings.ts`): an answer by 30 s, Key 2 asked when Key can't make it, given
+up after 90 s. Within that Gemini tries a busy model again (its retries and keys: ai.md).
+
+## Meals as tests
+
+Download meals saves every meal with something attached as a test for the command-line tool and
+the bench (see [lab-meal-prompt.md](lab-meal-prompt.md), The tool), all in one zip,
+`kcal-lab-composer-meals-<date>.zip` (`src/lab/composer/export.ts`). Unpacked, it is a folder the
+bench runs as it is: `<meal id>.json` each, and `data/` with the photos (as kept: what the model
+was sent) and the scanned products (as sent). Each file is named by the id it is kept under: a
+photo by its file id (as the logs' requests name it), a product by its attached id (inline in the
+logs' requests).
+
+```jsonc
+{
+  "description": "Борщ с салом", // the meal's title
+  "time": "2026-11-25T08:10:31+01:00", // when the answer was asked for: the time the model was told
+  "language": "ru", // the answer language set when downloaded
+  "inputs": [{ "photo": "data/<file id>.jpg" }, { "text": "…" }, { "product": "data/<id>.json" }],
+  "lab-composer": {
+    // the lab's own: deleting it makes a plain test
+    "meal": "<meal id>",
+    "build": "da4cdb7", // that asked, when its log is there
+    "answer": {}, // the model's answer, as it came
+    "answers": [
+      // the user's choices on it, by name; sizes and food per the food they are for
+      {
+        "dish": "Борщ",
+        "product": "Сало",
+        "base": "g",
+        "food": "…",
+        "sizes": { "Сало": 20 },
+        "count": 5,
+      },
+    ],
+    "missing": ["<file id>"], // photos no longer kept, left out of the inputs
+  },
+}
+```
+
+`time`, `answer` and `answers` only when the answer is for the meal's context as it is: a meal
+never answered, or attached to since, is its inputs only. Meals answered before 2026-11-25
+(which didn't keep their answer) take it from the logs, when the last answer logged is the one
+shown.
 
 ## Logs
 
