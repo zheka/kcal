@@ -26,10 +26,14 @@ interface Urgency {
 }
 ```
 
-| Task                         | Target | Limit | Why                                                                  |
-| ---------------------------- | ------ | ----- | -------------------------------------------------------------------- |
-| The app's product form       | 10 s   | 40 s  | someone is waiting, and can type the values instead                  |
-| The lab, the tool, the bench | ∞      | 5 min | tests: free, and runs comparable; a busy minute shouldn't lose a run |
+| Task                   | Target | Limit | Why                                                                       |
+| ---------------------- | ------ | ----- | ------------------------------------------------------------------------- |
+| The app's product form | 10 s   | 30 s  | someone is waiting, and can type the values instead                       |
+| The lab                | 30 s   | 90 s  | someone is waiting at the phone, less hurried                             |
+| The tool, a meal       | 60 s   | 90 s  | someone is at the terminal; `--target`, `--limit` change it               |
+| The bench              | 60 s   | 300 s | unattended; a busy minute shouldn't lose a run; `--target`, `--limit` too |
+
+A target of `inf` (`Infinity`) never spends: Key only, as long as there is a Key.
 
 Why two numbers: one budget can't say what happens past it (spend, give up, or keep waiting).
 Why the task decides only these: retries, timeouts and which key to spend depend on the
@@ -69,10 +73,12 @@ interface Progress {
   waitMs: number;
 }
 interface Attempt {
-  key: string;
+  key: string; //      the provider's label: Gemini's `key`, `key2`
+  keyEnd?: string; //  the key's last 4 characters: which real key, whatever its label
+  at?: number; //      sent, in ms since the request was asked
   ms: number;
   error?: string;
-  hedged?: boolean;
+  why?: string; //     why a costlier key was asked (Gemini: busy, cooling, paced, slow, only)
   cancelled?: boolean;
 }
 ```
@@ -85,10 +91,13 @@ interface Attempt {
 - **Progress is neutral:** what the provider is doing, never "try 2 of 6" (with an urgency the
   number of tries isn't known in advance); the caller words it.
 - **Errors:** `ModelError` with `sent` (false: nothing to log: no key, offline, a file gone),
-  `reply` (what came back anyway) and `attempts`.
+  `reply` (what came back anyway), `attempts`, and `key` when a key failed it and the user has
+  to act (invalid, out of credit).
 - **The log** (`ModelResponse`): `ms` is the whole time, waits included; `attempts` each try in
-  order, with the key that sent it (the provider's label: `key`, `key2`). Lab logs before
-  2026-11-25 have `retried` (the busy errors) and `{ image: id }` parts instead.
+  order, with the key that sent it (the provider's label: `key`, `key2`), its last 4
+  characters, when it was sent and why a costlier key was asked. Lab logs before 2026-11-25
+  have `retried` (the busy errors) and `{ image: id }` parts instead; before 2026-11-26, no
+  `keyEnd`: `key` was whichever key was set, free or paid.
 
 ## Keys: a key source
 
@@ -103,7 +112,7 @@ createGemini({ keys: () => Promise<{ key: string; key2: string }> }); // '' when
 | The app and the lab (`src/ai/browser.ts`)         | IndexedDB secret `gemini` | `gemini-2`         |
 | The tools (`envGemini` in `scripts/meal-tool.ts`) | `GEMINI_API_KEY`          | `GEMINI_API_KEY_2` |
 
-- **One instance per tab or process,** so what it knows of a key (its pace, later its
+- **One instance per tab or process,** so what it knows of a key (its pace, its
   cooldowns) holds for every request sent through it.
 - **Read before every try,** so a key set or forgotten meanwhile (in another tab, the menu) is
   the one used.
@@ -129,27 +138,70 @@ createGemini({ keys: () => Promise<{ key: string; key2: string }> }); // '' when
 5. `Provider` in `tasks.ts` gains its name; a task moves to it only through the bench, with its
    prompt.
 
-## Gemini now
+## Gemini
 
-The restructure kept the behaviour from before two keys:
+The plan (`gemini/plan.ts`) is a pure function of the urgency, the time and what is known of
+each key; `gemini/index.ts` runs it, asking it again after every wait and every try.
 
-- **One key at a time:** Key when set, else Key 2. The target isn't used yet.
-- **A busy Gemini** (429, 500, 503, 504; no answer in time; unreachable) is tried again after
-  5, 15, 30, 60, 120 s (the last repeated) while the limit allows, never starting a try with
-  less than 5 s left. Each try may take up to 120 s, never past the limit. Any other error is
-  final.
-- **Pace: 9 tries a minute per key,** across every request in the tab or process: under the
-  free tier's 15 for Flash-Lite.
+### Which key
 
-## Next: the cheap and the reliable key
+- **Key when it can answer before the target,** that is, when it can start soon enough to
+  answer within `ANSWER_MS` (5 s: answers take 2–9 s) before the target. What holds it back: its
+  backoff after busy tries, its cooldown after a quota error, its pace.
+- **Else Key 2, when it can.** Else whichever key can start first: Key 2 on a tie before the
+  target (it is what the target pays for), Key on a tie past it (the target is lost; free is as
+  fast).
+- **No target (`inf`): Key only.** Key 2 is never asked while there is a Key, even when Key
+  can't be asked again within the limit.
+- **A target no longer than `ANSWER_MS`:** Key can't make it from the start, so Key 2 alone,
+  at once. Never both: a request that pays anyway gains little from a free try beside it.
+- **Within the limit:** no try starts with less than 5 s left; each may take 120 s at most,
+  never past the limit.
 
-To decide and build in `gemini/plan.ts`:
+What that does, Key busy (a 503 in about half a second) each time it's asked:
 
-- Classify 429s: a minute's quota (cool the key for Gemini's `RetryInfo.retryDelay`) or a day's
-  (cool it until the daily reset). A cooling key is skipped, not tried.
-- Key busy (429, 503) → Key 2 at once when the target says it's worth it; Key 2 busy → back off.
-- **Hedging:** Key with no answer by the target's share (about 8–10 s: answers take 2–9 s) →
-  ask Key 2 too, take the first answer, cancel the other (a paid request already started is
-  billed).
-- Cooldowns are per tab: the app and the lab draw on the same project quota without knowing of
-  each other; a 429 corrects it at the cost of one fast try.
+| Target | Key's tries, then Key 2                                  |
+| ------ | -------------------------------------------------------- |
+| 5 s    | none: Key 2 alone, at once                               |
+| 10 s   | 1 (at 0 s), Key 2 at about 0.5 s                         |
+| 30 s   | 3 (0, 5.5, 21 s), Key 2 at about 21.5 s                  |
+| 60 s   | 4 (… 51.5 s), Key 2 at about 52 s                        |
+| ∞      | Key again after 5, 15, 30, 60, 120 s (the last repeated) |
+
+Key 2 is paid; one meal with a photo costs a fraction of a cent. The log's `why` says what
+each Key 2 try paid for.
+
+### Errors
+
+Each failed try is classified by its status and Google's error details (`gemini/http.ts`):
+
+| Kind    | What                                                                            | Then                                                                                                                       |
+| ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `busy`  | 500, 502, 503, 504; no answer in time; unreachable                              | that key backs off: 5, 15, 30, 60, 120 s, counted per key and request                                                      |
+| `quota` | a 429                                                                           | that key cools: Gemini's `RetryInfo` delay, else a minute; an hour for a day's quota (`PerDay` in the violated quota's id) |
+| `key`   | 401; any 403; a 400 about the API key; a 429 of a prepaid account out of credit | the request fails, naming the key (`Key 2: Gemini 400: API key not valid…`)                                                |
+| `final` | any other error: the request's own                                              | the request fails                                                                                                          |
+
+- **A key error fails the request, not just the key,** with Key 2 as with Key. Why: a key that
+  silently stops working is a key the user stops paying attention to; a request that needs it
+  says so, so it gets fixed or removed. Nothing is remembered of it: the next request that
+  needs it asks it again, so a key fixed meanwhile (topped up, replaced) works at once. A key
+  the plan doesn't need is never asked: with Key 2 broken, a request Key answers works.
+- **Out of credit is a key error, not a quota's:** a cooldown would keep a topped-up key unused.
+  Only a prepaid account's message ("prepayment credits are depleted") or a billing reason
+  counts: every free-tier 429's message mentions billing too.
+- **Cooldowns are by the key's value,** not its name: a key changed meanwhile is asked at once.
+- **Failed tries count toward the quota** (Google's billing FAQ, for 400s and 500s; reports for
+  503s), but aren't billed. So every try sent counts toward the pace, and a busy Key backs off
+  rather than being tried again at once.
+
+### Pace
+
+**Key keeps to 12 tries a minute,** across every request in the tab or process, failed or not:
+under the free tier's 15 for Flash-Lite, leaving room for the app and the lab, which share
+Key's project without knowing of each other (a 429 corrects it then: Key cools). Key's next
+turn is one more thing that holds it back: an urgent request asks Key 2 meanwhile, a patient
+one waits. Key 2 has no pace: a paid project's quota is far larger.
+
+Cooldowns and the pace are per tab or process: the app, the lab and the tool learn of a 429
+each at the cost of one try.

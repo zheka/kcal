@@ -1,12 +1,12 @@
 import { ModelError, type ModelRequest } from '../model.ts';
 import type { Answered, AskOptions, Attempt, Provider } from '../provider.ts';
 import { GeminiError, requestBody, send } from './http.ts';
-import { type KeyName, nextStep, type Tried } from './plan.ts';
+import { cooldownMs, type KeyName, type KeyState, nextStep } from './plan.ts';
 
 /**
- * Gemini as a Provider (provider.ts): asks with the user's keys, each try as its plan (plan.ts)
- * says, over its wire (http.ts). One per tab or process (createGemini), so what it knows of a
- * key (its pace) holds for every request sent through it.
+ * Gemini as a Provider (provider.ts): asks with the user's keys, each step as its plan (plan.ts)
+ * says, over its wire (http.ts). One per tab or process (createGemini), so what it learns of a
+ * key (its cooldown, its pace) holds for every request sent through it.
  */
 
 /** The keys as they are now: Key (cheap, free tier), Key 2 (reliable, paid); '' when not set. */
@@ -14,7 +14,7 @@ export type GeminiKeys = Record<KeyName, string>;
 
 export interface GeminiOptions {
   /**
-   * Reads the keys: before every try, so a key set or forgotten meanwhile is the one used. The
+   * Reads the keys: before every step, so a key set or forgotten meanwhile is the one used. The
    * app's from its database (src/ai/browser.ts), the tool's from the environment.
    */
   keys: () => Promise<GeminiKeys>;
@@ -26,12 +26,15 @@ export interface GeminiOptions {
 }
 
 /**
- * Tries a minute per key, across all requests: under the free tier's 15 for Flash-Lite, so
- * the quota isn't what fails a try (docs/lab-meal-prompt.md, The model).
+ * Key's tries a minute, across all requests: under the free tier's 15 for Flash-Lite, leaving
+ * room for the app and the lab, which share its project's quota without knowing of each other
+ * (docs/ai.md). Key 2 (paid) has no pace: its quota is far larger.
  */
-export const PER_MINUTE = 9;
+export const PER_MINUTE = 12;
 
 const NO_KEY = 'no Gemini key';
+/** A key as the user knows it, in messages. */
+const LABEL: Record<KeyName, string> = { key: 'Key', key2: 'Key 2' };
 
 export function createGemini(options: GeminiOptions): Provider {
   const {
@@ -40,23 +43,18 @@ export function createGemini(options: GeminiOptions): Provider {
     now = () => performance.now(),
     wait = defaultWait,
   } = options;
-  /** When each key's recent tries were sent. */
-  const sentAt: Record<KeyName, number[]> = { key: [], key2: [] };
+  /**
+   * By the key's value, not its name, so a key changed meanwhile starts afresh: when its recent
+   * tries were sent (Key's pace), until when it cools after a quota error.
+   */
+  const sentAt = new Map<string, number[]>();
+  const coolUntil = new Map<string, number>();
 
-  /** Waits for the key's next turn within PER_MINUTE, then takes it. */
-  async function pace(key: KeyName, o: AskOptions) {
-    const sent = sentAt[key];
-    for (;;) {
-      while (sent.length > 0 && sent[0]! + 60_000 <= now()) sent.shift();
-      if (sent.length < PER_MINUTE) {
-        sent.push(now());
-        return;
-      }
-      const waitMs = Math.ceil(sent[0]! + 60_000 - now());
-      o.onProgress?.({ why: 'quota', waitMs });
-      await wait(waitMs, o.signal);
-      if (o.signal?.aborted) return;
-    }
+  /** Until when Key waits for its next turn within PER_MINUTE (0: none). */
+  function paceUntil(value: string): number {
+    const sent = sentAt.get(value) ?? [];
+    while (sent.length > 0 && sent[0]! + 60_000 <= now()) sent.shift();
+    return sent.length < PER_MINUTE ? 0 : sent[0]! + 60_000;
   }
 
   async function ask(request: ModelRequest, o: AskOptions): Promise<Answered> {
@@ -66,56 +64,74 @@ export function createGemini(options: GeminiOptions): Provider {
     const body = JSON.stringify(await requestBody(request, o.files));
 
     const attempts: Attempt[] = [];
-    const tried: Tried[] = [];
+    const busy: Record<KeyName, { n: number; endMs: number }> = {
+      key: { n: 0, endMs: 0 },
+      key2: { n: 0, endMs: 0 },
+    };
     let last: GeminiError | undefined;
-    const fail = (message: string, reply = last?.reply) =>
+    const since = (t: number) => t - started;
+    const fail = (message: string, more: { reply?: GeminiError['reply']; key?: KeyName } = {}) =>
       new ModelError(message, {
         sent: attempts.length > 0,
-        ...(reply && { reply }),
+        ...(more.reply && { reply: more.reply }),
+        ...(more.key && { key: more.key }),
         attempts,
       });
 
     for (;;) {
       const set = await keys();
+      const state = (name: KeyName): KeyState => ({
+        set: !!set[name],
+        coolMs: since(coolUntil.get(set[name]) ?? -Infinity),
+        paceMs: name === 'key' ? since(paceUntil(set[name])) : -Infinity,
+        busy: busy[name].n,
+        busyEndMs: busy[name].endMs,
+      });
       const step = nextStep({
         urgency: o.urgency,
-        elapsedMs: now() - started,
-        keys: { key: !!set.key, key2: !!set.key2 },
-        tried,
+        elapsedMs: since(now()),
+        keys: { key: state('key'), key2: state('key2') },
       });
-      if (!step) throw fail(last?.message ?? NO_KEY);
-      if (step.waitMs > 0) {
-        o.onProgress?.({ why: 'busy', waitMs: step.waitMs });
-        await wait(step.waitMs, o.signal);
+      if (!step) throw fail(last?.message ?? NO_KEY, { reply: last?.reply });
+      if ('waitMs' in step) {
+        o.onProgress?.({ why: step.why, waitMs: Math.ceil(step.waitMs) });
+        await wait(Math.ceil(step.waitMs), o.signal);
+        if (o.signal?.aborted) throw fail('cancelled');
+        continue;
       }
-      if (!o.signal?.aborted) await pace(step.key, o);
-      if (o.signal?.aborted) throw fail('cancelled');
-      // the key as it is now: forgotten while waiting, the other one if there is one
-      const current = await keys();
-      const name: KeyName = current[step.key] ? step.key : step.key === 'key' ? 'key2' : 'key';
-      const key = current[name];
-      if (!key) throw fail(NO_KEY);
 
+      const name = step.send;
+      const key = set[name];
+      if (name === 'key') sentAt.set(key, [...(sentAt.get(key) ?? []), now()]);
       o.onProgress?.({ why: 'sending', waitMs: 0 });
       const t = now();
-      const ms = () => Math.round(now() - t);
+      const attempt: Attempt = {
+        key: name,
+        keyEnd: key.slice(-4),
+        at: Math.round(since(t)),
+        ms: 0,
+        ...(step.why && { why: step.why }),
+      };
+      attempts.push(attempt);
       try {
         const reply = await send(key, request.model, body, {
           timeoutMs: step.timeoutMs,
           signal: o.signal,
         });
-        attempts.push({ key: name, ms: ms() });
+        attempt.ms = Math.round(now() - t);
         return { ...reply, attempts };
       } catch (err) {
         const e = err instanceof GeminiError ? err : new GeminiError(String(err));
-        attempts.push({
-          key: name,
-          ms: ms(),
-          error: e.message,
-          ...(e.cancelled && { cancelled: true }),
-        });
-        if (e.cancelled) throw fail('cancelled', undefined);
-        tried.push({ key: name, busy: e.busy });
+        attempt.ms = Math.round(now() - t);
+        attempt.error = e.message;
+        if (e.kind === 'cancelled') {
+          attempt.cancelled = true;
+          throw fail('cancelled');
+        }
+        if (e.kind === 'key') throw fail(`${LABEL[name]}: ${e.message}`, { key: name });
+        if (e.kind === 'final') throw fail(e.message, { reply: e.reply });
+        if (e.kind === 'quota') coolUntil.set(key, now() + cooldownMs(e.quota!));
+        else busy[name] = { n: busy[name].n + 1, endMs: since(now()) };
         last = e;
       }
     }

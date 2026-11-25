@@ -1,43 +1,63 @@
 import type { Urgency } from '../provider.ts';
 
 /**
- * Gemini's strategy, pure: given the urgency, the keys there are and the tries so far, the next
- * try (which key, after how long, given how long), or none. Run by index.ts, which owns the
- * clock and the network.
+ * Gemini's strategy, pure: given the urgency, the time and what is known of each key, the next
+ * step: send a try with a key, wait, or give up. Run by index.ts, which owns the clock, the
+ * network and what it learns of the keys (cooldowns, pace). Why each rule: docs/ai.md.
  *
- * For now one key at a time, as before there were two: Key (cheap) when there is one, else Key 2;
- * a busy try is tried again after BACKOFF_MS while the limit allows. The target isn't used yet:
- * spending Key 2 to meet it (switching, hedging, cooldowns) is the next step (docs/ai.md).
+ * Key (cheap) is asked when it can answer before the target; else Key 2 (paid), when it can; else
+ * whichever can start soonest (Key 2 on a tie before the target, Key on a tie past it). With no
+ * target, Key 2 is never asked while there is a Key. A key the user left empty is never asked.
  */
 
 /** The keys, as the user names them: Key (cheap, free tier), Key 2 (reliable, paid). */
 export type KeyName = 'key' | 'key2';
 
-/** A try so far: its key, and whether it failed as busy (worth another try). */
-export interface Tried {
-  key: KeyName;
-  busy: boolean;
+/**
+ * A key as the plan sees it. Times are ms since the request was asked; one at or before now
+ * holds nothing back.
+ */
+export interface KeyState {
+  set: boolean;
+  /** Until when it cools after a quota error (its value's, across requests). */
+  coolMs: number;
+  /** Until when it waits to keep to its pace (Key's, across requests). */
+  paceMs: number;
+  /** Its busy tries in this request, and when the last one ended. */
+  busy: number;
+  busyEndMs: number;
 }
 
 export interface Situation {
   urgency: Urgency;
   /** Since the request was asked. */
   elapsedMs: number;
-  /** Which keys are set. */
-  keys: Record<KeyName, boolean>;
-  tried: readonly Tried[];
-}
-
-export interface Step {
-  key: KeyName;
-  /** How long to wait before sending. */
-  waitMs: number;
-  /** How long the try may take before it is given up, as busy. */
-  timeoutMs: number;
+  keys: Record<KeyName, KeyState>;
 }
 
 /**
- * Waits before each new try of a busy Gemini, the last repeated. Why: 503s at a busy hour are
+ * Why Key 2 is asked: Key busy, cooling, keeping to its pace, too slow for the target (or
+ * already slow to answer), or not set.
+ */
+export type Why = 'busy' | 'cooling' | 'paced' | 'slow' | 'only';
+
+export type Step =
+  | {
+      send: KeyName;
+      /** How long the try may take before it is given up, as busy. */
+      timeoutMs: number;
+      /** Key 2's tries only: why it is asked. */
+      why?: Why;
+    }
+  | {
+      /** How long to wait before planning again. */
+      waitMs: number;
+      /** What for: a busy key's backoff, or a quota (a cooldown, the pace). */
+      why: 'busy' | 'quota';
+    };
+
+/**
+ * Waits before each new try of a busy key, the last repeated. Why: 503s at a busy hour are
  * common and pass within minutes (docs/lab-meal-prompt.md, The model).
  */
 export const BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 120_000] as const;
@@ -45,16 +65,53 @@ export const BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 120_000] as const;
 export const TRY_TIMEOUT_MS = 120_000;
 /** No new try with less time than this left before the limit: it would only time out. */
 export const MIN_TRY_MS = 5_000;
+/** How long an answer takes, as the plan expects: whether a try can still answer by the target. */
+export const ANSWER_MS = 5_000;
+/** A key's cooldown after a quota error: Gemini's retry delay, else a minute; a day's: an hour. */
+export const MINUTE_COOLDOWN_MS = 60_000;
+export const DAY_COOLDOWN_MS = 3_600_000;
 
-/** The next try, or null: nothing left worth trying (an answer, a non-busy error, the limit). */
-export function nextStep({ urgency, elapsedMs, keys, tried }: Situation): Step | null {
-  const key: KeyName | null = keys.key ? 'key' : keys.key2 ? 'key2' : null;
-  if (!key) return null;
-  const last = tried.at(-1);
-  if (!last) return { key, waitMs: 0, timeoutMs: Math.min(TRY_TIMEOUT_MS, urgency.limitMs) };
-  if (!last.busy) return null;
-  const waitMs = BACKOFF_MS[Math.min(tried.length, BACKOFF_MS.length) - 1]!;
-  const left = urgency.limitMs - elapsedMs - waitMs;
-  if (left < MIN_TRY_MS) return null;
-  return { key, waitMs, timeoutMs: Math.min(TRY_TIMEOUT_MS, left) };
+/** How long a key cools after a quota error. */
+export function cooldownMs(quota: { daily: boolean; retryMs?: number | undefined }): number {
+  return quota.daily ? DAY_COOLDOWN_MS : (quota.retryMs ?? MINUTE_COOLDOWN_MS);
+}
+
+const NAMES: readonly KeyName[] = ['key', 'key2'];
+
+/** The next step, or null: nothing left worth trying (no key, the limit). */
+export function nextStep({ urgency, elapsedMs: now, keys }: Situation): Step | null {
+  const { targetMs: target, limitMs: limit } = urgency;
+  const asked: readonly KeyName[] =
+    target === Infinity && keys.key.set ? ['key'] : NAMES.filter((n) => keys[n].set);
+  const options = asked
+    .map((name) => ({ name, ...start(keys[name], now) }))
+    .filter((o) => o.at + MIN_TRY_MS <= limit);
+  if (options.length === 0) return null;
+
+  const pick =
+    options.find((o) => o.at + ANSWER_MS < target) ??
+    options.reduce((a, b) => (b.at < a.at || (b.at === a.at && now < target) ? b : a));
+  if (pick.at > now) {
+    return { waitMs: pick.at - now, why: pick.held === 'busy' ? 'busy' : 'quota' };
+  }
+  const timeoutMs = Math.min(TRY_TIMEOUT_MS, limit - now);
+  if (pick.name === 'key') return { send: 'key', timeoutMs };
+  const why: Why = !keys.key.set ? 'only' : (start(keys.key, now).held ?? 'slow');
+  return { send: 'key2', timeoutMs, why };
+}
+
+/** When a key can be sent next, and what holds it back till then (null: nothing). */
+function start(
+  k: KeyState,
+  now: number,
+): { at: number; held: 'busy' | 'cooling' | 'paced' | null } {
+  const backoff =
+    k.busy === 0 ? -Infinity : k.busyEndMs + BACKOFF_MS[Math.min(k.busy, BACKOFF_MS.length) - 1]!;
+  const holds = [
+    { at: backoff, held: 'busy' as const },
+    { at: k.coolMs, held: 'cooling' as const },
+    { at: k.paceMs, held: 'paced' as const },
+  ];
+  const latest = holds.reduce((a, b) => (b.at > a.at ? b : a));
+  return latest.at > now ? latest : { at: now, held: null };
 }

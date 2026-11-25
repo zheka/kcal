@@ -4,31 +4,42 @@ import type { FileSource } from '../provider.ts';
 
 /**
  * Gemini's wire: one request to generateContent with one key, and its reply read back, an error
- * classified (worth trying again or not). Which key, when and how often is the plan's (plan.ts,
+ * classified (busy, a quota, the key's, final). Which key, when and how often is the plan's (plan.ts,
  * run by index.ts).
  */
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
-/** Statuses of an overloaded, rate-limited or timed-out Gemini: worth trying again later. */
-const BUSY = [429, 500, 503, 504];
+/** Statuses of an overloaded or timed-out Gemini: worth trying again later. */
+const BUSY = [500, 502, 503, 504];
 
 /**
- * A try that got no usable reply. `busy`: worth another try a little later (an overloaded or
- * rate-limited Gemini, no answer in time, unreachable); `cancelled`: aborted by the caller;
- * `reply`: what came back anyway.
+ * Why a try got no usable reply, as the plan treats it:
+ * - `busy`: an overloaded Gemini, no answer in time, unreachable: worth another try a little later;
+ * - `quota`: a rate limit (429): the key cools for a while (`quota` says how long);
+ * - `key`: the key itself: invalid, expired, not allowed, out of credit: the user has to act;
+ * - `final`: the request itself (a bad schema, say): no other try would do better;
+ * - `cancelled`: aborted by the caller, or because another try answered.
  */
+export type Failure = 'busy' | 'quota' | 'key' | 'final' | 'cancelled';
+
+/** A try that got no usable reply: why, and what came back anyway. */
 export class GeminiError extends Error {
-  readonly busy: boolean;
-  readonly cancelled: boolean;
+  readonly kind: Failure;
+  /** A quota error's: whether it is the day's, and how long Gemini says to wait. */
+  readonly quota: { daily: boolean; retryMs?: number } | undefined;
   readonly reply: Omit<Reply, 'text'> | undefined;
   constructor(
     message: string,
-    o: { busy?: boolean; cancelled?: boolean; reply?: Omit<Reply, 'text'> } = {},
+    o: {
+      kind?: Failure;
+      quota?: GeminiError['quota'];
+      reply?: Omit<Reply, 'text'> | undefined;
+    } = {},
   ) {
     super(message);
-    this.busy = o.busy ?? false;
-    this.cancelled = o.cancelled ?? false;
+    this.kind = o.kind ?? 'final';
+    this.quota = o.quota;
     this.reply = o.reply;
   }
 }
@@ -58,13 +69,13 @@ export async function send(
     });
     text = await response.text();
   } catch (err) {
-    if (o.signal?.aborted) throw new GeminiError('cancelled', { cancelled: true });
+    if (o.signal?.aborted) throw new GeminiError('cancelled', { kind: 'cancelled' });
     // timed out or unreachable: worth another try, as a 503 is
     throw new GeminiError(
       controller.signal.aborted
         ? `no answer within ${o.timeoutMs / 1000} s`
         : `couldn’t reach Gemini (${String(err)})`,
-      { busy: true },
+      { kind: 'busy' },
     );
   } finally {
     clearTimeout(timer);
@@ -121,7 +132,54 @@ interface Body {
     thoughtsTokenCount?: number;
   };
   modelVersion?: string;
-  error?: { message?: string };
+  error?: ErrorBody;
+}
+
+/** Google's error: its message, and details that say which quota, how long to wait, why. */
+interface ErrorBody {
+  message?: string;
+  details?: {
+    reason?: string;
+    retryDelay?: string;
+    violations?: { quotaId?: string; quotaMetric?: string }[];
+  }[];
+}
+
+/**
+ * What kind of failure a status and error are (Failure). A key error: 401, any 403 (not allowed,
+ * blocked), a 400 about the API key, a 429 of a prepaid account out of credit (it won't pass
+ * until topped up, and no other 429 is about billing, though their message mentions it). A
+ * quota's: the day's when a violated quota is per day; its wait from RetryInfo.
+ */
+export function classify(
+  status: number,
+  error: ErrorBody | undefined,
+): { kind: Failure; quota?: { daily: boolean; retryMs?: number } } {
+  const message = error?.message ?? '';
+  const details = Array.isArray(error?.details) ? error.details : [];
+  const reasons = details.map((d) => d.reason ?? '');
+  if (status === 401 || status === 403) return { kind: 'key' };
+  if (status === 400 && (reasons.some((r) => r.startsWith('API_KEY_')) || /api key/i.test(message)))
+    return { kind: 'key' };
+  if (status === 429) {
+    if (
+      reasons.some((r) => r.includes('BILLING')) ||
+      /prepayment|credits are depleted/i.test(message)
+    )
+      return { kind: 'key' };
+    const daily = details.some((d) =>
+      (d.violations ?? []).some((v) => /PerDay/i.test(`${v.quotaId ?? ''} ${v.quotaMetric ?? ''}`)),
+    );
+    const retryMs = details.map((d) => seconds(d.retryDelay)).find((ms) => ms !== undefined);
+    return { kind: 'quota', quota: { daily, ...(retryMs !== undefined && { retryMs }) } };
+  }
+  return { kind: BUSY.includes(status) ? 'busy' : 'final' };
+}
+
+/** A Duration as Google writes it (`37s`, `0.5s`), in ms. */
+function seconds(duration: string | undefined): number | undefined {
+  const m = /^(\d+(?:\.\d+)?)s$/.exec(duration ?? '');
+  return m ? Math.round(Number(m[1]) * 1000) : undefined;
 }
 
 /** Gemini's answer as a Reply, or a GeminiError saying why there is none. */
@@ -131,12 +189,13 @@ export function readReply(status: number, text: string): Reply {
     body = JSON.parse(text) as Body;
   } catch {
     const what = text.trim() ? text.trim().slice(0, 300) : 'an empty reply';
-    throw new GeminiError(`Gemini ${status}: ${what}`, { busy: BUSY.includes(status) });
+    throw new GeminiError(`Gemini ${status}: ${what}`, classify(status, undefined));
   }
   if (status < 200 || status >= 300) {
-    throw new GeminiError(`Gemini ${status}: ${body.error?.message ?? 'error'}`, {
-      busy: BUSY.includes(status),
-    });
+    throw new GeminiError(
+      `Gemini ${status}: ${body.error?.message ?? 'error'}`,
+      classify(status, body.error),
+    );
   }
   const usage = body.usageMetadata;
   const about = {

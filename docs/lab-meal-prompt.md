@@ -36,12 +36,14 @@ entry records them with the request.
   rules depend on thinking.
 - **No temperature.** Why: Google's guide says Gemini 3 models reason worse away from their
   default; prompt v3 sent 0.2.
-- **Urgency: no target, given up after 5 minutes.** No target: Key 2 (paid) is never spent,
-  so runs are free and comparable. Within the 5 minutes Gemini (`src/ai/gemini/`, see
-  [ai.md](ai.md)) keeps to 9 tries a minute per key (under the free tier's 15), and tries a busy
-  Gemini (429, 500, 503, 504), one that doesn't answer within 120 s, or can't be reached, again
-  after 5, 15, 30, 60 and 120 s. Why: 503s at a busy hour are common (run 5 lost 3 of 20 before
-  these retries); a timed-out request is as worth another try as a 503.
+- **Urgency: the lab's answer by 30 s, given up after 90 s;** the tool's by 60 s, after 90 s;
+  the bench's by 60 s, after 300 s (`--target`, `--limit`; `inf`: Key only). Gemini
+  (`src/ai/gemini/`, see [ai.md](ai.md)) asks Key, tries it again after 5, 15, 30… s while it
+  is busy (500, 503, 504, no answer within 120 s, unreachable) and could still answer by the
+  target, and asks Key 2 (paid) when it can't. Why: 503s at a busy hour are common (run 5 lost 3
+  of 20 before these retries), and someone waiting at the phone shouldn't wait out a busy
+  minute when a paid key is set. The model and its settings stay the same on either key, so
+  runs stay comparable; the log says which key answered.
 - **Photos at most 1024 px on the longer side, JPEG 85**, shrunk the same by the lab
   (`src/ai/image.ts`) and the tool (sharp). Why: enough to tell foods and portions apart,
   small enough to send quickly; the same, so the tool sees what the phone sends.
@@ -215,7 +217,7 @@ GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal-bench.ts [--verbose]
   files can be); a test's id is its file name. A correction is more input in the same test. Why:
   no meal is sent back, so there are no steps.
 - **One at a time,** at a fixed time (13:00), so runs differ only by the model, the output is in
-  order, and the quota (Gemini's 9 tries a minute) is no worse off: a run of 20 tests is
+  order, and the quota (Gemini's 12 tries a minute on Key) is no worse off: a run of 20 tests is
   some 2–4 minutes.
 - **Output:** each failed test and why, and a summary (passed, failed, flags, questions asked,
   tokens, time); exit code 1 when any failed. `--verbose` adds each test's meal as text on

@@ -11,7 +11,7 @@ import type { Urgency } from './provider.ts';
  * (src/lab/meal/settings.ts).
  */
 
-/** The providers the app knows how to ask (src/ai/gemini.ts). */
+/** The providers the app knows how to ask (src/ai/gemini/). */
 export type Provider = 'gemini';
 
 export interface TaskSettings {
@@ -36,8 +36,8 @@ export const TASKS = {
     photo: { maxSide: 1024, quality: 85 },
     /**
      * Someone is waiting at the form, and can type the values instead: worth spending Key 2 to
-     * answer within 10 s; given up after 40 s.
+     * answer within 10 s; given up after 30 s.
      */
-    urgency: { targetMs: 10_000, limitMs: 40_000 },
+    urgency: { targetMs: 10_000, limitMs: 30_000 },
   },
 } as const satisfies Record<string, TaskSettings>;

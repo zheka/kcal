@@ -3,8 +3,11 @@
  * tool's code, one after another, and reports which failed. A test passes when a meal comes back;
  * expectations come later.
  *
- *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal-bench.ts [--verbose] [--repeat=N] [--out=<dir>] <test>…
+ *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal-bench.ts [--verbose] [--target=<s>] [--limit=<s>] [--repeat=N] [--out=<dir>] <test>…
  *     <test>     a test file, or a folder of them (its *.json, not its subfolders)
+ *     --target   each answer wanted within this many seconds (60), Key 2 spent if need be;
+ *                `inf`: Key only (BENCH_URGENCY in meal-tool.ts)
+ *     --limit    each given up after this many seconds (300)
  *     --repeat   each test N times (<test>-1, <test>-2, …), to tell a rule from chance
  *     --out      writes each test's everything (as scripts/meal.ts --out) to <dir>/<test>.json;
  *                nothing is written without it
@@ -18,6 +21,7 @@ import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   ask,
+  BENCH_URGENCY,
   envGemini,
   type Entry,
   givenText,
@@ -26,6 +30,7 @@ import {
   readTest,
   settingsText,
   statsText,
+  urgencyArgs,
   writeJson,
 } from './meal-tool.ts';
 
@@ -39,8 +44,11 @@ const { values: args, positionals } = parseArgs({
     verbose: { type: 'boolean', default: false },
     repeat: { type: 'string', default: '1' },
     out: { type: 'string' },
+    target: { type: 'string' },
+    limit: { type: 'string' },
   },
 });
+const urgency = urgencyArgs(args, BENCH_URGENCY);
 const note = args.verbose ? (text: string) => console.error(text) : undefined;
 
 const files = positionals.flatMap((p) =>
@@ -75,7 +83,7 @@ const runs = files.flatMap((file) =>
     : [{ file, id: idOf(file) }],
 );
 
-note?.(settingsText(LANGUAGE, NOW));
+note?.(settingsText(LANGUAGE, NOW, urgency));
 note?.(`${files.length} tests${repeat > 1 ? ` × ${repeat}` : ''}, one at a time\n`);
 
 const failed: string[] = [];
@@ -93,6 +101,7 @@ for (const { file, id } of runs) {
       language: LANGUAGE,
       now: NOW,
       given: test.given,
+      urgency,
       ...(note && { hint: note }),
     });
   } catch (err) {

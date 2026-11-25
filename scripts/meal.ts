@@ -2,12 +2,15 @@
  * One meal through the model, locally (the lab's own code, see scripts/meal-tool.ts): prints the
  * meal as text, and nothing else.
  *
- *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal.ts [--verbose] [--test=<file>] [--out=<file>] [<input>…]
+ *   GEMINI_API_KEY=… [GEMINI_API_KEY_2=…] node scripts/meal.ts [--verbose] [--target=<s>] [--limit=<s>] [--test=<file>] [--out=<file>] [<input>…]
  *     <input>    a photo file, a product JSON file (Open Food Facts data), a barcode, else a text;
  *                sent in the order given, after the test's
  *     --test     a test file (see readTest in meal-tool.ts): its inputs first
  *     --out      writes everything (inputs, request, answer, what the code made of it) to this
  *                JSON file; nothing is written without it
+ *     --target   the answer wanted within this many seconds (60), Key 2 spent if need be; `inf`:
+ *                Key only (MEAL_URGENCY in meal-tool.ts)
+ *     --limit    given up after this many seconds (90)
  *     --verbose  on stderr: the settings, brief notes as it goes, the stats at the end
  *
  * No meal (the model failed or answered nothing usable): why on stderr, exit code 1.
@@ -22,7 +25,9 @@ import {
   mealText,
   noMeal,
   readTest,
+  MEAL_URGENCY,
   settingsText,
+  urgencyArgs,
   statsText,
   writeJson,
 } from './meal-tool.ts';
@@ -35,8 +40,11 @@ const { values: args, positionals } = parseArgs({
     verbose: { type: 'boolean', default: false },
     test: { type: 'string' },
     out: { type: 'string' },
+    target: { type: 'string' },
+    limit: { type: 'string' },
   },
 });
+const urgency = urgencyArgs(args, MEAL_URGENCY);
 const note = args.verbose ? (text: string) => console.error(text) : undefined;
 
 const test = args.test ? readTest(args.test) : undefined;
@@ -53,7 +61,7 @@ if (!gemini) {
 
 const now = new Date();
 if (note) {
-  note(settingsText(LANGUAGE, now));
+  note(settingsText(LANGUAGE, now, urgency));
   if (args.test) note(`test ${args.test}${test?.description ? `: ${test.description}` : ''}`);
   note(`inputs ${inputs.map(givenText).join(' ')}`);
 }
@@ -63,6 +71,7 @@ const entry = await ask({
   language: LANGUAGE,
   now,
   given: inputs,
+  urgency,
   ...(note && { hint: note }),
 });
 

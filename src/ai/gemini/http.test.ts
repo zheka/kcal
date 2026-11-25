@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModelError, type ModelRequest } from '../model';
-import { GeminiError, readReply, requestBody, send } from './http';
+import { classify, GeminiError, readReply, requestBody, send } from './http';
 
 const REQUEST: ModelRequest = {
   model: 'gemini-x',
@@ -85,7 +85,7 @@ describe('a try', () => {
     vi.stubGlobal('fetch', hang);
     const err: unknown = await send('k', 'm', '{}', { timeoutMs: 50 }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(GeminiError);
-    expect(err).toMatchObject({ message: 'no answer within 0.05 s', busy: true, cancelled: false });
+    expect(err).toMatchObject({ message: 'no answer within 0.05 s', kind: 'busy' });
   });
 
   it('is cancelled when the caller aborts, not busy', async () => {
@@ -93,9 +93,18 @@ describe('a try', () => {
     const abort = new AbortController();
     const sent = send('k', 'm', '{}', { timeoutMs: 10_000, signal: abort.signal });
     abort.abort();
-    expect(await sent.catch((e: unknown) => e)).toMatchObject({ cancelled: true, busy: false });
+    expect(await sent.catch((e: unknown) => e)).toMatchObject({ kind: 'cancelled' });
   });
 });
+
+const error = (status: number, text: string) => {
+  try {
+    readReply(status, text);
+  } catch (err) {
+    return err as GeminiError;
+  }
+  throw new Error('no error');
+};
 
 describe('Gemini’s reply', () => {
   it('gives the answer’s text parts as received, without thoughts, and what it says', () => {
@@ -128,24 +137,87 @@ describe('Gemini’s reply', () => {
   });
 
   it('is an error when Gemini says so: busy ones are worth trying again', () => {
-    const error = (status: number, text: string) => {
-      try {
-        readReply(status, text);
-      } catch (err) {
-        return err as GeminiError;
-      }
-      throw new Error('no error');
-    };
     const busy = error(503, JSON.stringify({ error: { message: 'The model is overloaded.' } }));
     expect(busy.message).toBe('Gemini 503: The model is overloaded.');
-    expect(busy.busy).toBe(true);
-    expect(error(400, '{"error":{"message":"Bad key"}}').busy).toBe(false);
+    expect(busy.kind).toBe('busy');
+    expect(error(400, '{"error":{"message":"Invalid schema"}}').kind).toBe('final');
     expect(error(502, '<html>Bad Gateway</html>').message).toBe(
       'Gemini 502: <html>Bad Gateway</html>',
     );
     expect(error(200, '').message).toBe('Gemini 200: an empty reply');
     const blocked = error(200, JSON.stringify({ promptFeedback: { blockReason: 'OTHER' } }));
     expect(blocked.message).toBe('prompt blocked: OTHER');
-    expect(blocked.busy).toBe(false);
+    expect(blocked.kind).toBe('final');
+  });
+
+  it('is a quota’s, with how long to wait, or a key’s, as its error says', () => {
+    const quota = error(
+      429,
+      JSON.stringify({
+        error: {
+          message: 'You exceeded your current quota, please check your plan and billing details.',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+              violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier' }],
+            },
+            { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '37.5s' },
+          ],
+        },
+      }),
+    );
+    expect(quota).toMatchObject({ kind: 'quota', quota: { daily: false, retryMs: 37_500 } });
+    expect(quota.message).toMatch(/^Gemini 429: You exceeded/);
+  });
+});
+
+describe('a failure’s kind', () => {
+  const day = {
+    details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }],
+  };
+  it.each([
+    ['an overloaded Gemini', 503, { message: 'The model is overloaded.' }, { kind: 'busy' }],
+    ['a gateway’s error, without a body', 502, undefined, { kind: 'busy' }],
+    [
+      'a minute’s quota, no delay given',
+      429,
+      { message: 'quota' },
+      { kind: 'quota', quota: { daily: false } },
+    ],
+    ['a day’s quota', 429, day, { kind: 'quota', quota: { daily: true } }],
+    ['a 429 without a body', 429, undefined, { kind: 'quota', quota: { daily: false } }],
+    [
+      'a prepaid account out of credit',
+      429,
+      { message: 'Your prepayment credits are depleted.' },
+      { kind: 'key' },
+    ],
+    ['a billing reason', 429, { details: [{ reason: 'BILLING_DISABLED' }] }, { kind: 'key' }],
+    [
+      'an invalid key',
+      400,
+      {
+        message: 'API key not valid. Please pass a valid API key.',
+        details: [{ reason: 'API_KEY_INVALID' }],
+      },
+      { kind: 'key' },
+    ],
+    [
+      'an expired key, by its message',
+      400,
+      { message: 'API key expired. Please renew the API key.' },
+      { kind: 'key' },
+    ],
+    [
+      'a key not allowed',
+      403,
+      { message: 'Method doesn’t allow unregistered callers.' },
+      { kind: 'key' },
+    ],
+    ['unauthenticated', 401, undefined, { kind: 'key' }],
+    ['a bad request', 400, { message: 'Invalid JSON payload received.' }, { kind: 'final' }],
+    ['an unknown model', 404, { message: 'models/x is not found' }, { kind: 'final' }],
+  ] as const)('%s', (_, status, body, expected) => {
+    expect(classify(status, body as Parameters<typeof classify>[1])).toEqual(expected);
   });
 });

@@ -44,13 +44,17 @@ export interface AskOptions {
   signal?: AbortSignal;
 }
 
-/** One try, as logged: which key (the provider's label for it), how long, why it failed. */
+/** One try, as logged: which key (the provider's label for it), when, how long, why it failed. */
 export interface Attempt {
   key: string;
+  /** The key's last 4 characters: which real key it was, whatever its label. */
+  keyEnd?: string;
+  /** When it was sent, in ms since the request was asked. */
+  at?: number;
   ms: number;
   error?: string;
-  /** Sent while another try was still waiting for its answer. */
-  hedged?: boolean;
+  /** Why a costlier key was asked (the provider's words: Gemini's Key 2, plan.ts Why). */
+  why?: string;
   /** Given up because another try answered first, or the caller aborted. */
   cancelled?: boolean;
 }

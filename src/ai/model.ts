@@ -49,10 +49,16 @@ export interface Reply {
 
 /**
  * A request that got no usable reply. `sent`: it reached the provider (or was on its way), so
- * it is logged; `reply`: what came back anyway; `attempts`: the tries it took.
+ * it is logged; `reply`: what came back anyway; `attempts`: the tries it took; `key`: the key
+ * that failed it (the provider's label), when the user has to act on it (invalid, out of credit).
  */
 export class ModelError extends Error {
-  readonly options: { sent: boolean; reply?: Omit<Reply, 'text'>; attempts?: Attempt[] };
+  readonly options: {
+    sent: boolean;
+    reply?: Omit<Reply, 'text'>;
+    attempts?: Attempt[];
+    key?: string;
+  };
   constructor(message: string, options: ModelError['options']) {
     super(message);
     this.options = options;

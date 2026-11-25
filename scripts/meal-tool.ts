@@ -13,7 +13,7 @@ import sharp from 'sharp';
 import { lookUpBarcode } from '../src/data/openFoodFacts.ts';
 import { createGemini } from '../src/ai/gemini/index.ts';
 import { type ModelRequest, type ModelResponse, run } from '../src/ai/model.ts';
-import type { Progress, Provider } from '../src/ai/provider.ts';
+import type { Attempt, Progress, Provider, Urgency } from '../src/ai/provider.ts';
 import { type Processed, process as processMeal } from '../src/lab/meal/process.ts';
 import { type Meal, readMeal } from '../src/lab/meal/read.ts';
 import { type Input, mealRequest } from '../src/lab/meal/request.ts';
@@ -129,6 +129,38 @@ export function envGemini(): Provider | null {
   return createGemini({ keys: async () => keys, online: () => true });
 }
 
+/**
+ * How soon the tool wants an answer: by `--target` (seconds, or `inf`: Key only), given up after
+ * `--limit`. A meal (scripts/meal.ts) by 60 s, given up after 90 s: someone is at the terminal,
+ * but less hurried than in the lab; the bench by 60 s, given up after 300 s: it runs unattended,
+ * and a busy minute shouldn't lose a run. Why Key 2 is spent then: docs/ai.md.
+ */
+export const MEAL_URGENCY: Urgency = { targetMs: 60_000, limitMs: 90_000 };
+export const BENCH_URGENCY: Urgency = { targetMs: 60_000, limitMs: 300_000 };
+
+/** The urgency as `--target` and `--limit` say (seconds; `inf` for no target), else `defaults`. */
+export function urgencyArgs(
+  args: { target?: string | undefined; limit?: string | undefined },
+  defaults: Urgency,
+): Urgency {
+  const seconds = (text: string, name: string) => {
+    const n = text === 'inf' ? Infinity : Number(text);
+    if (!(n > 0)) throw new Error(`--${name}: seconds, or inf; not ${text}`);
+    return n * 1000;
+  };
+  const urgency = {
+    targetMs: args.target === undefined ? defaults.targetMs : seconds(args.target, 'target'),
+    limitMs: args.limit === undefined ? defaults.limitMs : seconds(args.limit, 'limit'),
+  };
+  if (urgency.limitMs === Infinity) throw new Error('--limit: seconds');
+  return urgency;
+}
+
+/** The urgency, in a line. */
+export const urgencyText = ({ targetMs, limitMs }: Urgency): string =>
+  `answer by ${targetMs === Infinity ? 'any time (Key only)' : `${targetMs / 1000} s`}, ` +
+  `given up after ${limitMs / 1000} s`;
+
 /** What Gemini is doing, as a hint. */
 function progressText({ why, waitMs }: Progress, model: string): string {
   const s = Math.ceil(waitMs / 1000);
@@ -156,6 +188,7 @@ export interface Ask {
   language: string;
   now: Date;
   given: Given[];
+  urgency: Urgency;
   hint?: Hint;
 }
 
@@ -169,7 +202,7 @@ export async function ask(a: Ask): Promise<Entry> {
   });
   const response = await run(request, {
     provider: a.provider,
-    urgency: SETTINGS.urgency,
+    urgency: a.urgency,
     files: photoFile, // a photo's id is its path
     check: () => [], // the reader is forgiving: any JSON is read, its repairs flagged
     onProgress: (p) => a.hint?.(progressText(p, request.model)),
@@ -212,11 +245,31 @@ export function about(entry: Entry): string {
     r.tokens &&
       `tokens in ${r.tokens.input} out ${r.tokens.output} thinking ${r.tokens.thinking ?? 0}`,
     r.stop && `stop ${r.stop}`,
-    r.attempts && r.attempts.length > 1 && `${r.attempts.length} tries`,
+    r.attempts && (r.attempts.length > 1 || r.attempts[0]?.key !== 'key') && triesText(r.attempts),
   ]
     .filter(Boolean)
     .join(', ');
 }
+
+/** Each try: its key, when it was sent, how long it took, how it ended. */
+const triesText = (attempts: Attempt[]): string =>
+  'tries ' +
+  attempts
+    .map((t) =>
+      [
+        t.key + (t.why ? ` (${t.why})` : ''),
+        t.at !== undefined && `at ${(t.at / 1000).toFixed(1)} s`,
+        `${(t.ms / 1000).toFixed(1)} s`,
+        t.cancelled
+          ? 'cancelled'
+          : t.error
+            ? (t.error.match(/^Gemini \d+/)?.[0] ?? 'failed')
+            : 'ok',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    )
+    .join('; ');
 
 /** Why the entry has no meal, when it has none. */
 export const noMeal = (entry: Entry): string | undefined =>
@@ -227,10 +280,9 @@ export const mealText = (entry: Entry): string =>
   entry.processed ? textView(entry.processed, entry.read?.flags) : '';
 
 /** The settings a request is sent with, for --verbose. */
-export const settingsText = (language: string, now: Date): string =>
+export const settingsText = (language: string, now: Date, urgency: Urgency): string =>
   `model ${SETTINGS.model}, thinking ${SETTINGS.thinking}, ` +
-  `temperature ${SETTINGS.temperature ?? 'default'}; given up after ` +
-  `${SETTINGS.urgency.limitMs / 1000} s; ` +
+  `temperature ${SETTINGS.temperature ?? 'default'}; ${urgencyText(urgency)}; ` +
   `photos ${SETTINGS.photo.maxSide} px, quality ${SETTINGS.photo.quality}\n` +
   `prompt ${PROMPT_FILE}, language ${language}, time ${now.toTimeString().slice(0, 5)}`;
 

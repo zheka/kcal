@@ -84,8 +84,9 @@ function Settings({
         />
       </label>
       <p class="hint">
-        {SETTINGS.model}, thinking {SETTINGS.thinking}; Key only, tried again while it’s busy, up to{' '}
-        {SETTINGS.urgency.limitMs / 60_000} min (src/lab/meal/settings.ts)
+        {SETTINGS.model}, thinking {SETTINGS.thinking}; Key, or Key 2 if Key can’t answer within{' '}
+        {SETTINGS.urgency.targetMs / 1000} s; given up after {SETTINGS.urgency.limitMs / 1000} s
+        (src/lab/meal/settings.ts)
       </p>
     </section>
   );
