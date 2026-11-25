@@ -76,7 +76,7 @@ function Composer({ lab, initial }: Props) {
     const keys = await geminiKeys();
     if (!keys.key && !keys.key2) {
       change(meal.id, (m) =>
-        applyUpdate(m, meal.context, null, 'no Gemini key: set Key in the menu'),
+        applyUpdate(m, meal.context, time, null, 'no Gemini key: set Key in the menu'),
       );
       return;
     }
@@ -93,7 +93,7 @@ function Composer({ lab, initial }: Props) {
       notSent = err instanceof Error ? err.message : String(err);
     }
     if (response) void lab.log({ time: time.toISOString(), meal: meal.id, request, response });
-    change(meal.id, (m) => applyUpdate(m, meal.context, response, notSent));
+    change(meal.id, (m) => applyUpdate(m, meal.context, time, response, notSent));
   }
 
   if (cleared) {

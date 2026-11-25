@@ -31,7 +31,9 @@ sends (`mealRequest` in `src/lab/meal/request.ts`, see
 language and the time, every attached thing as a part of its own in the order attached (a text,
 a photo, a scanned product as JSON), and the checklist. Nothing of the meal so far is sent: each
 update perceives the whole input afresh. The answer is read forgivingly (`read.ts`: what can be
-used is, repairs are flagged in the log) and replaces the meal. Meals answered by prompt v3 keep
+used is, repairs are flagged in the log) and replaces the meal. The meal keeps it as read and as
+it came, with when the update was sent, in local time with its offset (`answer`, `answeredAt`:
+since 2026-11-25). Meals answered by prompt v3 keep
 what they are composed from, without their answer: Update makes them again.
 
 A scanned product is what Open Food Facts says about it, nothing of my foods: the shared

@@ -1,4 +1,5 @@
 import type { ModelRequest, ModelResponse } from '../../ai/model';
+import { localTime } from '../../core/time';
 import { process, type Processed } from '../meal/process';
 import PROMPT from '../meal/prompt.md?raw';
 import { readMeal } from '../meal/read';
@@ -31,13 +32,14 @@ export function updateRequest(meal: ComposedMeal, now: Date, language: string): 
 export const checkAnswer = (): string[] => [];
 
 /**
- * The meal after an update sent with `sent` as its context: the answer as read, with no answers
- * yet, or the meal as it was with why it failed (no response: nothing was sent). Context
- * attached or removed meanwhile still needs an update.
+ * The meal after an update sent at `at` with `sent` as its context: the answer as read and as it
+ * came, with no answers yet, or the meal as it was with why it failed (no response: nothing was
+ * sent). Context attached or removed meanwhile still needs an update.
  */
 export function applyUpdate(
   meal: ComposedMeal,
   sent: readonly Attached[],
+  at: Date,
   response: ModelResponse | null,
   notSent?: string,
 ): ComposedMeal {
@@ -49,7 +51,15 @@ export function applyUpdate(
   const read = readMeal(response.answer).meal;
   const rest = { ...meal };
   delete rest.failed;
-  return { ...rest, meal: read, answers: {}, title: read.title || meal.title, changed: !same };
+  return {
+    ...rest,
+    meal: read,
+    answer: response.answer,
+    answeredAt: localTime(at),
+    answers: {},
+    title: read.title || meal.title,
+    changed: !same,
+  };
 }
 
 /** The meal as shown: the answer processed, with the user's answers; null before any. */

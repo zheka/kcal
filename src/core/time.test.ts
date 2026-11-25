@@ -9,6 +9,7 @@ import {
   localDateOf,
   localMinute,
   localMinuteOf,
+  localTime,
 } from './time';
 
 // Tests run in Europe/Berlin (see vite.config.ts): UTC+1 in winter, UTC+2 in summer.
@@ -18,6 +19,13 @@ describe('local dates and minutes', () => {
     const d = new Date(2026, 0, 5, 7, 3, 41, 512);
     expect(localDate(d)).toBe('2026-01-05');
     expect(localMinute(d)).toBe('2026-01-05T07:03');
+  });
+
+  it('formats local time with its offset, the same instant', () => {
+    const winter = new Date('2026-01-05T06:03:41.512Z');
+    expect(localTime(winter)).toBe('2026-01-05T07:03:41+01:00');
+    expect(new Date(localTime(winter)).getTime()).toBe(winter.getTime() - 512);
+    expect(localTime(new Date('2026-07-05T22:30:00Z'))).toBe('2026-07-06T00:30:00+02:00');
   });
 
   it('accepts real dates and minutes only', () => {
