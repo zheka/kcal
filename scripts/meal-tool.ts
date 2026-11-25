@@ -100,22 +100,32 @@ export async function inputs(list: Given[], language: string, hint?: Hint): Prom
 
 const shrunk = new Map<string, Promise<Blob>>();
 
-/** A photo (by its path) as the lab sends it (SETTINGS.photo): upright, shrunk, JPEG. */
+/**
+ * A photo (by its path) as the lab sends it (SETTINGS.photo): upright, shrunk, JPEG. A JPEG
+ * already upright and small enough is sent as it is, not encoded again: a photo the lab stored
+ * (shrunk on the phone) is then sent as the lab sent it.
+ */
 export function photoFile(path: string): Promise<Blob> {
   let p = shrunk.get(path);
   if (!p) {
-    p = sharp(path)
-      .rotate()
-      .resize(SETTINGS.photo.maxSide, SETTINGS.photo.maxSide, {
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: SETTINGS.photo.quality })
-      .toBuffer()
-      .then((b) => new Blob([new Uint8Array(b)], { type: 'image/jpeg' }));
+    p = prepare(path).then((b) => new Blob([new Uint8Array(b)], { type: 'image/jpeg' }));
     shrunk.set(path, p);
   }
   return p;
+}
+
+async function prepare(path: string): Promise<Buffer> {
+  const { maxSide, quality } = SETTINGS.photo;
+  const image = sharp(path);
+  const { format, width = Infinity, height = Infinity, orientation = 1 } = await image.metadata();
+  if (format === 'jpeg' && orientation === 1 && Math.max(width, height) <= maxSide) {
+    return readFileSync(path);
+  }
+  return image
+    .rotate()
+    .resize(maxSide, maxSide, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality })
+    .toBuffer();
 }
 
 /**

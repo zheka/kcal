@@ -45,8 +45,9 @@ entry records them with the request.
   minute when a paid key is set. The model and its settings stay the same on either key, so
   runs stay comparable; the log says which key answered.
 - **Photos at most 1024 px on the longer side, JPEG 85**, shrunk the same by the lab
-  (`src/ai/image.ts`) and the tool (sharp). Why: enough to tell foods and portions apart,
-  small enough to send quickly; the same, so the tool sees what the phone sends.
+  (`src/ai/image.ts`) and the tool (sharp); the tool sends a JPEG already upright and within
+  1024 px as it is. Why: enough to tell foods and portions apart, small enough to send quickly;
+  the same, so the tool sees what the phone sends, and a photo the lab stored, byte for byte.
 - **The answer as JSON in the schema** (`responseJsonSchema`, see the format doc).
 
 ## What a request holds
