@@ -21,26 +21,33 @@ async function paste(label: string, value: string) {
   fireEvent.click(screen.getByRole('button', { name: `Save ${label.toLowerCase()}` }));
 }
 
+/** Matches a saved key's line by its end, though the end is its own element. */
+const saved = (end: string) => (_: string, el: Element | null) =>
+  !!el?.classList.contains('key-saved') && el.textContent === `Saved on this device (…${end})`;
+
 describe('Gemini keys', () => {
   it('keeps each key on the device, shows its end, and forgets it', async () => {
     render(<SettingsScreen store={createStore(appData(), vi.fn())} />);
     await paste('Key', ' AIzaFirst1234 ');
-    await screen.findByText('Saved on this device (…1234)');
+    await screen.findByText(saved('1234'));
     expect(screen.getByLabelText('Key 2')).toBeTruthy(); // still empty
 
     await paste('Key 2', 'AIzaSecond5678');
-    await screen.findByText('Saved on this device (…5678)');
+    await screen.findByText(saved('5678'));
 
     // Read back from the database, as on the next start.
     cleanup();
     resetKeys();
     render(<SettingsScreen store={createStore(appData(), vi.fn())} />);
-    await screen.findByText('Saved on this device (…1234)');
-    expect(screen.getByText('Saved on this device (…5678)')).toBeTruthy();
+    await screen.findByText(saved('1234'));
+    expect(screen.getByText(saved('5678'))).toBeTruthy();
 
+    // One tap only arms Forget; the key stays until the second.
     fireEvent.click(screen.getByRole('button', { name: 'Forget key' }));
+    expect(screen.getByText(saved('1234'))).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Tap again to forget' }));
     await waitFor(() => expect(screen.getByPlaceholderText('Cheap Gemini key')).toBeTruthy());
-    expect(screen.getByText('Saved on this device (…5678)')).toBeTruthy();
+    expect(screen.getByText(saved('5678'))).toBeTruthy();
   });
 });
 

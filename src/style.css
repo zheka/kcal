@@ -1048,3 +1048,7 @@ select.input.base {
   flex: 1;
   min-width: 0;
 }
+
+.key-saved .nowrap {
+  white-space: nowrap;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { ConfirmButton } from './ConfirmButton';
 import { type KeyName, keys, loadKeys, setKey } from '../ai/keys';
 
 /**
@@ -18,7 +19,7 @@ export function GeminiKeys() {
   );
 }
 
-/** One key: a field to paste it into, or its last four characters and Forget. */
+/** One key: a field to paste it into, or its last four characters and Forget, confirmed by a second tap. */
 function KeyField(props: { name: KeyName; label: string; placeholder: string }) {
   const { name, label, placeholder } = props;
   const key = keys.value?.[name];
@@ -49,15 +50,16 @@ function KeyField(props: { name: KeyName; label: string; placeholder: string }) 
       )}
       {key ? (
         <div class="actions key-field">
-          <span class="key-saved">Saved on this device (…{key.slice(-4)})</span>
-          <button
-            type="button"
-            class="button"
-            aria-label={`Forget ${label.toLowerCase()}`}
-            onClick={() => void keep('')}
-          >
-            Forget
-          </button>
+          <span class="key-saved">
+            {/* The key's end never splits across lines, beside the wider armed Forget. */}
+            Saved on this device <span class="nowrap">(…{key.slice(-4)})</span>
+          </span>
+          <ConfirmButton
+            label="Forget"
+            confirmLabel="Tap again to forget"
+            ariaLabel={`Forget ${label.toLowerCase()}`}
+            onConfirm={() => void keep('')}
+          />
         </div>
       ) : (
         <form
