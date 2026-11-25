@@ -28,7 +28,7 @@ interface Urgency {
 
 | Task                   | Target | Limit | Why                                                                       |
 | ---------------------- | ------ | ----- | ------------------------------------------------------------------------- |
-| The app's product form | 10 s   | 30 s  | someone is waiting, and can type the values instead                       |
+| The app's product form | 15 s   | 30 s  | someone is waiting, and can type the values instead                       |
 | The lab                | 30 s   | 90 s  | someone is waiting at the phone, less hurried                             |
 | The tool, a meal       | 60 s   | 90 s  | someone is at the terminal; `--target`, `--limit` change it               |
 | The bench              | 60 s   | 300 s | unattended; a busy minute shouldn't lose a run; `--target`, `--limit` too |
@@ -156,7 +156,7 @@ each key; `gemini/index.ts` runs it, asking it again after every wait and every 
 - **A target no longer than `ANSWER_MS`:** Key can't make it from the start, so Key 2 alone,
   at once. Never both: a request that pays anyway gains little from a free try beside it.
 - **A slow try is hedged:** a try on its way is waited for until the last moment another
-  could still answer by the target (target − `ANSWER_MS`: 5 s in the app, 25 s in the lab,
+  could still answer by the target (target − `ANSWER_MS`: 10 s in the app, 25 s in the lab,
   never without a target); then the other key is asked too, the first answer taken and the
   other try cancelled (`cancelled` in the log; a paid one cancelled is likely billed anyway).
   Why not cut the slow try and switch: it costs the same paid try, and loses a free answer
@@ -164,15 +164,23 @@ each key; `gemini/index.ts` runs it, asking it again after every wait and every 
 - **Within the limit:** no try starts with less than 5 s left; each may take 120 s at most,
   never past the limit.
 
-What that does, Key busy (a 503 in about half a second) each time it's asked:
+What that does, Key busy each time it's asked (a 503 takes about 2 s, 1–4 s):
 
-| Target | Key's tries, then Key 2                                  |
-| ------ | -------------------------------------------------------- |
-| 5 s    | none: Key 2 alone, at once                               |
-| 10 s   | 1 (at 0 s), Key 2 at about 0.5 s                         |
-| 30 s   | 3 (0, 5.5, 21 s), Key 2 at about 21.5 s                  |
-| 60 s   | 4 (… 51.5 s), Key 2 at about 52 s                        |
-| ∞      | Key again after 5, 15, 30, 60, 120 s (the last repeated) |
+| Target       | Key's tries, then Key 2                                  |
+| ------------ | -------------------------------------------------------- |
+| 5 s          | none: Key 2 alone, at once                               |
+| 15 s (app)   | 2 (at 0, 4 s), Key 2 at about 6 s                        |
+| 30 s (lab)   | 3 (0, 4, 16 s), Key 2 at about 18 s                      |
+| 60 s (bench) | 4 (0, 4, 16, 48 s), Key 2 at about 50 s                  |
+| ∞            | Key again after 2, 10, 30, 60, 120 s (the last repeated) |
+
+Why the first retry after only 2 s: measured at a quiet hour, about half of Key's tries were
+503s, and a retry 5 s later failed about as often as a first try, so a 503 looked like that
+try's alone. The 5 s first wait cost about 2 s of median time; at 2 s, with the app's target at
+15 s, a simulation of these tries gave a median of about 6 s at every target, with Key 2 asked
+for about 28% of the app's requests, 13% of the lab's, 6% of the bench's (at a 10 s target:
+58%). To check at a busy hour: whether 503s then come in runs, which a 2 s retry wouldn't
+outwait.
 
 Key 2 is paid; one meal with a photo costs a fraction of a cent. The log's `why` says what
 each Key 2 try paid for.
@@ -183,7 +191,7 @@ Each failed try is classified by its status and Google's error details (`gemini/
 
 | Kind    | What                                                                            | Then                                                                                                                       |
 | ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `busy`  | 500, 502, 503, 504; no answer in time; unreachable                              | that key backs off: 5, 15, 30, 60, 120 s, counted per key and request                                                      |
+| `busy`  | 500, 502, 503, 504; no answer in time; unreachable                              | that key backs off: 2, 10, 30, 60, 120 s, counted per key and request                                                      |
 | `quota` | a 429                                                                           | that key cools: Gemini's `RetryInfo` delay, else a minute; an hour for a day's quota (`PerDay` in the violated quota's id) |
 | `key`   | 401; any 403; a 400 about the API key; a 429 of a prepaid account out of credit | the request fails, naming the key (`Key 2: Gemini 400: API key not valid…`)                                                |
 | `final` | any other error: the request's own                                              | the request fails                                                                                                          |

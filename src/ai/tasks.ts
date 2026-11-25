@@ -36,8 +36,8 @@ export const TASKS = {
     photo: { maxSide: 1024, quality: 85 },
     /**
      * Someone is waiting at the form, and can type the values instead: worth spending Key 2 to
-     * answer within 10 s; given up after 30 s.
+     * answer within 15 s (Key gets a second try first; a median about 6 s); given up after 30 s.
      */
-    urgency: { targetMs: 10_000, limitMs: 30_000 },
+    urgency: { targetMs: 15_000, limitMs: 30_000 },
   },
 } as const satisfies Record<string, TaskSettings>;

@@ -38,7 +38,7 @@ entry records them with the request.
   default; prompt v3 sent 0.2.
 - **Urgency: the lab's answer by 30 s, given up after 90 s;** the tool's by 60 s, after 90 s;
   the bench's by 60 s, after 300 s (`--target`, `--limit`; `inf`: Key only). Gemini
-  (`src/ai/gemini/`, see [ai.md](ai.md)) asks Key, tries it again after 5, 15, 30… s while it
+  (`src/ai/gemini/`, see [ai.md](ai.md)) asks Key, tries it again after 2, 10, 30… s while it
   is busy (500, 503, 504, no answer within 120 s, unreachable) and could still answer by the
   target, and asks Key 2 (paid) when it can't. Why: 503s at a busy hour are common (run 5 lost 3
   of 20 before these retries), and someone waiting at the phone shouldn't wait out a busy

@@ -64,10 +64,11 @@ export type Step =
     };
 
 /**
- * Waits before each new try of a busy key, the last repeated. Why: 503s at a busy hour are
- * common and pass within minutes (docs/lab-meal-prompt.md, The model).
+ * Waits before each new try of a busy key, the last repeated. Why: a 503 is often that try's
+ * alone (about half of Key's tries at a quiet hour, the next one as likely to pass), so the
+ * first retry is soon; one that persists passes within minutes (docs/ai.md, Gemini).
  */
-export const BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 120_000] as const;
+export const BACKOFF_MS = [2_000, 10_000, 30_000, 60_000, 120_000] as const;
 /** The longest a try may take: answers take 2–9 s; a stuck one is worth another try. */
 export const TRY_TIMEOUT_MS = 120_000;
 /** No new try with less time than this left before the limit: it would only time out. */

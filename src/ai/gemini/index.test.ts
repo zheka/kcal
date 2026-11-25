@@ -84,7 +84,7 @@ const options = (more: Partial<AskOptions> = {}): AskOptions => ({
 
 afterEach(() => vi.unstubAllGlobals());
 
-const APP = { targetMs: 10_000, limitMs: 30_000 };
+const APP = { targetMs: 15_000, limitMs: 30_000 };
 const LAB = { targetMs: 30_000, limitMs: 90_000 };
 const KEYS = { key: 'cheap-aaaa', key2: 'reliable-bbbb' };
 const quota = (o: { daily?: boolean; retryDelay?: string } = {}) => ({
@@ -151,30 +151,32 @@ describe('asking Gemini', () => {
     const answered = await g.ask(REQUEST, options({ onProgress: (p) => progress.push(p) }));
     expect(answered.attempts).toEqual([
       { key: 'key', keyEnd: 'aaaa', at: 0, ms: 0, error: 'Gemini 503: overloaded' },
-      { key: 'key', keyEnd: 'aaaa', at: 5_000, ms: 0, error: 'Gemini 500: overloaded' },
-      { key: 'key', keyEnd: 'aaaa', at: 20_000, ms: 0 },
+      { key: 'key', keyEnd: 'aaaa', at: 2_000, ms: 0, error: 'Gemini 500: overloaded' },
+      { key: 'key', keyEnd: 'aaaa', at: 12_000, ms: 0 },
     ]);
     expect(sent).toEqual(['cheap-aaaa', 'cheap-aaaa', 'cheap-aaaa']);
-    expect(time.waits).toEqual([5_000, 15_000]);
+    expect(time.waits).toEqual([2_000, 10_000]);
     expect(progress).toEqual([
       { why: 'sending', waitMs: 0 },
-      { why: 'busy', waitMs: 5_000 },
+      { why: 'busy', waitMs: 2_000 },
       { why: 'sending', waitMs: 0 },
-      { why: 'busy', waitMs: 15_000 },
+      { why: 'busy', waitMs: 10_000 },
       { why: 'sending', waitMs: 0 },
     ]);
   });
 
-  it('with a target Key can’t make again, asks Key 2 at once', async () => {
-    const sent = fakeFetch([503, BUSY]);
+  it('asks Key 2 at once when Key can’t answer by the target with another try', async () => {
+    const sent = fakeFetch([503, BUSY], [503, BUSY]);
     const { g, time } = gemini(KEYS);
     const answered = await g.ask(REQUEST, options({ urgency: APP }));
+    // a second try 2 s after the first could answer by 15 s; a third, 10 s later, couldn't
     expect(answered.attempts).toEqual([
       { key: 'key', keyEnd: 'aaaa', at: 0, ms: 0, error: 'Gemini 503: overloaded' },
-      { key: 'key2', keyEnd: 'bbbb', at: 0, ms: 0, why: 'busy' },
+      { key: 'key', keyEnd: 'aaaa', at: 2_000, ms: 0, error: 'Gemini 503: overloaded' },
+      { key: 'key2', keyEnd: 'bbbb', at: 2_000, ms: 0, why: 'busy' },
     ]);
-    expect(sent).toEqual(['cheap-aaaa', 'reliable-bbbb']);
-    expect(time.waits).toEqual([]);
+    expect(sent).toEqual(['cheap-aaaa', 'cheap-aaaa', 'reliable-bbbb']);
+    expect(time.waits).toEqual([2_000]);
   });
 
   it('cools a key over its quota, across requests, as long as Gemini says', async () => {
@@ -223,6 +225,7 @@ describe('asking Gemini', () => {
   it('fails on a key error, naming the key, without asking the other', async () => {
     const sent = fakeFetch(
       [503, BUSY],
+      [503, BUSY],
       [400, { error: { message: 'API key not valid.', details: [{ reason: 'API_KEY_INVALID' }] } }],
     );
     const err = await failed(gemini(KEYS).g.ask(REQUEST, options({ urgency: APP })));
@@ -231,7 +234,7 @@ describe('asking Gemini', () => {
       message: 'Key 2: Gemini 400: API key not valid.',
       options: { sent: true, key: 'key2' },
     });
-    expect(sent).toEqual(['cheap-aaaa', 'reliable-bbbb']);
+    expect(sent).toEqual(['cheap-aaaa', 'cheap-aaaa', 'reliable-bbbb']);
 
     fakeFetch([429, { error: { message: 'Your prepayment credits are depleted.' } }]);
     const credit = await failed(gemini({ key: '', key2: 'k2' }).g.ask(REQUEST, options()));
@@ -251,8 +254,8 @@ describe('asking Gemini', () => {
     const tries = await gemini({ key: 'k', key2: '' })
       .g.ask(REQUEST, short)
       .catch((e: ModelError) => e.options.attempts);
-    // a second try after 5 s; a third, 15 s later, would start at the limit
-    expect(tries).toHaveLength(2);
+    // tries at 0, 2 and 12 s; a fourth, 30 s later, would be past the limit
+    expect(tries).toHaveLength(3);
   });
 
   it('keeps Key to its pace across requests; the app asks Key 2 meanwhile', async () => {
@@ -276,11 +279,11 @@ describe('asking Gemini', () => {
       options({ urgency: APP, onProgress: (p) => progress.push(p) }),
     );
     expect(answered.attempts).toEqual([
-      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 5_000, cancelled: true },
-      { key: 'key2', keyEnd: 'bbbb', at: 5_000, ms: 0, why: 'slow' },
+      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 10_000, cancelled: true },
+      { key: 'key2', keyEnd: 'bbbb', at: 10_000, ms: 0, why: 'slow' },
     ]);
     expect(sent).toEqual(['cheap-aaaa', 'reliable-bbbb']);
-    expect(time.waits).toEqual([5_000]);
+    expect(time.waits).toEqual([10_000]);
     expect(progress).toEqual([
       { why: 'sending', waitMs: 0 },
       { why: 'slow', waitMs: 0 },
@@ -296,8 +299,8 @@ describe('asking Gemini', () => {
     });
     const answered = await gemini(KEYS).g.ask(REQUEST, options({ urgency: APP }));
     expect(answered.attempts).toEqual([
-      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 5_000 },
-      { key: 'key2', keyEnd: 'bbbb', at: 5_000, ms: 0, why: 'slow', cancelled: true },
+      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 10_000 },
+      { key: 'key2', keyEnd: 'bbbb', at: 10_000, ms: 0, why: 'slow', cancelled: true },
     ]);
   });
 
@@ -320,11 +323,11 @@ describe('asking Gemini', () => {
     const answered = await gemini(KEYS).g.ask(REQUEST, options({ urgency: APP }));
     expect(answered.text).toEqual(['{}']);
     expect(answered.attempts).toEqual([
-      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 5_000 },
+      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 10_000 },
       {
         key: 'key2',
         keyEnd: 'bbbb',
-        at: 5_000,
+        at: 10_000,
         ms: 0,
         why: 'slow',
         error: 'Gemini 400: API key not valid.',
