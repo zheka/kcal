@@ -15,12 +15,20 @@ const APP = { targetMs: 10_000, limitMs: 30_000 };
 const LAB = { targetMs: 30_000, limitMs: 90_000 };
 const FAST = { targetMs: 5_000, limitMs: 30_000 };
 
-const READY: KeyState = { set: true, coolMs: -Infinity, paceMs: -Infinity, busy: 0, busyEndMs: 0 };
+const READY: KeyState = {
+  set: true,
+  coolMs: -Infinity,
+  paceMs: -Infinity,
+  busy: 0,
+  busyEndMs: 0,
+  running: false,
+};
 const UNSET: KeyState = { ...READY, set: false };
 /** A key busy `n` times in this request, the last ending at `endMs`. */
 const busy = (n: number, endMs: number): KeyState => ({ ...READY, busy: n, busyEndMs: endMs });
 const cooling = (untilMs: number): KeyState => ({ ...READY, coolMs: untilMs });
 const paced = (untilMs: number): KeyState => ({ ...READY, paceMs: untilMs });
+const RUNNING: KeyState = { ...READY, running: true };
 
 const step = (
   urgency: Situation['urgency'],
@@ -183,6 +191,65 @@ describe('Gemini’s next step', () => {
       busy(2, 11_000),
       busy(1, 11_000),
       { waitMs: 4_000, why: 'busy' },
+    ],
+
+    // a try on its way: waited for, until another can only just answer by the target
+    [
+      'app, Key on its way: wait for it until 5 s',
+      APP,
+      1_000,
+      RUNNING,
+      READY,
+      { waitMs: 4_000, why: 'answer' },
+    ],
+    [
+      'app, Key still on its way at 5 s: Key 2 too',
+      APP,
+      5_000,
+      RUNNING,
+      READY,
+      { send: 'key2', timeoutMs: 25_000, why: 'slow' },
+    ],
+    [
+      'lab, Key on its way: Key 2 too only at 25 s',
+      LAB,
+      10_000,
+      RUNNING,
+      READY,
+      { waitMs: 15_000, why: 'answer' },
+    ],
+    [
+      'no target, Key on its way: wait for it, Key 2 never',
+      STRICT,
+      200_000,
+      RUNNING,
+      READY,
+      { waitMs: Infinity, why: 'answer' },
+    ],
+    ['both on their way: wait', APP, 8_000, RUNNING, RUNNING, { waitMs: Infinity, why: 'answer' }],
+    [
+      'Key 2 on its way (Key cooled), Key free again past 5 s: Key too',
+      APP,
+      6_000,
+      READY,
+      RUNNING,
+      { send: 'key', timeoutMs: 24_000 },
+    ],
+    [
+      'Key on its way, Key 2 backing off: wait for whichever first',
+      APP,
+      6_000,
+      RUNNING,
+      busy(1, 3_000),
+      { waitMs: 2_000, why: 'busy' },
+    ],
+    [
+      'only Key, on its way past 5 s: wait for it',
+      APP,
+      6_000,
+      RUNNING,
+      UNSET,
+      { waitMs: Infinity, why: 'answer' },
     ],
 
     // the limit

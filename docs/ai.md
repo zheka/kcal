@@ -155,6 +155,12 @@ each key; `gemini/index.ts` runs it, asking it again after every wait and every 
   can't be asked again within the limit.
 - **A target no longer than `ANSWER_MS`:** Key can't make it from the start, so Key 2 alone,
   at once. Never both: a request that pays anyway gains little from a free try beside it.
+- **A slow try is hedged:** a try on its way is waited for until the last moment another
+  could still answer by the target (target − `ANSWER_MS`: 5 s in the app, 25 s in the lab,
+  never without a target); then the other key is asked too, the first answer taken and the
+  other try cancelled (`cancelled` in the log; a paid one cancelled is likely billed anyway).
+  Why not cut the slow try and switch: it costs the same paid try, and loses a free answer
+  that may be a second away. At most one try per key at once.
 - **Within the limit:** no try starts with less than 5 s left; each may take 120 s at most,
   never past the limit.
 
@@ -182,7 +188,9 @@ Each failed try is classified by its status and Google's error details (`gemini/
 | `key`   | 401; any 403; a 400 about the API key; a 429 of a prepaid account out of credit | the request fails, naming the key (`Key 2: Gemini 400: API key not valid…`)                                                |
 | `final` | any other error: the request's own                                              | the request fails                                                                                                          |
 
-- **A key error fails the request, not just the key,** with Key 2 as with Key. Why: a key that
+- **A key error fails the request, not just the key,** with Key 2 as with Key, once no try
+  with the other key is on its way: one on its way is waited for (not cancelled), and its
+  answer taken if it comes; no new try is sent. Why: a key that
   silently stops working is a key the user stops paying attention to; a request that needs it
   says so, so it gets fixed or removed. Nothing is remembered of it: the next request that
   needs it asks it again, so a key fixed meanwhile (topped up, replaced) works at once. A key

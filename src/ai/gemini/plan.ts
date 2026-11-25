@@ -8,6 +8,8 @@ import type { Urgency } from '../provider.ts';
  * Key (cheap) is asked when it can answer before the target; else Key 2 (paid), when it can; else
  * whichever can start soonest (Key 2 on a tie before the target, Key on a tie past it). With no
  * target, Key 2 is never asked while there is a Key. A key the user left empty is never asked.
+ * A try on its way is waited for until the last moment another could still answer by the target
+ * (target − ANSWER_MS); then the other key is asked too (a hedge), the first answer taken.
  */
 
 /** The keys, as the user names them: Key (cheap, free tier), Key 2 (reliable, paid). */
@@ -26,6 +28,8 @@ export interface KeyState {
   /** Its busy tries in this request, and when the last one ended. */
   busy: number;
   busyEndMs: number;
+  /** A try with it is on its way. */
+  running: boolean;
 }
 
 export interface Situation {
@@ -52,8 +56,11 @@ export type Step =
   | {
       /** How long to wait before planning again. */
       waitMs: number;
-      /** What for: a busy key's backoff, or a quota (a cooldown, the pace). */
-      why: 'busy' | 'quota';
+      /**
+       * What for: a busy key's backoff, a quota (a cooldown, the pace), or the answer of a try on
+       * its way (planning again when it comes, else after waitMs; Infinity: only then).
+       */
+      why: 'busy' | 'quota' | 'answer';
     };
 
 /**
@@ -81,12 +88,16 @@ const NAMES: readonly KeyName[] = ['key', 'key2'];
 /** The next step, or null: nothing left worth trying (no key, the limit). */
 export function nextStep({ urgency, elapsedMs: now, keys }: Situation): Step | null {
   const { targetMs: target, limitMs: limit } = urgency;
+  const hedgeAt = target - ANSWER_MS;
+  const running = NAMES.some((n) => keys[n].running);
+  if (running && !(now >= hedgeAt)) return { waitMs: hedgeAt - now, why: 'answer' };
   const asked: readonly KeyName[] =
     target === Infinity && keys.key.set ? ['key'] : NAMES.filter((n) => keys[n].set);
   const options = asked
+    .filter((name) => !keys[name].running)
     .map((name) => ({ name, ...start(keys[name], now) }))
     .filter((o) => o.at + MIN_TRY_MS <= limit);
-  if (options.length === 0) return null;
+  if (options.length === 0) return running ? { waitMs: Infinity, why: 'answer' } : null;
 
   const pick =
     options.find((o) => o.at + ANSWER_MS < target) ??
@@ -96,7 +107,11 @@ export function nextStep({ urgency, elapsedMs: now, keys }: Situation): Step | n
   }
   const timeoutMs = Math.min(TRY_TIMEOUT_MS, limit - now);
   if (pick.name === 'key') return { send: 'key', timeoutMs };
-  const why: Why = !keys.key.set ? 'only' : (start(keys.key, now).held ?? 'slow');
+  const why: Why = !keys.key.set
+    ? 'only'
+    : keys.key.running
+      ? 'slow'
+      : (start(keys.key, now).held ?? 'slow');
   return { send: 'key2', timeoutMs, why };
 }
 

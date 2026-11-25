@@ -26,19 +26,50 @@ function fakeFetch(...replies: [number, object][]) {
   return keys;
 }
 
-/** A clock that only moves when waited on; each wait, as asked. */
+/**
+ * A clock that only moves when waited on; each wait, as asked. A wait first lets everything
+ * else due run (a reply on its way), and doesn't move the clock when it was cut short.
+ */
 function fakeTime() {
   let t = 0;
   const waits: number[] = [];
   return {
     now: () => t,
-    wait: async (ms: number) => {
+    wait: async (ms: number, signal?: AbortSignal) => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (signal?.aborted) return;
       waits.push(ms);
       t += ms;
     },
     waits,
   };
 }
+
+/** Gemini answering each try as `answer` says for its key, until the try is aborted. */
+function stubFetch(answer: (key: string) => [number, object] | Promise<[number, object]>) {
+  const keys: string[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      const key = (init.headers as Record<string, string>)['x-goog-api-key']!;
+      keys.push(key);
+      const aborted = new Promise<never>((_, reject) =>
+        init.signal!.addEventListener('abort', () => reject(new Error('aborted'))),
+      );
+      const [status, body] = await Promise.race([Promise.resolve(answer(key)), aborted]);
+      return new Response(JSON.stringify(body), { status });
+    }),
+  );
+  return keys;
+}
+
+/** An answer that comes when told to. */
+function later() {
+  let settle!: (reply: [number, object]) => void;
+  const promise = new Promise<[number, object]>((resolve) => (settle = resolve));
+  return { promise, settle };
+}
+const never = () => new Promise<[number, object]>(() => {});
 
 const gemini = (keys: GeminiKeys, more: { online?: () => boolean } = {}) => {
   const time = fakeTime();
@@ -65,7 +96,13 @@ const quota = (o: { daily?: boolean; retryDelay?: string } = {}) => ({
     ],
   },
 });
-const failed = (p: Promise<unknown>) => p.catch((e: unknown) => e as ModelError);
+const failed = (p: Promise<unknown>): Promise<ModelError> =>
+  p.then(
+    () => {
+      throw new Error('answered');
+    },
+    (e: unknown) => e as ModelError,
+  );
 
 describe('asking Gemini', () => {
   it('asks with Key, and logs which key, its end, when and how long', async () => {
@@ -228,6 +265,96 @@ describe('asking Gemini', () => {
     await g.ask(REQUEST, options({ onProgress: (p) => progress.push(p) }));
     expect(time.waits).toEqual([60_000]);
     expect(progress).toContainEqual({ why: 'quota', waitMs: 60_000 });
+  });
+
+  it('asks Key 2 too when Key is slow to answer by the target, taking the first answer', async () => {
+    const sent = stubFetch((key) => (key === KEYS.key ? never() : [200, OK]));
+    const { g, time } = gemini(KEYS);
+    const progress: Progress[] = [];
+    const answered = await g.ask(
+      REQUEST,
+      options({ urgency: APP, onProgress: (p) => progress.push(p) }),
+    );
+    expect(answered.attempts).toEqual([
+      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 5_000, cancelled: true },
+      { key: 'key2', keyEnd: 'bbbb', at: 5_000, ms: 0, why: 'slow' },
+    ]);
+    expect(sent).toEqual(['cheap-aaaa', 'reliable-bbbb']);
+    expect(time.waits).toEqual([5_000]);
+    expect(progress).toEqual([
+      { why: 'sending', waitMs: 0 },
+      { why: 'slow', waitMs: 0 },
+    ]);
+  });
+
+  it('takes Key’s answer when it comes first after all, cancelling Key 2', async () => {
+    const key = later();
+    stubFetch((k) => {
+      if (k === KEYS.key) return key.promise;
+      key.settle([200, OK]);
+      return never();
+    });
+    const answered = await gemini(KEYS).g.ask(REQUEST, options({ urgency: APP }));
+    expect(answered.attempts).toEqual([
+      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 5_000 },
+      { key: 'key2', keyEnd: 'bbbb', at: 5_000, ms: 0, why: 'slow', cancelled: true },
+    ]);
+  });
+
+  it('on a key error, waits for the other key’s try on its way: its answer, else the error', async () => {
+    const INVALID: [number, object] = [
+      400,
+      { error: { message: 'API key not valid.', details: [{ reason: 'API_KEY_INVALID' }] } },
+    ];
+    const keyAnswers = (reply: [number, object]) => {
+      const key = later();
+      const sent = stubFetch((k) => {
+        if (k === KEYS.key) return key.promise;
+        setTimeout(() => key.settle(reply), 0);
+        return INVALID;
+      });
+      return sent;
+    };
+
+    const sent = keyAnswers([200, OK]);
+    const answered = await gemini(KEYS).g.ask(REQUEST, options({ urgency: APP }));
+    expect(answered.text).toEqual(['{}']);
+    expect(answered.attempts).toEqual([
+      { key: 'key', keyEnd: 'aaaa', at: 0, ms: 5_000 },
+      {
+        key: 'key2',
+        keyEnd: 'bbbb',
+        at: 5_000,
+        ms: 0,
+        why: 'slow',
+        error: 'Gemini 400: API key not valid.',
+      },
+    ]);
+    expect(sent).toHaveLength(2); // Key's answer taken, no more tries
+
+    keyAnswers([503, BUSY]);
+    const err = await failed(gemini(KEYS).g.ask(REQUEST, options({ urgency: APP })));
+    expect(err).toMatchObject({
+      message: 'Key 2: Gemini 400: API key not valid.',
+      options: { key: 'key2', attempts: [{ error: 'Gemini 503: overloaded' }, {}] },
+    });
+    expect(fetch).toHaveBeenCalledTimes(2); // not tried again, though there was time
+  });
+
+  it('cancels every try on its way when the caller aborts', async () => {
+    const abort = new AbortController();
+    stubFetch((k) => {
+      if (k === KEYS.key2) setTimeout(() => abort.abort(), 0);
+      return never();
+    });
+    const err = await failed(
+      gemini(KEYS).g.ask(REQUEST, options({ urgency: APP, signal: abort.signal })),
+    );
+    expect(err).toMatchObject({ message: 'cancelled', options: { sent: true } });
+    expect(err.options.attempts?.map((a) => [a.key, a.cancelled])).toEqual([
+      ['key', true],
+      ['key2', true],
+    ]);
   });
 
   it('stops when the caller aborts', async () => {
