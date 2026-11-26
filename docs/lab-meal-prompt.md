@@ -197,10 +197,12 @@ unless the test says its own).
   file, `{ "description": "…", "time": "…", "language": "…", "inputs": [...] }`, the description
   saying what's hard about it; texts (`text`) and barcodes (`barcode`) inline, files (`photo`,
   `product`, `textFile`) as paths relative to the test file, or absolute. `time` and `language`
-  are optional: what the request tells the model, instead of the tool's. `time` is `HH:MM` or an
-  ISO 8601 date and time (`2026-11-25T08:10:31+01:00`, as the lab's download writes it); the
-  model is told its wall-clock time as written, whatever the zone the tool runs in. Other fields
-  are ignored. Why: a meal downloaded from the lab replays the request the lab sent.
+  are optional: what the request tells the model, instead of the tool's; `time` is `HH:MM`.
+  Other fields are ignored. Why: a meal from the lab replays the request the lab sent.
+- **From the lab:** `node scripts/lab-meal-test.ts --out=<dir> <download> [<meal id>…]` makes a
+  test of each meal in the lab's Download data (unzipped; see lab.md, Logs): its last update that
+  brought an answer (else its last), the inputs as the request sent them, its time and language,
+  the update itself (when, the build, the answer or the error) in a `lab-composer` section.
 - **Output:** the meal as text on stdout, and nothing else; no meal, why on stderr and exit code 1.
 - **`--out=<file>`:** everything as one JSON file: the inputs, the request, the answer, the
   reader's meal and flags, the processed meal. Nothing is written without it.

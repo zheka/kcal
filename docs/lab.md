@@ -21,8 +21,7 @@ and what comes next.
   before each try, so a key set or forgotten meanwhile is the one used; it reads and writes
   nothing else of the app's); the answer language (a code, `ru` by default); how the model is
   asked, as `src/lab/meal/settings.ts` says (model, thinking, how long it may take: the tool's
-  settings, not the user's); Download meals (as tests, below), Download logs, Clear logs, Clear
-  all lab data; the build.
+  settings, not the user's); Download data, Clear data (below); the build.
 
 ## Requests
 
@@ -32,9 +31,7 @@ sends (`mealRequest` in `src/lab/meal/request.ts`, see
 language and the time, every attached thing as a part of its own in the order attached (a text,
 a photo, a scanned product as JSON), and the checklist. Nothing of the meal so far is sent: each
 update perceives the whole input afresh. The answer is read forgivingly (`read.ts`: what can be
-used is, repairs are flagged in the log) and replaces the meal. The meal keeps it as read and as
-it came, with when the update was sent, in local time with its offset (`answer`, `answeredAt`:
-since 2026-11-25). Meals answered by prompt v3 keep
+used is, repairs are flagged in the log) and replaces the meal. Meals answered by prompt v3 keep
 what they are composed from, without their answer: Update makes them again.
 
 A scanned product is what Open Food Facts says about it, nothing of my foods: the shared
@@ -48,52 +45,18 @@ Requests are built provider-neutral and asked of Gemini (`src/ai/`, see [ai.md](
 the lab's urgency (`settings.ts`): an answer by 30 s, Key 2 asked when Key can't make it, given
 up after 90 s. Within that Gemini tries a busy model again (its retries and keys: ai.md).
 
-## Meals as tests
-
-Download meals saves every meal with something attached as a test for the command-line tool and
-the bench (see [lab-meal-prompt.md](lab-meal-prompt.md), The tool), all in one zip,
-`kcal-lab-composer-meals-<date>.zip` (`src/lab/composer/export.ts`). Unpacked, it is a folder the
-bench runs as it is: `<meal id>.json` each, and `data/` with the photos (as kept: what the model
-was sent) and the scanned products (as sent). Each file is named by the id it is kept under: a
-photo by its file id (as the logs' requests name it), a product by its attached id (inline in the
-logs' requests).
-
-```jsonc
-{
-  "description": "Борщ с салом", // the meal's title
-  "time": "2026-11-25T08:10:31+01:00", // when the answer was asked for: the time the model was told
-  "language": "ru", // the answer language set when downloaded
-  "inputs": [{ "photo": "data/<file id>.jpg" }, { "text": "…" }, { "product": "data/<id>.json" }],
-  "lab-composer": {
-    // the lab's own: deleting it makes a plain test
-    "meal": "<meal id>",
-    "build": "da4cdb7", // that asked, when its log is there
-    "answer": {}, // the model's answer, as it came
-    "answers": [
-      // the user's choices on it, by name; sizes and food per the food they are for
-      {
-        "dish": "Борщ",
-        "product": "Сало",
-        "base": "g",
-        "food": "…",
-        "sizes": { "Сало": 20 },
-        "count": 5,
-      },
-    ],
-    "missing": ["<file id>"], // photos no longer kept, left out of the inputs
-  },
-}
-```
-
-`time`, `answer` and `answers` only when the answer is for the meal's context as it is: a meal
-never answered, or attached to since, is its inputs only. Meals answered before 2026-11-25
-(which didn't keep their answer) take it from the logs, when the last answer logged is the one
-shown.
-
 ## Logs
 
-One entry per update that sent something (none for no Gemini key or offline); the download is the
-entries as a JSON array, oldest first. No key, no image data, no meals.
+One entry per update that sent something (none for no Gemini key or offline), failures included.
+
+**Download data** saves the logs and the photos as one zip, `kcal-lab-composer-<date>.zip`
+(`src/lab/storage/lab.ts`): `log.json`, the entries as a JSON array, oldest first, and
+`files/<file id>.jpg`, every photo as kept: shrunk, what the model is sent, named by the id the
+entries' requests use. No key, no meals (they are the lab's working state; what was sent is in the
+log). **Clear data** deletes all of it (every experiment's). Photos are kept until then, even when
+their meal is deleted, so every photo a log entry names is in the download.
+`scripts/lab-meal-test.ts` makes tests of a download's meals (see
+[lab-meal-prompt.md](lab-meal-prompt.md), The tool).
 
 ```jsonc
 {

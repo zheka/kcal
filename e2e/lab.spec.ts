@@ -51,7 +51,7 @@ test('the lab clears its own data and the prototype’s, and leaves everything e
   await expect(page.getByText('Saved on this device (…-key)')).toBeVisible();
 
   // a second tap confirms
-  await page.getByRole('button', { name: 'Clear all lab data' }).click();
+  await page.getByRole('button', { name: 'Clear data' }).click();
   await page.getByRole('button', { name: 'Tap again to clear everything' }).click();
   await expect(page.getByRole('heading', { name: 'Lab data cleared' })).toBeVisible();
   const left = await page.evaluate(async () => ({

@@ -56,13 +56,18 @@ async function saveKey(page: Page) {
 /** A log entry, as far as these tests look into it. */
 type Entry = Record<string, unknown> & { response: { error?: string } };
 
-async function downloadLogs(page: Page): Promise<{ text: string; logs: Entry[] }> {
+/** Download data: the log, and the files by name. */
+async function downloadData(
+  page: Page,
+): Promise<{ text: string; logs: Entry[]; files: Record<string, Uint8Array>; name: string }> {
   await page.getByRole('button', { name: 'Menu' }).click();
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download logs' }).click();
-  const text = readFileSync(await (await download).path(), 'utf8');
+  await page.getByRole('button', { name: 'Download data' }).click();
+  const zip = await download;
+  const files = unzipSync(readFileSync(await zip.path()));
+  const text = strFromU8(files['log.json']!);
   await page.getByRole('button', { name: 'Close' }).click();
-  return { text, logs: JSON.parse(text) as Entry[] };
+  return { text, logs: JSON.parse(text) as Entry[], files, name: zip.suggestedFilename() };
 }
 
 test('composes a meal from its attached context, answers it locally, updates it with more', async ({
@@ -144,7 +149,7 @@ test('composes a meal from its attached context, answers it locally, updates it 
   await page.getByRole('button', { name: 'Close' }).click();
 
   // the logs: every request and its answer, photos by id, never the key
-  const { text, logs } = await downloadLogs(page);
+  const { text, logs } = await downloadData(page);
   expect(text).not.toContain('test-key');
   expect(text).not.toContain(sent[0]!.parts[1]!.inline_data!.data);
   expect(logs).toHaveLength(2);
@@ -201,22 +206,14 @@ test('a failed update keeps the meal, says why, and can be retried; logs both', 
   expect(sent).toHaveLength(2);
   await page.getByRole('button', { name: 'Close' }).click();
 
-  const { logs } = await downloadLogs(page);
+  const { logs } = await downloadData(page);
   expect(logs.map((l) => l.response.error ?? 'answer')).toEqual([
     'Gemini 400: Something went wrong',
     'answer',
   ]);
-
-  // the logs can be cleared on their own
-  await page.getByRole('button', { name: 'Menu' }).click();
-  await page.getByRole('button', { name: 'Clear logs' }).click();
-  await page.getByRole('button', { name: 'Tap again to clear the logs' }).click();
-  await page.getByRole('button', { name: 'Close' }).click();
-  expect((await downloadLogs(page)).logs).toEqual([]);
-  await expect(page.locator('.composed-row')).toHaveCount(1);
 });
 
-test('downloads the meals as tests: the inputs, the photo as sent, the answer and choices', async ({
+test('downloads the data: the log, and the photos as sent, kept when their meal is deleted', async ({
   seeded: page,
 }) => {
   const sent = await fakeGemini(page, () => reply(ANSWER));
@@ -229,50 +226,16 @@ test('downloads the meals as tests: the inputs, the photo as sent, the answer an
   await page.getByLabel('What you eat').fill('вареники');
   await page.getByRole('button', { name: 'Add' }).click();
   await page.getByRole('button', { name: 'Update' }).click();
-  await page.getByRole('group', { name: 'how many' }).getByRole('button', { name: '14' }).click();
-  await expect(page.locator('.composed-item').first()).toContainText('14 × 45г');
-  await page.getByRole('button', { name: 'Close' }).click();
-  // a second meal, never answered
-  await page.getByRole('button', { name: 'New meal' }).click();
-  await page.getByLabel('What you eat').fill('чай');
-  await page.getByRole('button', { name: 'Add' }).click();
-  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('.composed-item')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Delete this meal' }).click();
+  await page.getByRole('button', { name: /Tap again/ }).click();
+  await expect(page.locator('.composed-row')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Menu' }).click();
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download meals' }).click();
-  const zip = await download;
-  expect(zip.suggestedFilename()).toMatch(/^kcal-lab-composer-meals-\d{4}-\d{2}-\d{2}\.zip$/);
-  const files = unzipSync(readFileSync(await zip.path()));
-  const tests = Object.keys(files).filter((f) => f.endsWith('.json') && !f.startsWith('data/'));
-  expect(tests).toHaveLength(2);
-  const meals = tests.map((f) => JSON.parse(strFromU8(files[f]!)) as Record<string, unknown>);
-  const done = meals.find((m) => 'time' in m)!;
-  const fresh = meals.find((m) => !('time' in m))!;
-
-  const photo = Object.keys(files).find((f) => f.startsWith('data/'))!;
-  expect(done).toEqual({
-    description: 'Обед',
-    time: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/),
-    language: 'ru',
-    inputs: [{ photo }, { text: 'вареники' }],
-    'lab-composer': {
-      meal: expect.any(String),
-      build: expect.any(String),
-      answer: ANSWER,
-      answers: [{ dish: 'Вареники', product: 'Вареники с картошкой', base: 'g', count: 14 }],
-    },
-  });
-  // the photo as sent to the model, named by its file id, as the logs' request names it
-  expect(Buffer.from(files[photo]!).toString('base64')).toBe(sent[0]!.parts[1]!.inline_data!.data);
-  await page.getByRole('button', { name: 'Close' }).click();
-  const { logs } = await downloadLogs(page);
+  const { logs, files, name } = await downloadData(page);
+  expect(name).toMatch(/^kcal-lab-composer-\d{4}-\d{2}-\d{2}\.zip$/);
   const content = (logs[0]!.request as { content: { file?: string }[] }).content;
-  expect(photo).toBe(`data/${content[1]!.file}.jpg`);
-  expect(fresh).toEqual({
-    description: '',
-    language: 'ru',
-    inputs: [{ text: 'чай' }],
-    'lab-composer': { meal: expect.any(String) },
-  });
+  const photo = files[`files/${content[1]!.file}.jpg`]!;
+  // the photo as the model was sent it
+  expect(Buffer.from(photo).toString('base64')).toBe(sent[0]!.parts[1]!.inline_data!.data);
+  expect(Object.keys(files).sort()).toEqual([`files/${content[1]!.file}.jpg`, 'log.json']);
 });

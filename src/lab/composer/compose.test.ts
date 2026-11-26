@@ -19,8 +19,7 @@ const meal = (context: Attached[] = [], more: Partial<ComposedMeal> = {}): Compo
 });
 const text = (id: string, t: string): Attached => ({ id, kind: 'text', text: t });
 const photo = (id: string): Attached => ({ id, kind: 'photo', file: `file-${id}` });
-const answered = (m: ComposedMeal) =>
-  applyUpdate(m, m.context, NOW, { ms: 900, answer: testAnswer });
+const answered = (m: ComposedMeal) => applyUpdate(m, m.context, { ms: 900, answer: testAnswer });
 
 describe('the update request', () => {
   it('is the tool’s request: the prompt, the settings, the context as attached, in order', () => {
@@ -66,12 +65,6 @@ describe('applying an update', () => {
     expect(next.changed).toBe(false);
   });
 
-  it('keeps the answer as it came, and when it was asked for, local time (tests: Berlin)', () => {
-    const next = answered(meal([text('a', 'вареники')]));
-    expect(next.answer).toEqual(testAnswer);
-    expect(next.answeredAt).toBe('2026-11-21T12:30:00+01:00');
-  });
-
   it('shows the meal with the user’s answers, values and totals updated', () => {
     const m = answered(meal([text('a', 'вареники')]));
     expect(shown(meal(), 'ru')).toBeNull();
@@ -83,9 +76,9 @@ describe('applying an update', () => {
 
   it('keeps the meal as it was when it failed, saying why, until the context changes', () => {
     const m = answered(meal([text('a', 'вареники')]));
-    const failed = applyUpdate(m, m.context, NOW, { ms: 300, error: 'Gemini 400: bad request' });
+    const failed = applyUpdate(m, m.context, { ms: 300, error: 'Gemini 400: bad request' });
     expect(failed).toEqual({ ...m, failed: 'Gemini 400: bad request' });
-    expect(applyUpdate(m, m.context, NOW, null, 'no API key').failed).toBe('no API key');
+    expect(applyUpdate(m, m.context, null, 'no API key').failed).toBe('no API key');
     const added = withContext(failed, [...failed.context, text('b', 'и чай')]);
     expect(added.failed).toBeUndefined();
     expect(added.changed).toBe(true);
@@ -94,10 +87,8 @@ describe('applying an update', () => {
   it('still needs an update when the context changed while it ran', () => {
     const m = meal([text('a', 'вареники')]);
     const meanwhile = withContext(m, [...m.context, text('b', 'и чай')]);
-    expect(applyUpdate(meanwhile, m.context, NOW, { ms: 900, answer: testAnswer }).changed).toBe(
-      true,
-    );
+    expect(applyUpdate(meanwhile, m.context, { ms: 900, answer: testAnswer }).changed).toBe(true);
     // a failure for what is no longer the context isn't shown
-    expect(applyUpdate(meanwhile, m.context, NOW, { ms: 9, error: 'x' })).toEqual(meanwhile);
+    expect(applyUpdate(meanwhile, m.context, { ms: 9, error: 'x' })).toEqual(meanwhile);
   });
 });

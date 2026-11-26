@@ -1,6 +1,7 @@
 // @vitest-environment node
 // IndexedDB (jsdom has none) from fake-indexeddb; Node's own Blob, which it can store.
 import 'fake-indexeddb/auto';
+import { strFromU8, unzipSync } from 'fflate';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openLab, type Lab } from './lab';
 import { clearLab, labTraces } from './clear';
@@ -109,23 +110,29 @@ describe('openLab', () => {
     expect(await lab.logs()).toEqual([]);
   });
 
-  it('exports only the logs, oldest first, as a pretty-printed array; clears them', async () => {
+  it('exports the logs, oldest first, and every file as kept; never data or secrets', async () => {
     const lab = await open<{ n: number }>();
     await lab.data.set({ n: 1 });
-    await lab.files.put(new Blob(['12345'], { type: 'image/png' }));
+    const photo = await lab.files.put(
+      new Blob([new Uint8Array([0xff, 0xd8, 7])], { type: 'image/jpeg' }),
+    );
+    const other = await lab.files.put(new Blob(['x'], { type: 'text/plain' }));
     await lab.setSecret('gemini', 'key-1234');
     await lab.log({ event: 'x' });
     await lab.log({ event: 'y' });
-    const json = await lab.exportJson();
+    const files = unzipSync(await lab.exportZip());
+    expect(Object.keys(files).sort()).toEqual(
+      ['files/' + other + '.bin', 'files/' + photo + '.jpg', 'log.json'].sort(),
+    );
+    expect(files[`files/${photo}.jpg`]).toEqual(new Uint8Array([0xff, 0xd8, 7]));
+    const json = strFromU8(files['log.json']!);
     expect(json).toMatch(/^\[\n {2}\{\n {4}"time"/);
     expect(JSON.parse(json)).toEqual([
       { time: expect.any(String), build: expect.any(String), event: 'x' },
       { time: expect.any(String), build: expect.any(String), event: 'y' },
     ]);
     expect(json).not.toContain('key-1234');
-    await lab.clearLogs();
-    expect(await lab.logs()).toEqual([]);
-    expect(await lab.data.get()).toEqual({ n: 1 });
+    expect(json).not.toContain('"n"');
   });
 });
 

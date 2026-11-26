@@ -16,17 +16,6 @@ export function localMinute(d: Date): string {
   return `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/**
- * Local time of `d` to the second, with the zone's offset: `YYYY-MM-DDTHH:mm:ss+01:00`. Both
- * the instant and the wall-clock time it was where it happened.
- */
-export function localTime(d: Date): string {
-  const offset = -d.getTimezoneOffset();
-  const abs = Math.abs(offset);
-  const zone = `${offset < 0 ? '-' : '+'}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
-  return `${localMinute(d)}:${pad(d.getSeconds())}${zone}`;
-}
-
 /** A real calendar date written as `YYYY-MM-DD`. */
 export function isValidDate(text: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);

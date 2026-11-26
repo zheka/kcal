@@ -7,20 +7,18 @@ import { SETTINGS } from '../meal/settings';
 /**
  * The lab's menu: the Gemini keys (the app's, the same section as its Settings: the lab asks
  * with Key); the composer's settings (the answer language), kept by the caller; how the model
- * is asked, as src/lab/meal/settings.ts says (the tool's too); the meals as tests (export.ts),
- * the lab's logs and data.
+ * is asked, as src/lab/meal/settings.ts says (the tool's too); the lab's data: its download
+ * (the logs and the photos, lab.ts) and clearing it.
  */
 
 interface LabActions {
-  downloadLogs: () => void;
-  downloadMeals: () => void;
-  clearLogs: () => void;
+  download: () => void;
   clearAll: () => void;
   close: () => void;
 }
 
 export function Menu(props: Parameters<typeof Settings>[0] & LabActions) {
-  const { downloadLogs, downloadMeals, clearLogs, clearAll, close, ...settings } = props;
+  const { download, clearAll, close, ...settings } = props;
   return (
     <div class="app lab-composer">
       <header class="topbar">
@@ -35,19 +33,11 @@ export function Menu(props: Parameters<typeof Settings>[0] & LabActions) {
         <section class="section">
           <h2 class="label">Lab</h2>
           <div class="actions column">
-            <button type="button" class="button" onClick={downloadMeals}>
-              Download meals
-            </button>
-            <button type="button" class="button" onClick={downloadLogs}>
-              Download logs
+            <button type="button" class="button" onClick={download}>
+              Download data
             </button>
             <ConfirmButton
-              label="Clear logs"
-              confirmLabel="Tap again to clear the logs"
-              onConfirm={clearLogs}
-            />
-            <ConfirmButton
-              label="Clear all lab data"
+              label="Clear data"
               confirmLabel="Tap again to clear everything"
               onConfirm={clearAll}
             />

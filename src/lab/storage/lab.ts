@@ -1,4 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { localDate } from '../../core/time';
+import { downloadBlob } from '../../ui/download';
 
 /**
  * An experiment's storage: one IndexedDB database, `kcal-lab-<id>`, apart from the app's data
@@ -8,9 +10,11 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
  *   whole on every save;
  * - `files`: blobs (photos), by id, kept out of `data` so saving it stays cheap;
  * - `secrets`: API keys and the like, by name, never downloaded;
- * - `logs`: debug records, appended, each with its time and build: what the download holds.
+ * - `logs`: debug records, appended, each with its time and build.
  *
- * `clearLab()` (clear.ts) deletes it all, with every other experiment's.
+ * The download is the logs and the files (the data is the experiment's working state, the logs
+ * what happened); `clearLab()` (clear.ts) deletes it all, with every other experiment's.
+ * Files are kept until then, so whatever a log names is there to download.
  */
 
 /** The build's commit (__APP_VERSION__ is `<commit> · <date>`). */
@@ -57,10 +61,13 @@ export interface Lab<T> {
    */
   log(record: Record<string, unknown> & { time?: string; build?: never }): Promise<void>;
   logs(): Promise<LogRecord[]>;
-  clearLogs(): Promise<void>;
-  /** The logs, oldest first, as a pretty-printed JSON array. */
-  exportJson(): Promise<string>;
-  /** Saves exportJson() as a file, `kcal-lab-<id>-<date>.json`. */
+  /**
+   * The logs and the files, as one zip (fflate, loaded only when asked): `log.json`, the logs
+   * oldest first as a pretty-printed array, and `files/<id>.<ext>`, every file as kept. Never
+   * the secrets or the data.
+   */
+  exportZip(): Promise<Uint8Array>;
+  /** Saves exportZip() as a file, `kcal-lab-<id>-<date>.zip`. */
   download(): Promise<void>;
   close(): void;
 }
@@ -115,18 +122,45 @@ export async function openLab<T>(id: string): Promise<Lab<T>> {
       }
     },
     logs: () => db.getAll('logs'),
-    clearLogs: () => db.clear('logs'),
-    exportJson: async () => JSON.stringify(await db.getAll('logs'), null, 2),
+    exportZip: async () => {
+      const { zipSync, strToU8 } = await import('fflate');
+      const entries: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = {
+        'log.json': strToU8(`${JSON.stringify(await db.getAll('logs'), null, 2)}\n`),
+      };
+      const tx = db.transaction('files');
+      const files: [string, Blob][] = [];
+      for (let c = await tx.store.openCursor(); c; c = await c.continue()) {
+        files.push([c.key, c.value]);
+      }
+      await tx.done;
+      for (const [id, blob] of files) {
+        // stored as they are: photos don't shrink
+        entries[`files/${id}.${extension(blob.type)}`] = [
+          new Uint8Array(await blob.arrayBuffer()),
+          { level: 0 },
+        ];
+      }
+      return zipSync(entries);
+    },
     download: async () => {
-      const json = await lab.exportJson();
-      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${name}-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const zip = await lab.exportZip();
+      downloadBlob(
+        `${name}-${localDate(new Date())}.zip`,
+        new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }),
+      );
     },
     close: () => db.close(),
   };
   return lab;
+}
+
+/** A file's extension by its type: `jpg` for a JPEG; `bin` for what isn't known. */
+function extension(type: string): string {
+  const known: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'application/json': 'json',
+  };
+  return known[type] ?? 'bin';
 }

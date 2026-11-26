@@ -25,13 +25,6 @@ export interface ComposedMeal {
   context: Attached[];
   /** The model's last answer, as read; none before the first update. */
   meal?: Meal;
-  /**
-   * The model's last answer as it came (the schema's JSON), and when its update was sent, local
-   * time with the offset (`2026-11-25T08:10:31+01:00`: the time the model was told). Kept since
-   * 2026-11-25, for downloading a meal as a test.
-   */
-  answer?: unknown;
-  answeredAt?: string;
   /** The user's answers to its questions; reset by an update. */
   answers: Answers;
   /** The context changed since the answer: Update sends it all. */

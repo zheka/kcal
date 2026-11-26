@@ -12,10 +12,8 @@ import '@fontsource-variable/roboto/wght.css';
 import '../../style.css';
 import './composer.css';
 import { newId } from '../../core/foods';
-import { localDate } from '../../core/time';
 import { gemini } from '../../ai/browser';
 import { geminiKeys } from '../../ai/keys';
-import { downloadBlob } from '../../ui/download';
 import { MenuIcon } from '../../ui/icons';
 import { run } from '../../ai/model';
 import type { Progress } from '../../ai/provider';
@@ -24,7 +22,6 @@ import { clearLab } from '../storage/clear';
 import { openLab, type Lab } from '../storage/lab';
 import { applyUpdate, checkAnswer, shown, updateRequest } from './compose';
 import { type ComposerData, EMPTY, fromStored, round, time, withMeal } from './data';
-import { mealsZip } from './export';
 import { MealScreen } from './MealScreen';
 import { Menu } from './Menu';
 import type { ComposedMeal } from './types';
@@ -67,17 +64,6 @@ function Composer({ lab, initial }: Props) {
       return meal ? { ...d, meals: withMeal(d.meals, update(meal)) } : d;
     });
 
-  /** The meals as tests, with their photos (export.ts), as one zip. */
-  async function downloadMeals() {
-    const zip = await mealsZip(data.meals, await lab.logs(), data.language, (id) =>
-      lab.files.get(id),
-    );
-    downloadBlob(
-      `kcal-lab-${lab.id}-meals-${localDate(new Date())}.zip`,
-      new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }),
-    );
-  }
-
   /** Sends the meal's whole context; logs the request and its outcome when it was sent. */
   async function update(meal: ComposedMeal, onBusy: (what: string) => void) {
     const time = new Date();
@@ -90,7 +76,7 @@ function Composer({ lab, initial }: Props) {
     const keys = await geminiKeys();
     if (!keys.key && !keys.key2) {
       change(meal.id, (m) =>
-        applyUpdate(m, meal.context, time, null, 'no Gemini key: set Key in the menu'),
+        applyUpdate(m, meal.context, null, 'no Gemini key: set Key in the menu'),
       );
       return;
     }
@@ -107,7 +93,7 @@ function Composer({ lab, initial }: Props) {
       notSent = err instanceof Error ? err.message : String(err);
     }
     if (response) void lab.log({ time: time.toISOString(), meal: meal.id, request, response });
-    change(meal.id, (m) => applyUpdate(m, meal.context, time, response, notSent));
+    change(meal.id, (m) => applyUpdate(m, meal.context, response, notSent));
   }
 
   if (cleared) {
@@ -124,9 +110,7 @@ function Composer({ lab, initial }: Props) {
       <Menu
         language={data.language}
         setLanguage={(language) => setData((d) => ({ ...d, language }))}
-        downloadLogs={() => void lab.download().catch(fail('download the logs'))}
-        downloadMeals={() => void downloadMeals().catch(fail('download the meals'))}
-        clearLogs={() => void lab.clearLogs().catch(fail('clear the logs'))}
+        download={() => void lab.download().catch(fail('download the data'))}
         clearAll={() =>
           void clearLab()
             .then(() => setCleared(true))
@@ -149,7 +133,7 @@ function Composer({ lab, initial }: Props) {
         close={() => setScreen('list')}
         remove={() => {
           setData((d) => ({ ...d, meals: d.meals.filter((m) => m.id !== open.id) }));
-          for (const a of open.context) if (a.kind === 'photo') void lab.files.delete(a.file);
+          // its photos stay: the log names them (lab.ts), until the lab is cleared
           setScreen('list');
         }}
       />
