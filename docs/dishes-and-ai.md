@@ -4,24 +4,28 @@ A discussion record: graduating the lab's meal composer into the app (a photo of
 product fills the forms), and the data model that needs (meals made of dishes, products matched
 against my library, barcodes of their own).
 
-Status (2026-11-26): **under discussion, nothing built. The data model summary below is not yet
-reviewed**; nothing in [design.md](design.md), [barcodes.md](barcodes.md) or [lab.md](lab.md)
-changes until it is. The reasoning and the rejected options are written up when it is final.
+Status (2026-11-26): **under discussion, nothing built. The data model is reviewed; the UI is
+next.** Nothing in [design.md](design.md), [barcodes.md](barcodes.md) or [lab.md](lab.md) changes
+until the whole is agreed. The reasoning and the rejected options are written up when it is final.
 
-## Data model (summary, to review)
+**The principle over all of it:** everything works offline, with no model; the model only takes
+the hassle when it is there, and never holds up a quick action (no waiting for it after a scan).
+It runs behind an explicit [ai] tap, where waiting is chosen, or in the background.
+
+## Data model (reviewed)
 
 ### Stored (the backup)
 
-| Entity          | Fields                                                    | Notes                                                                                                                                                                                                                               |
-| --------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Product**     | `id, name, perG?, perMl?, units[]`                        | As now, without `barcode`. The only live thing: fixing it changes every meal that uses it. Its name is descriptive; no category, no hidden description, no record of where its values came from.                                    |
-| **ProductUnit** | `id, name, g \| ml`                                       | As now ("piece = 55 g", "cup = 250 ml").                                                                                                                                                                                            |
-| **Barcode**     | `code, label: { name, brand?, pack?, per100? }, product?` | **New, a top-level list.** `code` unique. `label`: Open Food Facts' data as scanned, or typed from the pack when it doesn't know it; never counted. `product`: a **hint**, the product chosen last time for this barcode; optional. |
-| **Meal**        | `id, consumedAt?, title?, dishes[]`                       | Without `consumedAt`: a **template**, never counted. `title` kept for context.                                                                                                                                                      |
-| **Dish**        | `name?, items[], makes?: { amount, unit }, eaten?`        | **New**, inside its meal, never shared. No `makes`: eaten whole. With `makes` (one per dish: `1600 g`, `8 slices`): the items are the whole batch, counted × `eaten` / `makes`.                                                     |
-| **Item**        | `product, amount, unit`                                   | Was `Ingredient`. **Products only.** `unit`: `g`, `ml` or one of the product's unit ids.                                                                                                                                            |
-| **GoalSet**     | as now                                                    |                                                                                                                                                                                                                                     |
-| **Settings**    | as now, and the AI context's expiry                       |                                                                                                                                                                                                                                     |
+| Entity          | Fields                                                                          | Notes                                                                                                                                                                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Product**     | `id, name, perG?, perMl?, units[]`                                              | As now, without `barcode`. The only live thing: fixing it changes every meal that uses it. Its name is descriptive; no category, no hidden description, no record of where its values came from.                                                                                                        |
+| **ProductUnit** | `id, name, g \| ml`                                                             | As now ("piece = 55 g", "cup = 250 ml").                                                                                                                                                                                                                                                                |
+| **Barcode**     | `code, label: { name, brand?, pack?, per100?, categories? }, product?`          | **New, a top-level list.** `code` unique. `label`: Open Food Facts' data as scanned (`categories`: its tags, for finding close products offline), or typed from the pack when it doesn't know it; never counted. `product`: a **hint**, the product chosen last time for this barcode; optional.        |
+| **Meal**        | `id, consumedAt?, title?, dishes[]`                                             | Without `consumedAt`: a **template**, never counted. `title` kept for context.                                                                                                                                                                                                                          |
+| **Dish**        | `name?, items[], makes?: { amount, unit }, eaten?`                              | **New**, inside its meal, never shared. No `makes`: eaten whole. With `makes` (one per dish): the items are the whole batch, counted × `eaten` / `makes`. Its unit is `g`, `ml` or a free name (`servings` suggested, `slices`, `bowls`), `eaten` in the same: nothing has to be weighed (a pie isn't). |
+| **Item**        | `product, amount, unit`                                                         | Was `Ingredient`. **Products only.** `unit`: `g`, `ml` or one of the product's unit ids.                                                                                                                                                                                                                |
+| **GoalSet**     | as now                                                                          |                                                                                                                                                                                                                                                                                                         |
+| **Settings**    | as now, and the AI context's expiry; quick buttons as now (a product, or empty) |                                                                                                                                                                                                                                                                                                         |
 
 ### On the device only (not in the backup)
 
@@ -38,11 +42,20 @@ changes until it is. The reasoning and the rejected options are written up when 
 
 ### How one turns into another
 
-1. **A scan → Barcode.** A known code: its label and its hint, offline. An unknown one: Open
-   Food Facts' label (or typed), kept as a new Barcode.
-2. **Barcode → Product, the first time.** A candidate (the same food, values within a strict
-   tolerance of the label) is offered as the default; otherwise a new product from the label,
-   named as Open Food Facts names it without the brand. Either way the hint is set.
+1. **A scan → Barcode.** A known code: its label and its hint, offline, at once. An unknown one:
+   Open Food Facts' label, kept as a new Barcode; offline, the barcode is kept without a label (a
+   product picked or made by hand; the label filled in at a later lookup).
+2. **Any new product candidate → my data**, in every flow (a scan, an AI answer, the product
+   form, the food search), by code, offline:
+   - **a strict match** (the same barcode; or the same name, exactly but for case and spacing,
+     and macros within the strict tolerance): used, nothing asked;
+   - **close products** (values near, name words or Open Food Facts categories in common): a few
+     suggested, and **New**; linking and New both with the name editable (three protein desserts
+     become "Protein dessert"); in the AI screen they are the "what is it" chips;
+   - **nothing close:** a new product (from a scan: Open Food Facts' name without the brand).
+
+   A scanned barcode's hint is set to the product chosen.
+
 3. **Another product chosen for a scanned barcode** moves its hint, said with Undo.
 4. **An AI answer → a meal (Use):** dishes, items, title. Each product is mine (the model's
    library key, or a code match) or a **pending** new product from the model's name, values per
@@ -56,14 +69,22 @@ changes until it is. The reasoning and the rejected options are written up when 
 9. **Edits → facts:** the composer's changes since the last Use become facts in the AI context
    when [ai] is opened again; edits in the AI screen become facts at once.
 
-### Open in the data model
+### Settled in the review
 
-- **Quick buttons** point to `{ food, amount, unit }`: products only, or also a dish ("Sandwich",
-  the latest copied)?
-- **Deleting a product** a Barcode hints at: the hint is cleared, the barcode and its label kept
-  (assumed). Products used in meals can't be deleted, as now.
-- **`makes.unit`:** `g`, `ml` or a free name ("slices", "bowls"), `eaten` in the same unit.
-- **Dish names** aren't unique; "the latest of that name" ignores case and spacing.
+- **Quick buttons** stay as now: a product with its amount, or empty. A quick button for a dish
+  ("🥪", the latest Sandwich copied) can be added later as an optional field.
+- **Deleting a product** a Barcode hints at clears the hint; the barcode and its label stay (the
+  next scan matches from the stored label). Products used in meals can't be deleted, as now.
+- **Dish names** aren't unique; "the latest of that name" compares names exactly but for case
+  and spacing, as the strict product match does.
+- **A flavour or a brand is not a variant** when the values are within the strict tolerance
+  (three protein desserts of 86 kcal are one product); a kind is (water and tea, both 0 kcal),
+  and so is what changes the values (fat %, light).
+- **From one week of real data** (2026-11-20 to 26: 34 products, 59 meals, no recipes): half the
+  meals are one glass of water (the 💧 button), so a one-item meal stays as light as now; the
+  same items recur with other amounts (cheese 1 or 0.5, Frikadellen 5 or 8), the "latest dish,
+  tweaked" case; products have menu-size units (eggs M and L, cannoli мини and piece), so "my
+  unit" may be one of several.
 
 ## Agreed so far (to write up with reasons)
 
@@ -79,7 +100,7 @@ changes until it is. The reasoning and the rejected options are written up when 
     way to add by hand, offline too); opening it again lands in the context, with the composer's
     edits as facts; the model decides how to take the facts;
   - offline: photos and texts are kept, Update works when back online.
-- **Matching:** a wrong merge is worse than a duplicate; ask rather than pollute the library, but
+- **Matching:** the rule of the data model (2 above), the same in every flow. A wrong merge is worse than a duplicate; ask rather than pollute the library, but
   rarely, with very few clear options (a question and a proposal with Undo are the same thing).
   Daily and weekly averages must stay precise: errors of linked products are systematic and
   don't cancel out, so they must stay well under the noise (tens of kcal a day, never 200).
@@ -100,7 +121,6 @@ changes until it is. The reasoning and the rejected options are written up when 
 
 ## Next
 
-1. Review the data model above.
-2. The UI, in detail.
-3. Deferred: the tolerance's numbers; my recent dishes in the meal prompt (after product matching
+1. The UI, in detail.
+2. Deferred: the tolerance's numbers; my recent dishes in the meal prompt (after product matching
    works); minor UI (Use on an out-of-date answer, [ai] on the day screen, the expiry's details).
