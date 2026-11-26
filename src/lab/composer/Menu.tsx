@@ -2,13 +2,11 @@ import { useState } from 'preact/hooks';
 import { ConfirmButton } from '../../ui/ConfirmButton';
 import { GeminiKeys } from '../../ui/GeminiKeys';
 import { CloseIcon } from '../../ui/icons';
-import { SETTINGS } from '../meal/settings';
 
 /**
  * The lab's menu: the Gemini keys (the app's, the same section as its Settings: the lab asks
- * with Key); the composer's settings (the answer language), kept by the caller; how the model
- * is asked, as src/lab/meal/settings.ts says (the tool's too); the lab's data: its download
- * (the logs and the photos, lab.ts) and clearing it.
+ * with Key); the composer's settings (the answer language), kept by the caller; the lab's data:
+ * its download (the logs and the photos, lab.ts) and clearing it.
  */
 
 interface LabActions {
@@ -77,11 +75,6 @@ function Settings({
           }}
         />
       </div>
-      <p class="hint">
-        Answers in {language}; {SETTINGS.model}, thinking {SETTINGS.thinking}; Key, or Key 2 if Key
-        can’t answer within {SETTINGS.urgency.targetMs / 1000} s; given up after{' '}
-        {SETTINGS.urgency.limitMs / 1000} s (src/lab/meal/settings.ts)
-      </p>
     </section>
   );
 }
