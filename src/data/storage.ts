@@ -27,6 +27,22 @@ export function freshData(): AppData {
   };
 }
 
+/**
+ * The saved text as this window last read or wrote it: what its data is built on. Another
+ * window (the installed app and a browser tab, or an old tab kept alive) may save meanwhile;
+ * `savedByOtherWindow` tells, so that a save never erases what the other window saved.
+ * `undefined`: this window hasn't read or written yet.
+ */
+let lastSeen: string | null | undefined;
+
+/** Another window saved data that this one can't read (e.g. a newer version of the app). */
+export class OtherWindowDataError extends Error {
+  constructor(readonly problems: string[]) {
+    super('the app saved data in another window that this one can’t read; reload the app');
+    this.name = 'OtherWindowDataError';
+  }
+}
+
 export type LoadResult =
   | { ok: true; data: AppData }
   /** The saved data can't be used: `raw` is the saved text, unchanged. */
@@ -39,6 +55,7 @@ export type LoadResult =
  */
 export function loadSaved(storage: Storage = localStorage): LoadResult {
   const raw = storage.getItem(STORAGE_KEY);
+  lastSeen = raw;
   if (raw === null) {
     const data = freshData();
     saveData(data, storage);
@@ -58,12 +75,30 @@ export function peekSaved(storage: Storage = localStorage): AppData | null {
 
 /** Saves all data. Throws when the browser refuses (e.g. storage full); nothing is changed then. */
 export function saveData(data: AppData, storage: Storage = localStorage): void {
-  storage.setItem(STORAGE_KEY, documentJson(data));
+  const text = documentJson(data);
+  storage.setItem(STORAGE_KEY, text);
+  lastSeen = text;
 }
 
 /** Deletes the saved data (start fresh). */
 export function clearSaved(storage: Storage = localStorage): void {
   storage.removeItem(STORAGE_KEY);
+  lastSeen = null;
+}
+
+/**
+ * What another window saved since this one last read or wrote: the data, or null when the
+ * saved text is unchanged (or was deleted, which only starting fresh does: this window's data
+ * is then saved again on its next change). Throws `OtherWindowDataError` when the saved data
+ * fails its check, so that nothing is saved over data this window can't read.
+ */
+export function savedByOtherWindow(storage: Storage = localStorage): AppData | null {
+  const raw = storage.getItem(STORAGE_KEY);
+  if (raw === lastSeen || raw === null) return null;
+  const result = parseDocument(raw);
+  if (!result.ok) throw new OtherWindowDataError(result.problems);
+  lastSeen = raw;
+  return result.data;
 }
 
 /** Size of the saved data, in characters (what `localStorage` counts). */

@@ -521,6 +521,15 @@ has a single cause.
   for both.
 - **Every change is checked before it is saved**: the store runs the integrity check on the new
   data and saves it before showing it; an invalid change or a failed save changes nothing.
+- **More than one window.** The app may be open in two windows at once (the installed app and
+  a browser tab, or an old tab the browser keeps alive), each saving the whole document. So
+  storage remembers the saved text this window last read or wrote, and before every change
+  the store takes in what another window saved since (`savedByOtherWindow()`), then applies
+  the change on that: a change holds only its own records and tombstones, so applying it again
+  on the latest data merges, and a save never erases the other window's. A window also shows
+  the other's data when it saves (the `storage` event) and when it comes back to the front.
+  If the other window saved data this one can't read (a newer version of the app), nothing is
+  saved over it, and saving says to reload the app. Import still replaces everything.
 - **Versioning.** The document carries `"version": "kcal <semver>"`, which marks it as a kcal
   file and versions its schema (independent of app releases). While `0.x`, a minor bump may
   break (needs a migration) and a patch only adds optional fields. The app accepts the same

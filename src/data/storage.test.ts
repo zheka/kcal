@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { appData, egg } from '../core/testData';
+import { appData, egg, milk } from '../core/testData';
 import { documentJson } from './backup';
-import { clearSaved, loadSaved, peekSaved, saveData, savedSize, STORAGE_KEY } from './storage';
+import {
+  clearSaved,
+  loadSaved,
+  OtherWindowDataError,
+  peekSaved,
+  saveData,
+  savedByOtherWindow,
+  savedSize,
+  STORAGE_KEY,
+} from './storage';
 
 describe('storage', () => {
   beforeEach(() => localStorage.clear());
@@ -67,5 +76,26 @@ describe('storage', () => {
     saveData(appData());
     clearSaved();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('tells what another window saved since this one last read or wrote', () => {
+    loadSaved();
+    expect(savedByOtherWindow()).toBeNull();
+    saveData(appData({ products: [egg] }));
+    expect(savedByOtherWindow()).toBeNull();
+    // another window saves
+    const other = appData({ products: [egg, milk] });
+    localStorage.setItem(STORAGE_KEY, documentJson(other));
+    expect(savedByOtherWindow()).toEqual(other);
+    expect(savedByOtherWindow()).toBeNull(); // taken in
+  });
+
+  it('refuses another window’s data that this one can’t read, until reloaded', () => {
+    loadSaved();
+    const newer = JSON.stringify({ version: 'kcal 9.0.0', goals: [] });
+    localStorage.setItem(STORAGE_KEY, newer);
+    expect(() => savedByOtherWindow()).toThrow(OtherWindowDataError);
+    expect(() => savedByOtherWindow()).toThrow(/reload the app/);
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(newer);
   });
 });

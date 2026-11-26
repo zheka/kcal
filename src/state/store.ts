@@ -12,6 +12,10 @@ import { validateAppData } from '../core/validate';
  * derived from it. Every change goes through here (`apply`): the result is checked like an
  * import, put in canonical order and saved before it takes effect, so invalid data is never
  * stored or shown. The other methods are shorthands for common changes.
+ *
+ * The app may be open in more than one window, all saving the same document. `changes` returns
+ * what another window saved since this one last read or wrote (null: nothing); every change is
+ * applied on that latest data, so a save never erases another window's.
  */
 export interface Store {
   readonly data: ReadonlySignal<AppData>;
@@ -30,19 +34,34 @@ export interface Store {
   deleteMeal(id: string): void;
   /** New daily targets, saved now, effective from the start of today. */
   saveGoals(perDay: NutrientValues, now: Date): void;
-  /** Replaces all data (import). */
+  /** Replaces all data (import), over whatever another window saved. */
   replaceAll(data: AppData): void;
+  /**
+   * Takes in what another window saved, without saving anything. Throws what `changes`
+   * throws (e.g. when the other window's data can't be read).
+   */
+  refresh(): void;
 }
 
 export class InvalidChangeError extends Error {}
 
-export function createStore(initial: AppData, persist: (data: AppData) => void): Store {
+export function createStore(
+  initial: AppData,
+  persist: (data: AppData) => void,
+  changes: () => AppData | null = () => null,
+): Store {
   const data = signal(canonical(initial));
   // Separate computeds keep the same list when only meals or goals change, so the food
   // table is not rebuilt for them.
   const products = computed(() => data.value.products);
   const recipes = computed(() => data.value.recipes);
   const foods = computed(() => buildFoodTable(products.value, recipes.value));
+
+  /** Shows what another window saved; throws, changing nothing, if it can't be read. */
+  function refresh(): void {
+    const saved = changes();
+    if (saved !== null) data.value = canonical(saved);
+  }
 
   function commit(change: AppData): void {
     const problems = validateAppData(change);
@@ -53,6 +72,7 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
   }
 
   function apply(change: Change): void {
+    refresh(); // on the latest data: the change's records and tombstones go on top of it
     commit(applyChange(data.value, change));
   }
 
@@ -67,6 +87,7 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
       apply({ recipes: [recipe] });
     },
     deleteFood(id) {
+      refresh();
       // The friendly check; validation would refuse it too, in less friendly words.
       if (isUsed(usages(data.value, id))) throw new InvalidChangeError('the food is in use');
       apply({ products: [tombstone(id)], recipes: [tombstone(id)] });
@@ -78,6 +99,7 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
       apply({ meals: [tombstone(id)] });
     },
     saveGoals(perDay, now) {
+      refresh();
       const goals = data.value.goals;
       const added = saveGoals(goals, perDay, now).slice(goals.length);
       if (added.length > 0) apply({ goals: added });
@@ -85,5 +107,6 @@ export function createStore(initial: AppData, persist: (data: AppData) => void):
     replaceAll(next) {
       commit(next);
     },
+    refresh,
   };
 }

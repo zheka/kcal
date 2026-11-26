@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/pre
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appData, egg, ing, makes, meal, milk, oatFlakes, recipe, water } from '../core/testData';
 import type { AppData } from '../core/types';
-import { serializeBackup } from '../data/backup';
+import { documentJson, serializeBackup } from '../data/backup';
+import { loadSaved, saveData, savedByOtherWindow, STORAGE_KEY } from '../data/storage';
 import { createStore, type Store } from '../state/store';
 import { App } from './App';
 import { clearDrafts } from './drafts';
@@ -476,5 +477,40 @@ describe('library and closing screens', () => {
     expect(await screen.findByRole('heading', { name: 'New recipe' })).toBeTruthy();
     expect((nameField() as HTMLInputElement).value).toBe('Oats with skyr');
     expect(store.data.value.products).toEqual([oatFlakes]);
+  });
+});
+
+describe('the app open in another window too', () => {
+  /** The app on the data saved in localStorage, as main.tsx starts it. */
+  function startSaved(path: string) {
+    saveData(appData({ products: [egg] }));
+    const loaded = loadSaved();
+    if (!loaded.ok) throw new Error('not loaded');
+    store = createStore(loaded.data, saveData, savedByOtherWindow);
+    navigate(path);
+    render(<App store={store} />);
+  }
+  const saved = () => JSON.parse(localStorage.getItem(STORAGE_KEY)!) as AppData;
+  afterEach(() => localStorage.clear());
+
+  it('keeps what the other window saved when saving here', () => {
+    startSaved('/goals');
+    // behind this window's back, the other one adds milk
+    localStorage.setItem(STORAGE_KEY, documentJson(appData({ products: [egg, milk] })));
+    type(field('kcal'), '2000');
+    click('Save');
+    expect(saved().products.map((p) => p.name)).toEqual(['egg', 'milk']);
+    expect(saved().goals.map((g) => g.perDay?.kcal)).toEqual([2000]);
+    expect(store.data.value.products).toEqual([egg, milk]);
+  });
+
+  it('saves nothing over data it can’t read, and says to reload', () => {
+    startSaved('/goals');
+    const newer = JSON.stringify({ version: 'kcal 9.0.0', goals: [] });
+    localStorage.setItem(STORAGE_KEY, newer);
+    type(field('kcal'), '2000');
+    click('Save');
+    expect(screen.getByText(/^Could not save: .*can’t read; reload the app$/)).toBeTruthy();
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(newer);
   });
 });
