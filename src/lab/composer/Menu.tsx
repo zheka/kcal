@@ -61,13 +61,12 @@ function Settings({
   return (
     <section class="section">
       <h2 class="label">Settings</h2>
-      <label class="field">
-        <span class="label">Answer language</span>
+      <div class="field">
         <input
-          id="composer-language"
           class="input"
+          aria-label="Answer language"
           autoComplete="off"
-          placeholder="a code: ru, en, de…"
+          placeholder="Answer language: ru, en, de…"
           value={languageText}
           onInput={(e) => {
             const text = e.currentTarget.value;
@@ -77,11 +76,11 @@ function Settings({
             if (/^[a-z]{2,3}$/.test(code)) setLanguage(code);
           }}
         />
-      </label>
+      </div>
       <p class="hint">
-        {SETTINGS.model}, thinking {SETTINGS.thinking}; Key, or Key 2 if Key can’t answer within{' '}
-        {SETTINGS.urgency.targetMs / 1000} s; given up after {SETTINGS.urgency.limitMs / 1000} s
-        (src/lab/meal/settings.ts)
+        Answers in {language}; {SETTINGS.model}, thinking {SETTINGS.thinking}; Key, or Key 2 if Key
+        can’t answer within {SETTINGS.urgency.targetMs / 1000} s; given up after{' '}
+        {SETTINGS.urgency.limitMs / 1000} s (src/lab/meal/settings.ts)
       </p>
     </section>
   );

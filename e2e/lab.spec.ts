@@ -48,7 +48,7 @@ test('the lab clears its own data and the prototype’s, and leaves everything e
   // the app's key, set from the lab: the app's, so clearing the lab keeps it
   await page.getByRole('textbox', { name: 'Key', exact: true }).fill('secret-key');
   await page.getByRole('button', { name: 'Save key', exact: true }).click();
-  await expect(page.getByText('Saved on this device (…-key)')).toBeVisible();
+  await expect(page.getByText('Key saved on this device (…-key)')).toBeVisible();
 
   // a second tap confirms
   await page.getByRole('button', { name: 'Clear data' }).click();

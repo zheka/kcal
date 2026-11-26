@@ -13,8 +13,8 @@ export function GeminiKeys() {
   return (
     <section class="section">
       <h2 class="label">Gemini</h2>
-      <KeyField name="gemini" label="Key" placeholder="Cheap Gemini key" />
-      <KeyField name="gemini-2" label="Key 2" placeholder="Reliable Gemini key" />
+      <KeyField name="gemini" label="Key" placeholder="Key: cheap Gemini key" />
+      <KeyField name="gemini-2" label="Key 2" placeholder="Key 2: reliable Gemini key" />
     </section>
   );
 }
@@ -25,7 +25,6 @@ function KeyField(props: { name: KeyName; label: string; placeholder: string }) 
   const key = keys.value?.[name];
   const [text, setText] = useState('');
   const [error, setError] = useState('');
-  const id = `key-${name}`;
 
   async function keep(value: string) {
     setError('');
@@ -39,20 +38,14 @@ function KeyField(props: { name: KeyName; label: string; placeholder: string }) 
 
   if (key === undefined) return null;
   return (
+    // No label over the field: the section's heading is the only one; the placeholder and the
+    // saved line name the key.
     <div class="field">
-      {/* A label names the field; a saved key is plain text under its name. */}
-      {key ? (
-        <span class="label">{label}</span>
-      ) : (
-        <label class="label" for={id}>
-          {label}
-        </label>
-      )}
       {key ? (
         <div class="actions key-field">
           <span class="key-saved">
             {/* The key's end never splits across lines, beside the wider armed Forget. */}
-            Saved on this device <span class="nowrap">(…{key.slice(-4)})</span>
+            {label} saved on this device <span class="nowrap">(…{key.slice(-4)})</span>
           </span>
           <ConfirmButton
             label="Forget"
@@ -70,8 +63,8 @@ function KeyField(props: { name: KeyName; label: string; placeholder: string }) 
           }}
         >
           <input
-            id={id}
             class="input"
+            aria-label={label}
             type="password"
             autoComplete="off"
             placeholder={placeholder}

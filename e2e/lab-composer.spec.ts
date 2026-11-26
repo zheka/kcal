@@ -49,7 +49,7 @@ async function saveKey(page: Page) {
   await page.getByRole('button', { name: 'Menu' }).click();
   await page.getByRole('textbox', { name: 'Key', exact: true }).fill('test-key');
   await page.getByRole('button', { name: 'Save key', exact: true }).click();
-  await expect(page.getByText('Saved on this device (…-key)')).toBeVisible();
+  await expect(page.getByText('Key saved on this device (…-key)')).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 }
 
