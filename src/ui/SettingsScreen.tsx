@@ -33,6 +33,8 @@ type ImportState =
 /** Export and import, and what is saved: how much of what, its size, its format. */
 function Backup({ store }: { store: Store }) {
   const [importing, setImporting] = useState<ImportState>({ step: 'idle' });
+  /** Why the last export didn't happen. */
+  const [exportError, setExportError] = useState<string>();
   const data = store.data.value;
   const size = savedSize();
 
@@ -52,12 +54,20 @@ function Backup({ store }: { store: Store }) {
         <button
           type="button"
           class="button"
-          onClick={() =>
+          onClick={() => {
+            // What is saved now, with what another window saved since.
+            try {
+              store.refresh();
+            } catch (err) {
+              setExportError((err as Error).message);
+              return;
+            }
+            setExportError(undefined);
             downloadText(
               `kcal-backup-${localDate(new Date())}.json`,
-              serializeBackup(data, new Date()),
-            )
-          }
+              serializeBackup(store.data.peek(), new Date()),
+            );
+          }}
         >
           Export
         </button>
@@ -75,6 +85,7 @@ function Backup({ store }: { store: Store }) {
           />
         </label>
       </div>
+      {exportError && <p class="error">Could not export: {exportError}.</p>}
       {importing.step === 'refused' && (
         <div class="notice">
           <p>Import refused: {plural(importing.problems.length, 'problem')}</p>

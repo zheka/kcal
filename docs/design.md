@@ -529,7 +529,9 @@ has a single cause.
   on the latest data merges, and a save never erases the other window's. A window also shows
   the other's data when it saves (the `storage` event) and when it comes back to the front.
   If the other window saved data this one can't read (a newer version of the app), nothing is
-  saved over it, and saving says to reload the app. Import still replaces everything.
+  saved over it, and saving says to reload the app. Import replaces everything, but it too
+  first takes in what another window saved, so it never saves over data this window can't
+  read; export does the same, so the file is what is saved now.
 - **Versioning.** The document carries `"version": "kcal <semver>"`, which marks it as a kcal
   file and versions its schema (independent of app releases). While `0.x`, a minor bump may
   break (needs a migration) and a patch only adds optional fields. The app accepts the same

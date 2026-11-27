@@ -163,6 +163,8 @@ describe('store', () => {
       expect(() => store.deleteMeal('m:x')).toThrow('can’t read');
       expect(() => store.saveGoals({ kcal: 1 }, new Date())).toThrow('can’t read');
       expect(() => store.refresh()).toThrow('can’t read');
+      // not even an import saves over it
+      expect(() => store.replaceAll(appData({ products: [milk] }))).toThrow('can’t read');
       expect(persist).not.toHaveBeenCalled();
       expect(store.data.value.products).toEqual([egg]);
     });

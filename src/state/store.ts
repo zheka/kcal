@@ -34,7 +34,11 @@ export interface Store {
   deleteMeal(id: string): void;
   /** New daily targets, saved now, effective from the start of today. */
   saveGoals(perDay: NutrientValues, now: Date): void;
-  /** Replaces all data (import), over whatever another window saved. */
+  /**
+   * Replaces all data (import), over whatever another window saved. Throws what `refresh`
+   * throws, saving nothing: data another window saved that this one can't read (e.g. a newer
+   * version of the app) is never saved over, not even by an import.
+   */
   replaceAll(data: AppData): void;
   /**
    * Takes in what another window saved, without saving anything. Throws what `changes`
@@ -105,6 +109,7 @@ export function createStore(
       if (added.length > 0) apply({ goals: added });
     },
     replaceAll(next) {
+      refresh();
       commit(next);
     },
     refresh,
