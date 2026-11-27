@@ -374,12 +374,45 @@ describe('refused saves (storage full: another zheka.github.io project may have 
 describe('problem screen', () => {
   it('lists the problems and starts fresh only after a second tap', () => {
     const onStartFresh = vi.fn();
-    render(<ProblemScreen problems={['meals: missing']} raw="{}" onStartFresh={onStartFresh} />);
+    render(
+      <ProblemScreen
+        problems={['meals: missing']}
+        raw="{}"
+        newer={false}
+        onStartFresh={onStartFresh}
+      />,
+    );
     expect(screen.getByText('meals: missing')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Update app' })).toBeNull();
     click('Start fresh');
     expect(onStartFresh).not.toHaveBeenCalled();
     click('Tap again to delete saved data');
     expect(onStartFresh).toHaveBeenCalledOnce();
+  });
+
+  it('offers to update, never to start fresh, when a newer version saved the data', async () => {
+    let done = () => {};
+    const onUpdate = vi.fn(() => new Promise<void>((resolve) => (done = resolve)));
+    render(
+      <ProblemScreen
+        problems={['version "kcal 0.3.0" is newer than this app (kcal 0.2.0): update the app']}
+        raw="{}"
+        newer
+        onStartFresh={vi.fn()}
+        onUpdate={onUpdate}
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Saved by a newer version of the app' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start fresh' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download saved data' })).toBeTruthy();
+    click('Update app');
+    expect(onUpdate).toHaveBeenCalledOnce();
+    const busy = screen.getByRole<HTMLButtonElement>('button', { name: 'Updating…' });
+    expect(busy.disabled).toBe(true);
+    done();
+    expect(await screen.findByRole('button', { name: 'Update app' })).toBeTruthy();
   });
 });
 

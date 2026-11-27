@@ -25,23 +25,37 @@ const DOCUMENT_FIELDS = [
   'version',
 ];
 
+/** [major, minor, patch] of a kcal version, or null when it isn't one. */
+function parseVersion(version: unknown): [number, number, number] | null {
+  const match = typeof version === 'string' ? /^kcal (\d+)\.(\d+)\.(\d+)$/.exec(version) : null;
+  return match ? (match.slice(1).map(Number) as [number, number, number]) : null;
+}
+
+const OWN = parseVersion(VERSION_TAG)!;
+
+/** Whether a newer app wrote this version: the data is fine, and updating the app reads it. */
+export function isNewerVersion(version: unknown): boolean {
+  const parsed = parseVersion(version);
+  if (!parsed) return false;
+  const [major, minor, patch] = parsed;
+  const [ownMajor, ownMinor, ownPatch] = OWN;
+  return (
+    major > ownMajor ||
+    (major === ownMajor && minor > ownMinor) ||
+    (major === ownMajor && minor === ownMinor && patch > ownPatch)
+  );
+}
+
 /** A problem with the version, or null when this app can read it as it is. */
 export function versionProblem(version: unknown): string | null {
   if (version === undefined) return `no version: this is not a ${APP_NAME} file`;
-  const match = typeof version === 'string' ? /^kcal (\d+)\.(\d+)\.(\d+)$/.exec(version) : null;
-  if (!match) return `version ${JSON.stringify(version)}: this is not a ${APP_NAME} file`;
-  const [major, minor, patch] = match.slice(1).map(Number) as [number, number, number];
-  const [ownMajor, ownMinor, ownPatch] = SCHEMA_VERSION.split('.').map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  const newer =
-    major > ownMajor ||
-    (major === ownMajor && minor > ownMinor) ||
-    (major === ownMajor && minor === ownMinor && patch > ownPatch);
-  if (newer) return `version "${version}" is newer than this app (${VERSION_TAG}): update the app`;
-  if (major !== ownMajor || minor !== ownMinor) {
+  const parsed = parseVersion(version);
+  if (!parsed) return `version ${JSON.stringify(version)}: this is not a ${APP_NAME} file`;
+  if (isNewerVersion(version)) {
+    return `version "${version}" is newer than this app (${VERSION_TAG}): update the app`;
+  }
+  const [major, minor] = parsed;
+  if (major !== OWN[0] || minor !== OWN[1]) {
     return `version "${version}" is from an older ${APP_NAME} (this app reads ${VERSION_TAG}) and can no longer be read`;
   }
   return null;
@@ -72,7 +86,10 @@ export function validateDocument(doc: unknown): string[] {
   return [...problems, ...validateAppData(record)];
 }
 
-export type ParseResult = { ok: true; data: AppData } | { ok: false; problems: string[] };
+export type ParseResult =
+  | { ok: true; data: AppData }
+  /** `newer`: a newer version of the app wrote it (the data is fine; this app can't read it). */
+  | { ok: false; problems: string[]; newer: boolean };
 
 /**
  * Reads a backup file or the saved data. All-or-nothing: any problem refuses the whole file.
@@ -83,10 +100,13 @@ export function parseDocument(text: string): ParseResult {
   try {
     doc = JSON.parse(text);
   } catch (err) {
-    return { ok: false, problems: [`not valid JSON: ${(err as Error).message}`] };
+    return { ok: false, problems: [`not valid JSON: ${(err as Error).message}`], newer: false };
   }
   const problems = validateDocument(doc);
-  if (problems.length > 0) return { ok: false, problems };
+  if (problems.length > 0) {
+    const newer = isNewerVersion((doc as { version?: unknown } | null)?.version);
+    return { ok: false, problems, newer };
+  }
   return { ok: true, data: fromDocument(doc as Record<string, unknown>) };
 }
 

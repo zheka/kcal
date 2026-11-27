@@ -24,6 +24,7 @@ function start(): void {
       <ProblemScreen
         problems={loaded.problems}
         raw={loaded.raw}
+        newer={loaded.newer}
         onStartFresh={() => {
           clearSaved();
           start();

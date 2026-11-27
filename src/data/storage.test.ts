@@ -52,6 +52,15 @@ describe('storage', () => {
     const result = loadSaved();
     expect(!result.ok && result.raw).toBe(raw);
     expect(!result.ok && result.problems).toContain('goals: must be a list');
+    expect(!result.ok && result.newer).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(raw);
+  });
+
+  it('tells saved data a newer version of the app wrote', () => {
+    const raw = JSON.stringify({ version: 'kcal 0.3.0', dishes: [] });
+    localStorage.setItem(STORAGE_KEY, raw);
+    const result = loadSaved();
+    expect(!result.ok && result.newer).toBe(true);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(raw);
   });
 

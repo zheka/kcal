@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { appData, egg, ing, makes, meal, oatFlakes, recipe, water } from '../core/testData';
 import {
   documentJson,
+  isNewerVersion,
   parseDocument,
   serializeBackup,
   validateDocument,
@@ -32,6 +33,20 @@ describe('versions', () => {
     );
     expect(versionProblem(undefined)).toBe('no version: this is not a kcal file');
     expect(versionProblem('other 0.1.0')).toMatch(/not a kcal file/);
+  });
+
+  it('tells data a newer app wrote from data that is broken', () => {
+    for (const v of ['kcal 0.2.1', 'kcal 0.3.0', 'kcal 1.0.0'])
+      expect(isNewerVersion(v)).toBe(true);
+    for (const v of ['kcal 0.2.0', 'kcal 0.1.9', 'other 9.0.0', undefined, 3]) {
+      expect(isNewerVersion(v)).toBe(false);
+    }
+    const newer = parseDocument(JSON.stringify({ version: 'kcal 0.3.0', dishes: [] }));
+    expect(!newer.ok && newer.newer).toBe(true);
+    const broken = parseDocument(JSON.stringify({ version: 'kcal 0.2.0', goals: {} }));
+    expect(!broken.ok && broken.newer).toBe(false);
+    const notJson = parseDocument('{');
+    expect(!notJson.ok && notJson.newer).toBe(false);
   });
 });
 
@@ -110,6 +125,7 @@ describe('backup', () => {
         'unknown field "extra"',
         'product #1 "egg", perG: kcal must be a non-negative number',
       ],
+      newer: false,
     });
   });
 
@@ -128,6 +144,7 @@ describe('backup', () => {
     expect(parseDocument('[]')).toEqual({
       ok: false,
       problems: ['the file must contain a JSON object'],
+      newer: false,
     });
   });
 });

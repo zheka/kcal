@@ -217,3 +217,20 @@ test('the close button returns to the screen it was opened from', async ({ seede
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
 });
+
+test.describe('problem screen', () => {
+  test('data a newer version saved: Update app and Download, no Start fresh', async ({ page }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('kcal', JSON.stringify({ version: 'kcal 9.0.0', dishes: [] })),
+    );
+    await page.goto('#/');
+    await expect(
+      page.getByRole('heading', { name: 'Saved by a newer version of the app' }),
+    ).toBeVisible();
+    await expectNoHorizontalScroll(page);
+    for (const name of ['Update app', 'Download saved data']) {
+      await expectOnScreen(page.getByRole('button', { name }));
+    }
+    await expect(page.getByRole('button', { name: 'Start fresh' })).toHaveCount(0);
+  });
+});

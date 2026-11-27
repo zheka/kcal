@@ -45,8 +45,11 @@ export class OtherWindowDataError extends Error {
 
 export type LoadResult =
   | { ok: true; data: AppData }
-  /** The saved data can't be used: `raw` is the saved text, unchanged. */
-  | { ok: false; problems: string[]; raw: string };
+  /**
+   * The saved data can't be used: `raw` is the saved text, unchanged. `newer`: a newer version
+   * of the app saved it (the data is fine; updating the app is the fix).
+   */
+  | { ok: false; problems: string[]; raw: string; newer: boolean };
 
 /**
  * Reads the saved data, checked exactly like an import. When there is none, starts fresh and
@@ -62,7 +65,7 @@ export function loadSaved(storage: Storage = localStorage): LoadResult {
     return { ok: true, data };
   }
   const result = parseDocument(raw);
-  return result.ok ? result : { ok: false, problems: result.problems, raw };
+  return result.ok ? result : { ...result, raw };
 }
 
 /** Reads the saved data without ever writing: null when there is none or it fails its check. */

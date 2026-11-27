@@ -65,6 +65,20 @@ export async function installUpdate(): Promise<void> {
   await activateUpdate(true);
 }
 
+/**
+ * Gets the newest version now, for when this window's version can't read the saved data: switches
+ * to a waiting one; otherwise checks, and reloads, which loads the newest version the browser has:
+ * another window may have installed it already, so nothing waits here, and then a reload works
+ * offline too. Without a service worker, just reloads.
+ */
+export async function updateApp(reload = () => location.reload()): Promise<void> {
+  if (updateState.value !== 'available' && updateState.value !== 'unavailable') {
+    await checkForUpdate();
+  }
+  if (updateState.value === 'available') await installUpdate();
+  else reload();
+}
+
 /** Resolves once a new service worker has finished installing (or failed). */
 function installed(worker: ServiceWorker): Promise<void> {
   return new Promise((resolve) => {

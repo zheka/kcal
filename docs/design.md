@@ -542,6 +542,12 @@ has a single cause.
 - **Check on load.** Saved data is checked like an import on every start. If it fails, the
   app shows a **problem screen** with the problems and two actions: download the saved data
   unchanged (to fix it at the desk), or start fresh (two-tap confirmation).
+- **Newer saved data is not broken.** Data saved by a newer version of the app (a browser tab
+  already on a new version while the installed app, which switches only on its next launch,
+  still runs the old one) is fine: the problem screen says so and offers **Update app** and
+  download, never Start fresh, which would delete valid data. Update app switches to a waiting
+  new version; otherwise it checks, then reloads, which also loads a version another window
+  already installed (nothing waits in this window then), offline too.
 - Persistent storage is requested, so the browser does not evict the data.
 - Later sync fits this model: records with ids, plus `updatedAt` and tombstones (see Changes).
 
