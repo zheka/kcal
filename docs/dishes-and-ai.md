@@ -8,6 +8,11 @@ Status (2026-11-26): **under discussion, nothing built. The data model is review
 next.** Nothing in [design.md](design.md), [barcodes.md](barcodes.md) or [lab.md](lab.md) changes
 until the whole is agreed. The reasoning and the rejected options are written up when it is final.
 
+2026-11-27: the AI is to leave the app: recognition moves to the Gemini app, which reads a Drive
+folder kcal keeps and shares JSON back ([gemini-and-drive.md](gemini-and-drive.md)). The data
+model below still holds; its parts about a model called from kcal (keys, AI context, logs, the
+[ai] tap) are to be rewritten around the exchange format.
+
 **The principle over all of it:** everything works offline, with no model; the model only takes
 the hassle when it is there, and never holds up a quick action (no waiting for it after a scan).
 It runs behind an explicit [ai] tap, where waiting is chosen, or in the background.

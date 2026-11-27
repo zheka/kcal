@@ -9,7 +9,8 @@ Live: https://zheka.github.io/kcal/
 See [docs/design.md](docs/design.md) for the design and decisions, and
 [docs/barcodes.md](docs/barcodes.md) for the open discussion of barcodes and packs,
 [docs/ai.md](docs/ai.md) for how a model is asked (tasks, providers, keys, retries), and
-[docs/lab.md](docs/lab.md) for the AI experiment in the lab.
+[docs/lab.md](docs/lab.md) for the AI experiment in the lab;
+[docs/gemini-and-drive.md](docs/gemini-and-drive.md) has the plan to move the AI out of the app.
 
 ## Development
 
