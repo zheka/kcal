@@ -76,7 +76,8 @@ The frame is development-only (`src/dev/phoneFrame.ts`) and not part of the prod
   maskable 512 px, Apple touch 180 px) are generated from `public/icon.svg` at build time.
   The icon itself, a hedgehog hugged by a croissant, is drawn by `scripts/make-icon.py`
   (`python3 scripts/make-icon.py public/icon.svg`); its content stays inside the maskable safe
-  zone.
+  zone. The PNG names end in a hash of `icon.svg`: Android rebuilds an installed app's icon
+  only when the manifest changes, so a redrawn icon must change the file names.
 - **Vitest** with jsdom and Testing Library for unit and UI tests.
 - **Playwright** (Chromium) for end-to-end tests of the built app at Pixel 8a size, in the
   dark theme, one test at a time: layout checks jsdom can't do (nothing wider than the screen, headers, buttons and
